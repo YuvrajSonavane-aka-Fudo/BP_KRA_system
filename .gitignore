@@ -1,1 +1,4 @@
 documents
+.env
+venv
+db.sqlite3
