@@ -12,9 +12,7 @@ from .models import (
     KRACategory, Stage, Level, Rating
 )
 
-# ---------------------------------------------------------------------------
 # Remove ALL JWT imports — we are using session auth now
-# ---------------------------------------------------------------------------
 
 HR_ROLES      = {'Admin'}
 LEAD_ROLES    = {'Manager'}
@@ -37,9 +35,7 @@ def _caller_can_act_on(caller, target_employee_id):
     ).exists()
 
 
-# ============================================================================
 # 1. Authentication
-# ============================================================================
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -99,9 +95,8 @@ class LogoutView(APIView):
         return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
 
 
-# ============================================================================
 # 2 & 3. KRA Cycle — List & Create
-# ============================================================================
+
 
 class KRACycleListCreateView(APIView):
     """
@@ -150,38 +145,68 @@ class KRACycleListCreateView(APIView):
         for field in ('name', 'start_date', 'end_date', 'stages'):
             if field not in data:
                 return Response(
-                    f'Missing required field: {field}',
+                    {'error': f'Missing required field: {field}'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
         stages_data = data['stages']
-        stage_ids   = [s['stage_id'] for s in stages_data]
 
-        if Stage.objects.filter(id__in=stage_ids).count() != len(stage_ids):
+        if not stages_data:
             return Response(
-                'One or more stage_id values are invalid',
+                {'error': 'stages cannot be empty'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            cycle = KRACycle.objects.create(
-                name=data['name'],
-                description=data.get('description', ''),
-                start_date=data['start_date'],
-                end_date=data['end_date'],
-                status='DRAFT',
-                is_deleted=False,
+        # Validate all stage_ids exist
+        stage_ids = [s['stage_id'] for s in stages_data]
+        existing_stages = Stage.objects.filter(id__in=stage_ids)
+
+        if existing_stages.count() != len(stage_ids):
+            found_ids    = set(existing_stages.values_list('id', flat=True))
+            missing_ids  = set(stage_ids) - found_ids
+            return Response(
+                {'error': f'Invalid stage_id(s): {list(missing_ids)}'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Build a lookup so we can set stage FK by id
+        stage_map = {s.id: s for s in existing_stages}
+
+        with transaction.atomic():
+            # Set the cycle's current stage to the first stage in the list
+            first_stage = stage_map[stages_data[0]['stage_id']]
+
+            cycle = KRACycle.objects.create(
+                name        = data['name'],
+                description = data.get('description', ''),
+                start_date  = data['start_date'],
+                end_date    = data['end_date'],
+                status      = 'DRAFT',
+                stage       = first_stage,   # ← FK set correctly
+                is_deleted  = False,
+            )
+
             for s in stages_data:
+                # Validate each stage entry has required fields
+                for field in ('stage_id', 'start_date', 'end_date'):
+                    if field not in s:
+                        raise ValueError(f'Missing {field} in stages entry')
+
                 KRACycleStage.objects.create(
-                    kra_cycle=cycle,
-                    stage_id=s['stage_id'],
-                    start_date=s['start_date'],
-                    end_date=s['end_date'],
-                    is_deleted=False,
+                    kra_cycle  = cycle,
+                    stage      = stage_map[s['stage_id']],  # ← FK, not stage_id=
+                    start_date = s['start_date'],
+                    end_date   = s['end_date'],
+                    is_deleted = False,
                 )
 
         return Response(
-            {'id': cycle.id, 'name': cycle.name, 'status': cycle.status},
+            {
+                'id':          cycle.id,
+                'name':        cycle.name,
+                'status':      cycle.status,
+                'stage':       {'id': first_stage.id, 'name': first_stage.name},
+                'stages_count': len(stages_data),
+            },
             status=status.HTTP_201_CREATED,
         )
