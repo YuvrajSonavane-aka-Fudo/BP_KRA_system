@@ -1,4 +1,3 @@
-from django.contrib.auth import authenticate
 from django.db import transaction
 from django.http import HttpResponse
 
@@ -6,7 +5,6 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import (
     Employee, KRACycle, KRACycleStage, EmployeeKRACycle,
@@ -14,41 +12,176 @@ from .models import (
     KRACategory, Stage, Level, Rating
 )
 
-# 1 . Authentication API
+# ---------------------------------------------------------------------------
+# Remove ALL JWT imports — we are using session auth now
+# ---------------------------------------------------------------------------
+
+HR_ROLES      = {'Admin'}
+LEAD_ROLES    = {'Manager'}
+EMPLOYEE_ROLE = 'Employee'
+
+
+def _get_caller(request):
+    return request.user  # Employee instance set by SessionEmployeeAuthentication
+
+
+def _is_hr(employee):
+    return employee.employee_roles.filter(name__in=HR_ROLES).exists()
+
+
+def _caller_can_act_on(caller, target_employee_id):
+    if _is_hr(caller):
+        return True
+    return Employee.objects.filter(
+        id=target_employee_id, manager_id=caller.id
+    ).exists()
+
+
+# ============================================================================
+# 1. Authentication
+# ============================================================================
 
 class LoginView(APIView):
-    '''
-        POST /api/v1/auth/login
-        Accepts email + password , returns JWT access / refresh tokens.
-    '''
-    
     permission_classes = [AllowAny]
-    
-    def post(self , request):
-        email = request.data.get('email')
-        password = request.data.get('password')
-        
+    authentication_classes = []  # ← no auth needed for login
+
+    def post(self, request):
+        email    = request.data.get('email', '').strip()
+        password = request.data.get('password', '')
+
         if not email or not password:
             return Response(
-                {'error' : 'Please provide both email and password'}, status = status.HTTP_400_BAD_REQUEST
+                {'error': 'Please provide both email and password'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
         try:
-            employee = Employee.objects.get(email = email)
-            if employee.password != password:
-                return Response({'error': 'Account is inactive'},status = status.HTTP_403_FORBIDDEN)
-            
-            refresh = RefreshToken.for_user(employee)
-            
-            user_roles = [employee.role.name]
-            
-            return Response({
-                'access_token' : str(refresh.access_token),
-                'refresh' : str(refresh),
-                'employee_id' : employee.id,
-                'roles':user_roles,
-                'full_name': f'{employee.first_name} {employee.last_name}',
-                'department': employee.department.department_name if employee.department else None
-            }, status = status.HTTP_200_OK)
-            
+            employee = Employee.objects.select_related(
+                'department', 'role'
+            ).get(email=email)
         except Employee.DoesNotExist:
-            return Response({'error': 'Invalid credentials'},status = status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {'error': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if employee.password != password:
+            return Response(
+                {'error': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not employee.active:
+            return Response(
+                {'error': 'Account is inactive'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Save employee into session
+        request.session['employee_id'] = employee.id
+        request.session.save()
+
+        return Response({
+            'session_id':  request.session.session_key,
+            'employee_id': employee.id,
+            'roles':       [employee.role.name] if employee.role else [],
+            'full_name':   f'{employee.first_name} {employee.last_name}',
+            'department':  employee.department.department_name if employee.department else None,
+        }, status=status.HTTP_200_OK)
+
+
+class LogoutView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        request.session.flush()
+        return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# 2 & 3. KRA Cycle — List & Create
+# ============================================================================
+
+class KRACycleListCreateView(APIView):
+    """
+    GET  /api/v1/kra/cycles  – list cycles (role-filtered)
+    POST /api/v1/kra/cycles  – create a new cycle with stage windows
+    """
+    permission_classes = [IsAuthenticated]
+    # ← NO authentication_classes here — inherits global SessionEmployeeAuthentication
+
+    def get(self, request):
+        caller        = _get_caller(request)
+        status_filter = request.query_params.get('status')
+
+        if _is_hr(caller):
+            qs = KRACycle.objects.filter(is_deleted=False).select_related('stage')
+        else:
+            qs = KRACycle.objects.filter(
+                is_deleted=False,
+                status='ACTIVE',
+                employee_cycles__employee=caller,
+            ).select_related('stage').distinct()
+
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        cycles = [
+            {
+                'id':          c.id,
+                'name':        c.name,
+                'description': c.description,
+                'start_date':  c.start_date,
+                'end_date':    c.end_date,
+                'status':      c.status,
+                'current_stage': (
+                    {'id': c.stage.id, 'name': c.stage.name}
+                    if c.stage else None
+                ),
+            }
+            for c in qs
+        ]
+        return Response({'cycles': cycles}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        data = request.data
+
+        for field in ('name', 'start_date', 'end_date', 'stages'):
+            if field not in data:
+                return Response(
+                    f'Missing required field: {field}',
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        stages_data = data['stages']
+        stage_ids   = [s['stage_id'] for s in stages_data]
+
+        if Stage.objects.filter(id__in=stage_ids).count() != len(stage_ids):
+            return Response(
+                'One or more stage_id values are invalid',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            cycle = KRACycle.objects.create(
+                name=data['name'],
+                description=data.get('description', ''),
+                start_date=data['start_date'],
+                end_date=data['end_date'],
+                status='DRAFT',
+                is_deleted=False,
+            )
+            for s in stages_data:
+                KRACycleStage.objects.create(
+                    kra_cycle=cycle,
+                    stage_id=s['stage_id'],
+                    start_date=s['start_date'],
+                    end_date=s['end_date'],
+                    is_deleted=False,
+                )
+
+        return Response(
+            {'id': cycle.id, 'name': cycle.name, 'status': cycle.status},
+            status=status.HTTP_201_CREATED,
+        )

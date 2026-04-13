@@ -166,6 +166,14 @@ class Employee(models.Model):
     def __str__(self):
         return f'{self.first_name} {self.last_name} ({self.email})'
     
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+    
 class EmployeeRole(models.Model):
     '''
         employee_role
@@ -236,6 +244,13 @@ class KRALevel(models.Model):
         db_column = 'level_id',
         related_name = 'kra_levels',
     )
+    name     = models.TextField(null=True, blank=True)
+    category = models.ForeignKey(
+        KRACategory, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        db_column='category_id',
+        related_name='kra_levels'
+        )
     
     class Meta:
         db_table = 'kra_level'
@@ -417,7 +432,7 @@ class EmployeeKRALevel(models.Model):
         Rating ,
         null = True , blank = True,
         on_delete = models.SET_NULL,
-        db_column = ' lead_rating_id',
+        db_column = 'lead_rating_id',
         related_name = 'lead_assessments',
     )
     
