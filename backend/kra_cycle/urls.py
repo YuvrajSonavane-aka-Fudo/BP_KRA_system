@@ -1,6 +1,8 @@
 from django.urls import path
-from .views import LoginView
+from .views import LoginView, LogoutView, KRACycleListCreateView
 
 urlpatterns = [
-    path('/login/', LoginView.as_view() , name ='login' ),
+    path('auth/login',  LoginView.as_view()),
+    path('auth/logout', LogoutView.as_view()),
+    path('kra/cycles',  KRACycleListCreateView.as_view()),
 ]

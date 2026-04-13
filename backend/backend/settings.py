@@ -58,6 +58,17 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'backend.urls'
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'kra_cycle.authentication.CsrfExemptSessionAuthentication',  # ← CSRF skip
+        'kra_cycle.authentication.SessionEmployeeAuthentication',     # ← employee lookup
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+
 
 TEMPLATES = [
     {
