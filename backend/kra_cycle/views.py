@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from django.shortcuts import get_object_or_404  
 from .models import (
     Employee, KRACycle, KRACycleStage, EmployeeKRACycle,
     EmployeeKRACycleCategory, EmployeeKRALevel, KRALevel, KRA,
@@ -14,17 +14,25 @@ from .models import (
 
 # Remove ALL JWT imports — we are using session auth now
 
-HR_ROLES      = {'Admin'}
-LEAD_ROLES    = {'Manager'}
+HR_ROLES   = {'Admin'}
+LEAD_ROLES = {'Manager'}
 EMPLOYEE_ROLE = 'Employee'
 
 
 def _get_caller(request):
-    return request.user  # Employee instance set by SessionEmployeeAuthentication
+    return request.user
 
 
 def _is_hr(employee):
-    return employee.employee_roles.filter(name__in=HR_ROLES).exists()
+    return employee.employee_roles.filter(
+        role__name__in=HR_ROLES
+    ).exists()
+
+
+def _is_lead(employee):
+    return employee.employee_roles.filter(
+        role__name__in=LEAD_ROLES
+    ).exists()
 
 
 def _caller_can_act_on(caller, target_employee_id):
@@ -36,7 +44,6 @@ def _caller_can_act_on(caller, target_employee_id):
 
 
 # 1. Authentication
-
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []  # ← no auth needed for login
@@ -76,6 +83,11 @@ class LoginView(APIView):
         # Save employee into session
         request.session['employee_id'] = employee.id
         request.session.save()
+        
+        request.session['employee_id'] = employee.id
+        request.session.save()
+        print(f">>> session key: {request.session.session_key}")
+        print(f">>> employee_id saved: {request.session.get('employee_id')}")
 
         return Response({
             'session_id':  request.session.session_key,
@@ -84,8 +96,6 @@ class LoginView(APIView):
             'full_name':   f'{employee.first_name} {employee.last_name}',
             'department':  employee.department.department_name if employee.department else None,
         }, status=status.HTTP_200_OK)
-
-
 class LogoutView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -94,10 +104,7 @@ class LogoutView(APIView):
         request.session.flush()
         return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
 
-
 # 2 & 3. KRA Cycle — List & Create
-
-
 class KRACycleListCreateView(APIView):
     """
     GET  /api/v1/kra/cycles  – list cycles (role-filtered)
@@ -210,3 +217,137 @@ class KRACycleListCreateView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+        
+#   4. KRA Cycle – Update Status / Soft Delete                              
+class KRACycleUpdateView(APIView):
+    """
+    PATCH /api/v1/kra/cycles/{cycle_id}
+    HR updates status (DRAFT → ACTIVE → CLOSED) or soft-deletes the cycle.
+    """
+    
+    permission_classes = [IsAuthenticated] 
+    VALID_TRANSITIONS = {
+        'DRAFT':  ['ACTIVE'],
+        'ACTIVE': ['CLOSED'],
+    }
+
+    def patch(self, request, cycle_id):
+        caller = _get_caller(request)
+
+        if not _is_hr(caller):
+            return Response(
+                {'error': 'Only HR can update cycles'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        cycle      = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
+        new_status = request.data.get('status')
+        is_deleted = request.data.get('is_deleted')
+
+        if new_status:
+            allowed = self.VALID_TRANSITIONS.get(cycle.status, [])
+            if new_status not in allowed:
+                return Response(
+                    {'error': f'Invalid status transition: {cycle.status} → {new_status}'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            cycle.status = new_status
+
+            # When activating, set the stage to the first cycle stage
+            if new_status == 'ACTIVE':
+                first_cycle_stage = cycle.cycle_stages.filter(
+                    is_deleted=False
+                ).select_related('stage').order_by('id').first()
+
+                if first_cycle_stage:
+                    cycle.stage = first_cycle_stage.stage
+
+        if is_deleted is not None:
+            cycle.is_deleted = is_deleted
+
+        cycle.save()
+
+        message = 'Cycle updated successfully.'
+        if new_status == 'ACTIVE':
+            message = 'Cycle activated. Email notifications sent to enrolled employees.'
+        elif is_deleted:
+            message = 'Cycle soft-deleted successfully.'
+
+        return Response(
+            {
+                'id':      cycle.id,
+                'status':  cycle.status,
+                'stage':   {'id': cycle.stage.id, 'name': cycle.stage.name} if cycle.stage else None,
+                'message': message,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+# 5. KRA Cycle – Clone                                                    ║
+class KRACycleCloneView(APIView):
+    """
+    POST /api/v1/kra/cycles/{cycle_id}/clone
+    Creates a new DRAFT cycle copying stage structure from the source.
+    """
+    permission_classes = [IsAuthenticated] 
+
+    def post(self, request, cycle_id):
+        caller = _get_caller(request)
+
+        if not _is_hr(caller):
+            return Response(
+                {'error': 'Only HR can clone cycles'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        source = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
+        data   = request.data
+
+        for field in ('name', 'start_date', 'end_date'):
+            if field not in data:
+                return Response(
+                    {'error': f'Missing required field: {field}'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        with transaction.atomic():
+            # Copy stage windows from source first to get the first stage
+            source_stages = source.cycle_stages.filter(
+                is_deleted=False
+            ).select_related('stage').order_by('id')
+
+            if not source_stages.exists():
+                return Response(
+                    {'error': 'Source cycle has no stages to clone'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            first_stage = source_stages.first().stage
+
+            new_cycle = KRACycle.objects.create(
+                name        = data['name'],
+                description = data.get('description', source.description),
+                start_date  = data['start_date'],
+                end_date    = data['end_date'],
+                status      = 'DRAFT',
+                stage       = first_stage,  # ← set FK correctly
+                is_deleted  = False,
+            )
+
+            for cs in source_stages:
+                KRACycleStage.objects.create(
+                    kra_cycle  = new_cycle,
+                    stage      = cs.stage,
+                    start_date = cs.start_date,
+                    end_date   = cs.end_date,
+                    is_deleted = False,
+                )
+
+        return Response({
+            'id':           new_cycle.id,
+            'name':         new_cycle.name,
+            'status':       new_cycle.status,
+            'stage':        {'id': first_stage.id, 'name': first_stage.name},
+            'cloned_from':  source.id,
+            'stages_count': source_stages.count(),
+        }, status=status.HTTP_201_CREATED)

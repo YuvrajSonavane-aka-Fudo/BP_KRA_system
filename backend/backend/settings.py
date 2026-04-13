@@ -51,7 +51,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    #'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -60,7 +60,6 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'backend.urls'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'kra_cycle.authentication.CsrfExemptSessionAuthentication',  # ← CSRF skip
         'kra_cycle.authentication.SessionEmployeeAuthentication',     # ← employee lookup
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -85,6 +84,7 @@ TEMPLATES = [
     },
 ]
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 
 WSGI_APPLICATION = 'backend.wsgi.application'
@@ -140,3 +140,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Session settings
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # store sessions in DB
+SESSION_COOKIE_NAME = 'sessionid'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = False   # False for HTTP (local dev), True for HTTPS (prod)
+SESSION_SAVE_EVERY_REQUEST = True  # refresh session on every request
