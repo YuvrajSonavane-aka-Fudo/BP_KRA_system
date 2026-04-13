@@ -133,6 +133,7 @@ class Employee(models.Model):
         related_name = 'direct_reports',
     )
     previous_manager = models.ForeignKey(
+        'self',
         null = True , blank = True,
         on_delete = models.SET_NULL ,
         db_column = 'previous_manager_id',
@@ -303,7 +304,7 @@ class EmployeeKRACycle(models.Model):
     employee_kra_cycle
     Central pivot : links an emploee to a kra cycle
     """
-    employee - models.ForeignKey(
+    employee = models.ForeignKey(
         Employee,
         null = True , blank = True,
         on_delete = models.CASCADE,
