@@ -22,8 +22,8 @@ from .models import (
     AuditLog,
 )
 
-HR_ROLES      = {"Admin"}
-LEAD_ROLES    = {"Manager"}
+HR_ROLES      = {"Admin" , "HR" , "Vertical Lead"}
+LEAD_ROLES    = {"Manager" , "Team Lead"}
 EMPLOYEE_ROLE = "Employee"
 
 
@@ -440,3 +440,161 @@ class KRACycleCloneView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+        
+# 6. KRA Cycle - Stage advancement
+
+class KRACycleAdvanceStageView(APIView):
+    """
+    POST /api/v1/kra/cycles/{cycle_id}/advance-stage
+
+    Two modes:
+
+    1. CYCLE-LEVEL advance (no body or empty body)
+       - Moves the cycle forward by 1 stage
+       - Syncs ALL enrolled employees to the new stage
+       - HR only
+
+    2. EMPLOYEE-LEVEL override (provide target_stage_id + optional employee_ids)
+       - HR can set ANY stage (forward or backward) for:
+           a) ALL employees in the cycle  →  omit employee_ids or pass []
+           b) Specific employees only     →  pass employee_ids: [1001, 1002]
+       - Does NOT change the cycle's own stage_id
+
+    Request body examples:
+
+        {}                                          # advance cycle by 1, sync all employees
+
+        { "target_stage_id": 3 }                   # set ALL employees back to stage 3
+
+        { "target_stage_id": 3,
+          "employee_ids": [1001, 1002] }            # set only those two employees to stage 3
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, cycle_id):
+        caller = _get_caller(request)
+
+        if not _is_hr(caller):
+            return Response(
+                'Only HR can advance or override cycle stages',
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        cycle = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
+
+        target_stage_id = request.data.get('target_stage_id')   # optional
+        employee_ids    = request.data.get('employee_ids', [])   # optional list
+
+        #  Mode 2: explicit stage override for employees 
+        if target_stage_id is not None:
+            return self._override_employee_stages(
+                cycle, target_stage_id, employee_ids
+            )
+
+        #  Mode 1: advance the cycle by one stage 
+        return self._advance_cycle(cycle)
+
+    #  Mode 1 helper 
+    def _advance_cycle(self, cycle):
+        if not cycle.stage_id:
+            return Response(
+                'Cycle has no current stage assigned',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if cycle.stage_id >= 5:
+            return Response(
+                'Cycle is already at the final stage',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        previous_stage = cycle.stage
+        new_stage_id   = cycle.stage_id + 1
+
+        try:
+            new_stage = Stage.objects.get(id=new_stage_id)
+        except Stage.DoesNotExist:
+            return Response('Next stage does not exist', status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            cycle.stage = new_stage
+            cycle.save()
+            affected = EmployeeKRACycle.objects.filter(
+                kra_cycle_id=cycle.id
+            ).update(stage_id=new_stage_id)
+
+        # AUDIT LOG
+        _audit(self.request, "CYCLE_STAGE_ADVANCED", "KRACycle", cycle.id,
+            old_data={
+                "previous_stage_id": previous_stage.id,
+                "previous_stage_name": previous_stage.name,
+            },
+            new_data={
+                "new_stage_id": new_stage.id,
+                "new_stage_name": new_stage.name,
+                "employees_synced": affected,
+            }
+        )
+
+        return Response({
+            'mode':           'cycle_advance',
+            'cycle_id':       cycle.id,
+            'previous_stage': {'id': previous_stage.id, 'name': previous_stage.name},
+            'current_stage':  {'id': new_stage.id,      'name': new_stage.name},
+            'employees_synced': affected,
+            'message':        f'Cycle advanced to {new_stage.name}',
+        }, status=status.HTTP_200_OK)
+
+    # Mode 2 helper 
+    def _override_employee_stages(self, cycle, target_stage_id, employee_ids):
+        try:
+            target_stage = Stage.objects.get(id=target_stage_id)
+        except Stage.DoesNotExist:
+            return Response(
+                f'Stage {target_stage_id} does not exist',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ekc_qs = EmployeeKRACycle.objects.filter(kra_cycle_id=cycle.id)
+
+        if employee_ids:
+            enrolled_ids = set(
+                ekc_qs.values_list('employee_id', flat=True)
+            )
+            invalid = set(employee_ids) - enrolled_ids
+            if invalid:
+                return Response(
+                    f'These employee IDs are not enrolled in this cycle: {sorted(invalid)}',
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            ekc_qs = ekc_qs.filter(employee_id__in=employee_ids)
+
+        with transaction.atomic():
+            affected = ekc_qs.update(stage_id=target_stage_id)
+
+        scope = f'employees {employee_ids}' if employee_ids else 'all employees'
+
+        # ✅ AUDIT LOG
+        _audit(self.request, "EMPLOYEE_STAGE_OVERRIDE", "KRACycle", cycle.id,
+            old_data={
+                "cycle_stage_id": cycle.stage_id,
+                "cycle_stage_name": cycle.stage.name if cycle.stage else None,
+            },
+            new_data={
+                "target_stage_id": target_stage.id,
+                "target_stage_name": target_stage.name,
+                "scope": scope,
+                "employees_updated": affected,
+            }
+        )
+
+        return Response({
+            'mode':            'employee_override',
+            'cycle_id':        cycle.id,
+            'target_stage':    {'id': target_stage.id, 'name': target_stage.name},
+            'cycle_stage':     {'id': cycle.stage_id,  'name': cycle.stage.name if cycle.stage else None},
+            'scope':           scope,
+            'employees_updated': affected,
+            'message': (
+                f'{affected} employee(s) moved to {target_stage.name}'
+            ),
+        }, status=status.HTTP_200_OK)
