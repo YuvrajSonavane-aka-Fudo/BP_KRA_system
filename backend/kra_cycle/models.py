@@ -452,3 +452,29 @@ class EmployeeKRALevel(models.Model):
         
     def __str__(self):
         return f'EKL {self.id} - Employee {self.employee_id} / KRALevel {self.kra_level_id}'
+    
+class AuditLog(models.Model):
+    """
+    audit_log
+    Tracks every significant action made by any employee.
+    """
+    employee = models.ForeignKey(
+        Employee,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        db_column='employee_id',
+        related_name='audit_logs',
+    )
+    action     = models.CharField(max_length=100)           # e.g. 'CYCLE_CREATED'
+    entity     = models.CharField(max_length=100)           # e.g. 'KRACycle'
+    entity_id  = models.IntegerField(null=True, blank=True) # e.g. cycle.id
+    old_data   = models.JSONField(null=True, blank=True)    # state BEFORE the change
+    new_data   = models.JSONField(null=True, blank=True)    # state AFTER the change
+    timestamp  = models.DateTimeField(auto_now_add=True)
+    ip_address = models.CharField(max_length=50, null=True, blank=True)
+
+    class Meta:
+        db_table = 'audit_log'
+
+    def __str__(self):
+        return f'{self.employee_id} → {self.action} on {self.entity}:{self.entity_id} at {self.timestamp}'
