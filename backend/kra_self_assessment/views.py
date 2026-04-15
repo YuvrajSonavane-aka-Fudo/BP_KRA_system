@@ -47,12 +47,12 @@ def _caller_can_act_on(caller, target_employee_id):
 
 def _audit(request, action, entity, entity_id, old_data=None, new_data=None):
     AuditLog.objects.create(
-        employee   = _get_caller(request),
-        action     = action,
-        entity     = entity,
-        entity_id  = entity_id,
-        old_data   = old_data,
-        new_data   = new_data,
+        employee = _get_caller(request),
+        action = action,
+        entity = entity,
+        entity_id = entity_id,
+        old_data = old_data,
+        new_data = new_data,
         ip_address = request.META.get("REMOTE_ADDR"),
     )
 
@@ -79,28 +79,28 @@ class SelfAssessmentView(APIView):
 
         kras = [
             {
-                'employee_kra_level_id':       r.id,
-                'kra_level_id':                r.kra_level_id,
-                'kra_name':                    getattr(r.kra_level, 'name', None),
-                'description_by_lead':         r.description_by_lead,
+                'employee_kra_level_id': r.id,
+                'kra_level_id': r.kra_level_id,
+                'kra_name': getattr(r.kra_level, 'name', None),
+                'description_by_lead': r.description_by_lead,
                 'help_and_assistance_required': r.help_and_assistance_required,
-                'self_rating_id':              r.self_rating_id,
-                'self_rating':                 r.self_rating.rating if r.self_rating else None,
-                'self_comment':                r.self_comment,
-                'progress_notes':              r.progress_notes,
-                'lead_rating_id':              r.lead_rating_id,
-                'lead_rating':                 r.lead_rating.rating if r.lead_rating else None,
-                'lead_comment':                r.lead_comment,
-                'lead_progress_notes':         r.lead_progress_notes,
+                'self_rating_id': r.self_rating_id,
+                'self_rating': r.self_rating.rating if r.self_rating else None,
+                'self_comment': r.self_comment,
+                'progress_notes': r.progress_notes,
+                'lead_rating_id': r.lead_rating_id,
+                'lead_rating': r.lead_rating.rating if r.lead_rating else None,
+                'lead_comment': r.lead_comment,
+                'lead_progress_notes': r.lead_progress_notes,
             }
             for r in kra_rows
         ]
 
         return Response({
-            'cycle_id':              cycle_id,
+            'cycle_id': cycle_id,
             'employee_kra_cycle_id': ekc.id,
-            'status':                ekc.status,
-            'current_stage':         (
+            'status': ekc.status,
+            'current_stage': (
                 {'id': ekc.stage.id, 'name': ekc.stage.name}
                 if ekc.stage else None
             ),
@@ -133,7 +133,7 @@ class SelfAssessmentSubmitView(APIView):
 
         data = request.data
 
-        # --- Capture OLD DATA for audit ---
+        #  Capture OLD DATA for audit 
         old_data = {
             "self_rating_id": row.self_rating_id,
             "self_comment": row.self_comment,
@@ -143,7 +143,7 @@ class SelfAssessmentSubmitView(APIView):
 
         updated_fields = {}
 
-        # --- Apply updates ---
+        # Apply updates 
         self_rating_id = data.get('self_rating_id')
         if self_rating_id is not None:
             if not Rating.objects.filter(id=self_rating_id).exists():
@@ -165,7 +165,7 @@ class SelfAssessmentSubmitView(APIView):
 
         row.save()
 
-        # --- AUDIT LOG ---
+        #AUDIT LOG
         _audit(
             request,
             "SELF_ASSESSMENT_UPDATED",
