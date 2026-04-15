@@ -573,7 +573,7 @@ class KRACycleAdvanceStageView(APIView):
 
         scope = f'employees {employee_ids}' if employee_ids else 'all employees'
 
-        # ✅ AUDIT LOG
+        #  AUDIT LOG
         _audit(self.request, "EMPLOYEE_STAGE_OVERRIDE", "KRACycle", cycle.id,
             old_data={
                 "cycle_stage_id": cycle.stage_id,
