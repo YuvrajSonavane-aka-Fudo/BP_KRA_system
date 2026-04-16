@@ -43,7 +43,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'kra_cycle',
     'kra_self_assessment',
-    'kra_lead_view',
     'corsheaders',
 ]
 
