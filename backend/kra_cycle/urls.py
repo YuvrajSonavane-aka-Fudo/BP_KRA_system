@@ -6,8 +6,6 @@ from .views import (
     KRACycleUpdateView,
     KRACycleCloneView,
     KRACycleAdvanceStageView,
-    ReferenceDataView,
-    KRALibraryView,
 )
 
 urlpatterns = [
@@ -17,7 +15,4 @@ urlpatterns = [
     path('kra/cycles/<int:cycle_id>', KRACycleUpdateView.as_view()),
     path('kra/cycles/<int:cycle_id>/clone',KRACycleCloneView.as_view()),
     path('kra/cycles/<int:cycle_id>/advance-stage' , KRACycleAdvanceStageView.as_view()),
-    path('kra/reference-data',ReferenceDataView.as_view()),
-    path('kra/library',KRALibraryView.as_view()),
-    
 ]
