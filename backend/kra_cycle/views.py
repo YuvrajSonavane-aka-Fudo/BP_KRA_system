@@ -598,3 +598,71 @@ class KRACycleAdvanceStageView(APIView):
                 f'{affected} employee(s) moved to {target_stage.name}'
             ),
         }, status=status.HTTP_200_OK)
+        
+class ReferenceDataView(APIView):
+    """
+    GET /api/v1/kra/reference-data
+    Returns stages, levels, ratings, and categories. Called once on app load.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        stages     = list(Stage.objects.values('id', 'name'))
+        levels     = list(Level.objects.values('id', 'name', 'min_experience', 'max_experience'))
+        ratings    = list(Rating.objects.values('id', 'rating', 'description'))
+        categories = list(KRACategory.objects.values('id', 'name', 'is_standard'))
+
+        return Response({
+            'stages':     stages,
+            'levels':     levels,
+            'ratings':    ratings,
+            'categories': categories,
+        }, status=status.HTTP_200_OK)
+        
+class KRALibraryView(APIView):
+    """
+    GET /api/v1/kra/library?category_id=&level_id=
+    Returns all KRAs with their level variants; optionally filtered.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        category_id = request.query_params.get('category_id')
+        level_id    = request.query_params.get('level_id')
+
+        qs = KRA.objects.select_related('category').prefetch_related(
+            'kra_levels__level',    # related_name 'kra_levels' on KRALevel.kra
+            'kra_levels__category', # requires 'category' field on KRALevel (see model NOTE)
+        )
+
+        if category_id:
+            qs = qs.filter(category_id=category_id)
+        if level_id:
+            qs = qs.filter(kra_levels__level_id=level_id).distinct()
+
+        kras = []
+        for k in qs:
+            levels_data = []
+            for kl in k.kra_levels.all():
+                entry = {
+                    'kra_level_id': kl.id,
+                    'level_id':     kl.level_id,
+                    'level_name':   kl.level.name if kl.level else None,
+                    # 'name' and 'category' exist in DB but may be absent from
+                    # the model — add them to KRALevel (see NOTE at top of file)
+                    'description':  getattr(kl, 'name', None),
+                }
+                if level_id and str(kl.level_id) != str(level_id):
+                    continue
+                levels_data.append(entry)
+
+            kras.append({
+                'id':            k.id,
+                'name':          k.name,
+                'description':   k.description,
+                'category_id':   k.category_id,
+                'category_name': k.category.name if k.category else None,
+                'levels':        levels_data,
+            })
+
+        return Response({'kras': kras}, status=status.HTTP_200_OK)
