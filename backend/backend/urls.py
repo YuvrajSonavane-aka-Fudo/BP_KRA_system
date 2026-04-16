@@ -21,6 +21,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/' , include('kra_cycle.urls')),
     path('api/v1/' , include('kra_self_assessment.urls')),
-    path('api/v1/', include('kra_lead_view.urls'))
+    path('api/v1/', include('kra_lead_view.urls')),
+    path('api/v1/', include('kra_reports.urls'))
     
 ]
