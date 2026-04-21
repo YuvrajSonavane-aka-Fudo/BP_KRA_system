@@ -19,5 +19,4 @@ urlpatterns = [
     path('kra/cycles/<int:cycle_id>/advance-stage' , KRACycleAdvanceStageView.as_view()),
     path('kra/reference-data',ReferenceDataView.as_view()),
     path('kra/library',KRALibraryView.as_view()),
-    
 ]

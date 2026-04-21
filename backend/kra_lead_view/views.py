@@ -1,3 +1,6 @@
+from django.shortcuts import render
+
+# Create your views here.
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
