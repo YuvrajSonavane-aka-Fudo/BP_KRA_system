@@ -12,9 +12,11 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PauseIcon from '@mui/icons-material/Pause';
+import BlockIcon from '@mui/icons-material/Block';
 import { useNavigate, useParams } from 'react-router-dom';
 import ROUTES from '../../config/routes';
-import { getCycleById, updateCycle, cloneCycle, advanceCycleStage } from '../../api/cyclesApi';
+import { getCycleById, updateCycle, cloneCycle, advanceCycleStage, getCycles } from '../../api/cyclesApi';
 import { invalidateCyclesCache } from '../../hooks/useCycles';
 import useRoleAccess from '../../hooks/useRoleAccess';
 
@@ -22,102 +24,127 @@ const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 const shadow = '0px 12px 32px -4px rgba(30,58,138,0.06)';
 
 const STATUS_STYLES = {
-  ACTIVE:  { bgcolor: '#dbeafe', color: '#1d4ed8' },
-  DRAFT:   { bgcolor: '#f1f5f9', color: '#64748b' },
-  CLOSED:  { bgcolor: '#dcfce7', color: '#15803d' },
+  ACTIVE:    { bgcolor: '#dbeafe', color: '#1d4ed8' },
+  DRAFT:     { bgcolor: '#f1f5f9', color: '#64748b' },
+  CLOSED:    { bgcolor: '#dcfce7', color: '#166534' },
+  ON_HOLD:   { bgcolor: '#fef3c7', color: '#92400e' },
+  INACTIVE:  { bgcolor: '#fef3c7', color: '#92400e' },
+  CANCELLED: { bgcolor: '#fee2e2', color: '#991b1b' },
 };
 
 const STAGES = [
   { id: 1, name: 'KRA Assignment By Lead' },
-  { id: 2, name: 'KRA Tracking' },
-  { id: 3, name: 'Assessment' },
+  { id: 2, name: 'Self Assessment' },
+  { id: 3, name: 'Lead Assessment' },
   { id: 4, name: 'HR Validation' },
-  { id: 5, name: 'Closure' },
+  { id: 5, name: 'Completed' },
 ];
+
+const STATUS_ACTIONS = {
+  DRAFT:     ['ACTIVE'],
+  ACTIVE:    ['ON_HOLD', 'CLOSED', 'CANCELLED'],
+  ON_HOLD:   ['ACTIVE', 'CANCELLED'],
+  INACTIVE:  ['ACTIVE', 'CANCELLED'],
+  CLOSED:    [],
+  CANCELLED: [],
+};
+
+const ACTION_CONFIG = {
+  ACTIVE:    { label: 'Activate',    icon: <PlayArrowIcon />,   color: gradient,  textColor: '#fff',    borderColor: null },
+  ON_HOLD:   { label: 'Put On Hold', icon: <PauseIcon />,       color: '#fef3c7', textColor: '#92400e', borderColor: '#fcd34d' },
+  CLOSED:    { label: 'Close',       icon: <CheckCircleIcon />, color: '#dcfce7', textColor: '#15803d', borderColor: '#86efac' },
+  CANCELLED: { label: 'Cancel',      icon: <BlockIcon />,       color: '#fee2e2', textColor: '#991b1b', borderColor: '#fca5a5' },
+};
 
 export default function CycleDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { canManageCycles } = useRoleAccess();
 
-  const [cycle, setCycle] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [actionLoading, setActionLoading] = useState('');
-  const [actionError, setActionError] = useState('');
+  const [cycle, setCycle]           = useState(null);
+  const [allCycles, setAllCycles]   = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Clone dialog
-  const [cloneOpen, setCloneOpen] = useState(false);
-  const [cloneName, setCloneName] = useState('');
-  const [cloneStart, setCloneStart] = useState('');
-  const [cloneEnd, setCloneEnd] = useState('');
+  const [cloneOpen, setCloneOpen]       = useState(false);
+  const [cloneName, setCloneName]       = useState('');
+  const [cloneStart, setCloneStart]     = useState('');
+  const [cloneEnd, setCloneEnd]         = useState('');
   const [cloneLoading, setCloneLoading] = useState(false);
-  const [cloneError, setCloneError] = useState('');
+  const [cloneError, setCloneError]     = useState('');
 
-  // Delete dialog
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen]       = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
+  const [deleteError, setDeleteError]     = useState('');
 
-  // Advance stage dialog
-  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [advanceOpen, setAdvanceOpen]       = useState(false);
   const [advanceLoading, setAdvanceLoading] = useState(false);
-  const [advanceError, setAdvanceError] = useState('');
+  const [advanceError, setAdvanceError]     = useState('');
+
+  const [confirmAction, setConfirmAction]   = useState(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [confirmError, setConfirmError]     = useState('');
 
   const fetchCycle = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      const res = await getCycleById(id);
-      setCycle(res.data);
+      const [cycleRes, allRes] = await Promise.all([
+        getCycleById(id),
+        getCycles(),
+      ]);
+      setCycle(cycleRes.data);
+      setAllCycles(allRes.data?.cycles ?? allRes.data ?? []);
     } catch (err) {
       setError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to load cycle.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [id]);
 
   useEffect(() => { fetchCycle(); }, [fetchCycle]);
 
-  function flash(msg) {
-    setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(''), 4000);
+  function flash(msg) { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 4000); }
+
+  function getOtherActiveCycle() {
+    return allCycles.find(c => c.status === 'ACTIVE' && String(c.id) !== String(id));
   }
 
-  async function handleActivate() {
-    setActionLoading('activate');
-    setActionError('');
-    try {
-      await updateCycle(id, { status: 'ACTIVE' });
-      invalidateCyclesCache();
-      await fetchCycle();
-      flash('Cycle activated successfully. Notifications sent to all VLs and HRs.');
-    } catch (err) {
-      setActionError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to activate cycle.');
-    } finally {
-      setActionLoading('');
+  function handleOpenStatusChange(targetStatus) {
+    setConfirmError('');
+    if (targetStatus === 'ACTIVE') {
+      const other = getOtherActiveCycle();
+      if (other) {
+        setConfirmAction(targetStatus);
+        setConfirmError(`"${other.name}" is currently active. You must close it or put it on hold before activating another cycle. Only one cycle can be active at a time.`);
+        return;
+      }
     }
+    setConfirmAction(targetStatus);
   }
 
-  async function handleClose() {
-    setActionLoading('close');
-    setActionError('');
+  async function handleStatusChange(targetStatus) {
+    if (targetStatus === 'ACTIVE') {
+      const other = getOtherActiveCycle();
+      if (other) {
+        setConfirmError(`"${other.name}" is currently active. You must close it or put it on hold before activating another cycle. Only one cycle can be active at a time.`);
+        setConfirmLoading(false);
+        return;
+      }
+    }
+    setConfirmLoading(true); setConfirmError('');
     try {
-      await updateCycle(id, { status: 'CLOSED' });
+      await updateCycle(id, { status: targetStatus });
       invalidateCyclesCache();
       await fetchCycle();
-      flash('Cycle closed successfully.');
+      setConfirmAction(null);
+      const labels = { ACTIVE: 'activated', ON_HOLD: 'put on hold', CLOSED: 'closed', CANCELLED: 'cancelled' };
+      flash(`Cycle "${cycle?.name}" ${labels[targetStatus] ?? 'updated'} successfully.${targetStatus === 'ACTIVE' ? ' Notifications sent to all VLs and HRs.' : ''}`);
     } catch (err) {
-      setActionError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to close cycle.');
-    } finally {
-      setActionLoading('');
-    }
+      setConfirmError(err?.response?.data?.error || err?.response?.data?.detail || 'Action failed. Please try again.');
+    } finally { setConfirmLoading(false); }
   }
 
   async function handleAdvanceStage() {
-    setAdvanceLoading(true);
-    setAdvanceError('');
+    setAdvanceLoading(true); setAdvanceError('');
     try {
       const res = await advanceCycleStage(id, {});
       invalidateCyclesCache();
@@ -125,92 +152,81 @@ export default function CycleDetailPage() {
       setAdvanceOpen(false);
       flash(res.data?.message || 'Stage advanced successfully.');
     } catch (err) {
-      setAdvanceError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to advance stage.');
-    } finally {
-      setAdvanceLoading(false);
-    }
+      setAdvanceError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to advance stage. Please try again.');
+    } finally { setAdvanceLoading(false); }
   }
 
   async function handleClone() {
-    if (!cloneName || !cloneStart || !cloneEnd) {
-      setCloneError('All fields are required.');
-      return;
-    }
-    setCloneLoading(true);
-    setCloneError('');
+    if (!cloneName || !cloneStart || !cloneEnd) { setCloneError('All fields are required.'); return; }
+    setCloneLoading(true); setCloneError('');
     try {
       const res = await cloneCycle(id, { name: cloneName, start_date: cloneStart, end_date: cloneEnd });
       invalidateCyclesCache();
       setCloneOpen(false);
       navigate(ROUTES.CYCLE_DETAIL.replace(':id', res.data.id));
     } catch (err) {
-      setCloneError(err?.response?.data?.error || err?.response?.data?.detail || 'Clone failed.');
-    } finally {
-      setCloneLoading(false);
-    }
+      setCloneError(err?.response?.data?.error || err?.response?.data?.detail || 'Clone failed. Please try again.');
+    } finally { setCloneLoading(false); }
   }
 
+  // ── DELETE: only DRAFT cycles allowed ──────────────────────────────────────
   async function handleDelete() {
-    setDeleteLoading(true);
-    setDeleteError('');
+    if (currentStatus !== 'DRAFT') return; // 🛡️ hard guard
+    setDeleteLoading(true); setDeleteError('');
     try {
       await updateCycle(id, { is_deleted: true });
       invalidateCyclesCache();
-      navigate(ROUTES.CYCLES);
+      navigate(ROUTES.DASHBOARD);
     } catch (err) {
-      setDeleteError(err?.response?.data?.error || err?.response?.data?.detail || 'Delete failed.');
+      setDeleteError(err?.response?.data?.error || err?.response?.data?.detail || 'Delete failed. Please try again.');
       setDeleteLoading(false);
     }
   }
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
-        <CircularProgress sx={{ color: '#1E3A8A' }} />
-      </Box>
-    );
-  }
+  if (loading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+      <CircularProgress sx={{ color: '#1E3A8A' }} />
+    </Box>
+  );
 
-  if (error) {
-    return (
-      <Box sx={{ maxWidth: 900, mx: 'auto' }}>
-        <Alert severity="error" action={<Button size="small" onClick={fetchCycle} startIcon={<RefreshIcon />}>Retry</Button>}>
-          {error}
-        </Alert>
-      </Box>
-    );
-  }
+  if (error) return (
+    <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+      <Alert severity="error" action={<Button size="small" onClick={fetchCycle} startIcon={<RefreshIcon />}>Retry</Button>}>{error}</Alert>
+    </Box>
+  );
 
   if (!cycle) return null;
 
-  const isDraft  = cycle.status === 'DRAFT';
-  const isActive = cycle.status === 'ACTIVE';
-  const isClosed = cycle.status === 'CLOSED';
-  const currentStageId = cycle.current_stage?.id ?? null;
-  const canAdvance = isActive && canManageCycles && currentStageId && currentStageId < 5;
+  const currentStatus    = cycle.status;
+  const currentStageId   = cycle.current_stage?.id ?? null;
+  const availableActions = STATUS_ACTIONS[currentStatus] ?? [];
+  const canAdvance       = currentStatus === 'ACTIVE' && canManageCycles && currentStageId && currentStageId < 5;
+  const isFrozen         = currentStatus === 'CLOSED' || currentStatus === 'CANCELLED';
+  const otherActiveCycle = getOtherActiveCycle();
+
+  // ── Delete permission: only DRAFT ─────────────────────────────────────────
+  const canDelete     = currentStatus === 'DRAFT';
+  const deleteTooltip = canDelete ? 'Delete cycle' : 'Only draft cycles can be deleted';
 
   return (
     <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
-      {/* Page Header */}
+
+      {/* ── Page Header ─────────────────────────────────────────────────────── */}
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={3}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
-          <IconButton onClick={() => navigate(ROUTES.CYCLES)} sx={{ color: '#64748b' }}>
+          <IconButton onClick={() => navigate(ROUTES.DASHBOARD)} sx={{ color: '#64748b' }}>
             <ArrowBackIcon />
           </IconButton>
           <Box>
             <Stack direction="row" alignItems="center" spacing={1.5}>
               <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: '#1E3A8A' }}>{cycle.name}</Typography>
-              <Chip
-                label={cycle.status}
-                size="small"
-                sx={{ fontSize: 10, fontWeight: 700, height: 22, borderRadius: '9999px', ...(STATUS_STYLES[cycle.status] ?? STATUS_STYLES.DRAFT) }}
-              />
+              <Chip label={cycle.status.replace('_', ' ')} size="small"
+                sx={{ fontSize: 10, fontWeight: 700, height: 22, borderRadius: '9999px', ...(STATUS_STYLES[currentStatus] ?? STATUS_STYLES.DRAFT) }} />
             </Stack>
-            <Typography sx={{ fontSize: 13, color: '#64748b', mt: 0.3 }}>
-              {cycle.start_date} — {cycle.end_date}
-            </Typography>
+            <Typography sx={{ fontSize: 13, color: '#64748b', mt: 0.3 }}>{cycle.start_date} — {cycle.end_date}</Typography>
           </Box>
         </Stack>
+
         <Stack direction="row" spacing={1} alignItems="center">
           <Tooltip title="Refresh">
             <IconButton onClick={fetchCycle} sx={{ color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 2 }}>
@@ -223,19 +239,29 @@ export default function CycleDetailPage() {
                 <Button
                   startIcon={<ContentCopyIcon />}
                   onClick={() => { setCloneName(`${cycle.name} (Copy)`); setCloneStart(''); setCloneEnd(''); setCloneError(''); setCloneOpen(true); }}
-                  sx={{ color: '#64748b', fontWeight: 600, border: '1px solid #e2e8f0', borderRadius: 2 }}
-                >
+                  sx={{ color: '#64748b', fontWeight: 600, border: '1px solid #e2e8f0', borderRadius: 2 }}>
                   Clone
                 </Button>
               </Tooltip>
-              <Tooltip title="Delete cycle">
-                <Button
-                  startIcon={<DeleteOutlineIcon />}
-                  onClick={() => { setDeleteError(''); setDeleteOpen(true); }}
-                  sx={{ color: '#ef4444', fontWeight: 600, border: '1px solid #fecaca', borderRadius: 2, '&:hover': { bgcolor: '#fef2f2' } }}
-                >
-                  Delete
-                </Button>
+
+              {/* DELETE BUTTON #1 — header
+                  Disabled for every status except DRAFT.
+                  <span> wrapper needed so Tooltip shows on disabled button. */}
+              <Tooltip title={deleteTooltip}>
+                <span>
+                  <Button
+                    startIcon={<DeleteOutlineIcon />}
+                    disabled={!canDelete}
+                    onClick={() => { if (!canDelete) return; setDeleteError(''); setDeleteOpen(true); }}
+                    sx={{
+                      color: '#ef4444', fontWeight: 600,
+                      border: '1px solid #fecaca', borderRadius: 2,
+                      '&:hover': { bgcolor: '#fef2f2' },
+                      '&.Mui-disabled': { color: '#fca5a5', borderColor: '#fee2e2', bgcolor: 'transparent' },
+                    }}>
+                    Delete
+                  </Button>
+                </span>
               </Tooltip>
             </>
           )}
@@ -248,23 +274,15 @@ export default function CycleDetailPage() {
           {successMsg}
         </Alert>
       )}
-      {actionError && (
-        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setActionError('')}>
-          {actionError}
-        </Alert>
-      )}
 
-      {/* Stage Stepper */}
+      {/* ── Stage Stepper ───────────────────────────────────────────────────── */}
       <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(197,197,211,0.2)', boxShadow: shadow, mb: 3, overflow: 'hidden' }}>
         <Box sx={{ background: gradient, p: 3, color: '#fff' }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
             <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Cycle Stages</Typography>
             {canAdvance && (
-              <Button
-                startIcon={<SkipNextIcon />}
-                onClick={() => { setAdvanceError(''); setAdvanceOpen(true); }}
-                sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}
-              >
+              <Button startIcon={<SkipNextIcon />} onClick={() => { setAdvanceError(''); setAdvanceOpen(true); }}
+                sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 700, borderRadius: 2, '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}>
                 Advance Stage
               </Button>
             )}
@@ -273,7 +291,7 @@ export default function CycleDetailPage() {
             <Box sx={{ position: 'absolute', top: 11, left: 12, right: 12, height: 2, bgcolor: 'rgba(255,255,255,0.15)', zIndex: 0 }} />
             <Stack direction="row" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
               {STAGES.map((stage) => {
-                const done = currentStageId && stage.id < currentStageId;
+                const done   = currentStageId && stage.id < currentStageId;
                 const active = currentStageId === stage.id;
                 return (
                   <Stack key={stage.id} alignItems="center" spacing={1}>
@@ -285,7 +303,7 @@ export default function CycleDetailPage() {
                       outline: active ? '5px solid rgba(255,255,255,0.12)' : 'none',
                       transition: 'all 0.2s',
                     }}>
-                      {done && <CheckCircleIcon sx={{ color: '#fff', fontSize: 16 }} />}
+                      {done   && <CheckCircleIcon sx={{ color: '#fff', fontSize: 16 }} />}
                       {active && <Typography sx={{ fontSize: 11, color: '#1E3A8A', fontWeight: 800 }}>{stage.id}</Typography>}
                       {!done && !active && <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>{stage.id}</Typography>}
                     </Box>
@@ -300,13 +318,15 @@ export default function CycleDetailPage() {
           {cycle.current_stage && (
             <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               <Typography sx={{ fontSize: 12, color: 'rgba(191,214,254,0.7)' }}>Current Stage</Typography>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700 }}>{cycle.current_stage.name}</Typography>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700 }}>
+                {STAGES.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name}
+              </Typography>
             </Box>
           )}
         </Box>
       </Paper>
 
-      {/* Cycle Info & Actions */}
+      {/* ── Cycle Info + Actions ─────────────────────────────────────────────── */}
       <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(197,197,211,0.2)', boxShadow: shadow, overflow: 'hidden' }}>
         <Box sx={{ p: 3 }}>
           <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
@@ -324,7 +344,8 @@ export default function CycleDetailPage() {
               </Box>
               <Box flex={1}>
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Status</Typography>
-                <Chip label={cycle.status} size="small" sx={{ fontWeight: 700, borderRadius: '9999px', ...(STATUS_STYLES[cycle.status] ?? STATUS_STYLES.DRAFT) }} />
+                <Chip label={cycle.status.replace('_', ' ')} size="small"
+                  sx={{ fontWeight: 700, borderRadius: '9999px', ...(STATUS_STYLES[currentStatus] ?? STATUS_STYLES.DRAFT) }} />
               </Box>
             </Stack>
             {cycle.description && (
@@ -346,87 +367,138 @@ export default function CycleDetailPage() {
           </Stack>
         </Box>
 
-        {canManageCycles && (
+        {/* Actions section */}
+        {canManageCycles && (availableActions.length > 0 || canAdvance) && (
           <>
             <Divider />
             <Box sx={{ p: 3, bgcolor: '#f8fafc' }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 2 }}>Actions</Typography>
-              <Stack direction="row" spacing={2} flexWrap="wrap" gap={1}>
-                {isDraft && (
-                  <Button
-                    variant="contained"
-                    startIcon={actionLoading === 'activate' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
-                    onClick={handleActivate}
-                    disabled={!!actionLoading}
-                    sx={{ background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }}
-                  >
-                    {actionLoading === 'activate' ? 'Activating...' : 'Activate Cycle'}
-                  </Button>
-                )}
-                {isActive && (
-                  <Button
-                    variant="outlined"
-                    startIcon={actionLoading === 'close' ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
-                    onClick={handleClose}
-                    disabled={!!actionLoading}
-                    sx={{ fontWeight: 700, borderRadius: 2, px: 3, color: '#15803d', borderColor: '#86efac', '&:hover': { bgcolor: '#f0fdf4', borderColor: '#4ade80' }, '&:disabled': { opacity: 0.6 } }}
-                  >
-                    {actionLoading === 'close' ? 'Closing...' : 'Close Cycle'}
-                  </Button>
-                )}
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 2 }}>
+                Actions
+              </Typography>
+              {otherActiveCycle && availableActions.includes('ACTIVE') && (
+                <Alert severity="warning" sx={{ mb: 2, fontSize: 12, borderRadius: 2 }}>
+                  <strong>Cannot activate this cycle.</strong> "{otherActiveCycle.name}" is currently active. Please close it or put it on hold first.
+                </Alert>
+              )}
+              <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
+                {availableActions.map((targetStatus) => {
+                  const cfg = ACTION_CONFIG[targetStatus];
+                  const isGradient = targetStatus === 'ACTIVE';
+                  const isDisabled = targetStatus === 'ACTIVE' && !!otherActiveCycle;
+                  return (
+                    <Tooltip key={targetStatus} title={isDisabled ? 'Another cycle is already active. Close or put it on hold first.' : ''} disableHoverListener={!isDisabled}>
+                      <span>
+                        <Button
+                          variant={isGradient ? 'contained' : 'outlined'}
+                          startIcon={cfg.icon}
+                          disabled={isDisabled}
+                          onClick={() => handleOpenStatusChange(targetStatus)}
+                          sx={isGradient
+                            ? { background: isDisabled ? undefined : gradient, color: isDisabled ? undefined : '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&.Mui-disabled': { opacity: 0.45 } }
+                            : { fontWeight: 700, borderRadius: 2, px: 3, color: cfg.textColor, borderColor: cfg.borderColor, bgcolor: cfg.color, '&:hover': { opacity: 0.85 } }
+                          }>
+                          {cfg.label}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  );
+                })}
                 {canAdvance && (
-                  <Button
-                    variant="outlined"
-                    startIcon={<SkipNextIcon />}
+                  <Button variant="outlined" startIcon={<SkipNextIcon />}
                     onClick={() => { setAdvanceError(''); setAdvanceOpen(true); }}
-                    sx={{ fontWeight: 700, borderRadius: 2, px: 3, color: '#1E3A8A', borderColor: '#bfdbfe', '&:hover': { bgcolor: '#eff6ff', borderColor: '#93c5fd' } }}
-                  >
+                    sx={{ fontWeight: 700, borderRadius: 2, px: 3, color: '#1E3A8A', borderColor: '#bfdbfe', '&:hover': { bgcolor: '#eff6ff', borderColor: '#93c5fd' } }}>
                     Advance Stage
                   </Button>
-                )}
-                {isClosed && (
-                  <Typography sx={{ fontSize: 13, color: '#94a3b8', alignSelf: 'center' }}>
-                    This cycle is closed. No further actions available.
-                  </Typography>
                 )}
               </Stack>
             </Box>
           </>
         )}
+
+        {/* Frozen notice */}
+        {isFrozen && (
+          <>
+            <Divider />
+            <Box sx={{ p: 3, bgcolor: '#f8fafc' }}>
+              <Typography sx={{ fontSize: 13, color: '#94a3b8' }}>
+                This cycle is <strong>{currentStatus.toLowerCase().replace('_', ' ')}</strong>. No further actions are available.
+              </Typography>
+            </Box>
+          </>
+        )}
       </Paper>
 
-      {/* Advance Stage Dialog */}
+      {/* ── CONFIRM STATUS CHANGE DIALOG ────────────────────────────────────── */}
+      <Dialog open={!!confirmAction} onClose={() => !confirmLoading && setConfirmAction(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        {confirmAction && (() => {
+          const cfg = ACTION_CONFIG[confirmAction];
+          const isBlocked = confirmAction === 'ACTIVE' && !!getOtherActiveCycle();
+          return (
+            <>
+              <DialogTitle sx={{ fontWeight: 800, color: '#1E3A8A', fontSize: '1.1rem' }}>{cfg?.label} Cycle</DialogTitle>
+              <DialogContent>
+                {isBlocked ? (
+                  <Alert severity="error" sx={{ fontSize: 13 }}>
+                    <strong>Action not allowed.</strong> "{getOtherActiveCycle()?.name}" is currently active. Please close it or put it on hold before activating this cycle. Only one cycle can be active at a time.
+                  </Alert>
+                ) : (
+                  <Typography sx={{ fontSize: 14, color: '#374151' }}>
+                    Are you sure you want to <strong>{cfg?.label?.toLowerCase()}</strong> the cycle <strong>"{cycle.name}"</strong>?
+                  </Typography>
+                )}
+                {confirmAction === 'ACTIVE' && !isBlocked && (
+                  <Alert severity="info" sx={{ mt: 2, fontSize: 12 }}>Activation will send email notifications to all VLs and HRs.</Alert>
+                )}
+                {confirmError && <Alert severity="error" sx={{ mt: 2 }}>{confirmError}</Alert>}
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                <Button onClick={() => { setConfirmAction(null); setConfirmError(''); }} disabled={confirmLoading} sx={{ color: '#64748b', fontWeight: 600 }}>
+                  {isBlocked ? 'OK' : 'Cancel'}
+                </Button>
+                {!isBlocked && (
+                  <Button onClick={() => handleStatusChange(confirmAction)} disabled={confirmLoading}
+                    sx={confirmAction === 'ACTIVE'
+                      ? { background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }
+                      : { bgcolor: cfg?.color, color: cfg?.textColor, border: `1px solid ${cfg?.borderColor}`, fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { opacity: 0.85 }, '&:disabled': { opacity: 0.6 } }
+                    }>
+                    {confirmLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Processing...</> : cfg?.label}
+                  </Button>
+                )}
+              </DialogActions>
+            </>
+          );
+        })()}
+      </Dialog>
+
+      {/* ── ADVANCE STAGE DIALOG ────────────────────────────────────────────── */}
       <Dialog open={advanceOpen} onClose={() => !advanceLoading && setAdvanceOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#1E3A8A', fontSize: '1.1rem' }}>Advance Stage</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: '#1E3A8A', fontSize: '1.1rem' }}>Advance to Next Stage</DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 14, color: '#374151', mb: 1 }}>
-            This will advance the cycle from <strong>Stage {currentStageId}: {cycle.current_stage?.name}</strong> to{' '}
+            This will move from{' '}
+            <strong>Stage {currentStageId}: {STAGES.find(s => s.id === currentStageId)?.name}</strong> to{' '}
             <strong>Stage {currentStageId + 1}: {STAGES.find(s => s.id === currentStageId + 1)?.name}</strong>.
           </Typography>
-          <Typography sx={{ fontSize: 13, color: '#64748b' }}>
-            All enrolled employees will be synced to the new stage.
-          </Typography>
+          <Typography sx={{ fontSize: 13, color: '#64748b' }}>All enrolled employees will be moved to the new stage.</Typography>
           {advanceError && <Alert severity="error" sx={{ mt: 2 }}>{advanceError}</Alert>}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={() => setAdvanceOpen(false)} disabled={advanceLoading} sx={{ color: '#64748b', fontWeight: 600 }}>Cancel</Button>
-          <Button
-            onClick={handleAdvanceStage}
-            disabled={advanceLoading}
-            sx={{ background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }}
-          >
+          <Button onClick={handleAdvanceStage} disabled={advanceLoading}
+            sx={{ background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }}>
             {advanceLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Advancing...</> : 'Advance Stage'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Clone Dialog */}
+      {/* ── CLONE DIALOG ────────────────────────────────────────────────────── */}
       <Dialog open={cloneOpen} onClose={() => !cloneLoading && setCloneOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, color: '#1E3A8A', fontSize: '1.1rem' }}>Clone Cycle</DialogTitle>
         <DialogContent>
-          <Typography sx={{ fontSize: 13, color: '#64748b', mb: 2 }}>
-            Cloning from: <strong>{cycle.name}</strong>
-          </Typography>
+          <Typography sx={{ fontSize: 13, color: '#64748b', mb: 2 }}>Cloning from: <strong>{cycle.name}</strong></Typography>
+          <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
+            Cycle details and employee assignments will be cloned. Individual KRA assignments will not be carried over.
+          </Alert>
           {cloneError && <Alert severity="error" sx={{ mb: 2 }}>{cloneError}</Alert>}
           <Stack spacing={2} mt={1}>
             <TextField label="New Cycle Name" fullWidth value={cloneName} onChange={e => setCloneName(e.target.value)} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
@@ -438,13 +510,14 @@ export default function CycleDetailPage() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={() => setCloneOpen(false)} disabled={cloneLoading} sx={{ color: '#64748b', fontWeight: 600 }}>Cancel</Button>
-          <Button onClick={handleClone} disabled={cloneLoading} sx={{ background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }}>
+          <Button onClick={handleClone} disabled={cloneLoading}
+            sx={{ background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }}>
             {cloneLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Cloning...</> : 'Clone Cycle'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Delete Dialog */}
+      {/* ── DELETE DIALOG ───────────────────────────────────────────────────── */}
       <Dialog open={deleteOpen} onClose={() => !deleteLoading && setDeleteOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, color: '#ef4444', fontSize: '1.1rem' }}>Delete Cycle</DialogTitle>
         <DialogContent>
@@ -454,12 +527,29 @@ export default function CycleDetailPage() {
           {deleteError && <Alert severity="error" sx={{ mt: 2 }}>{deleteError}</Alert>}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDeleteOpen(false)} disabled={deleteLoading} sx={{ color: '#64748b', fontWeight: 600 }}>Cancel</Button>
-          <Button onClick={handleDelete} disabled={deleteLoading} sx={{ bgcolor: '#ef4444', color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { bgcolor: '#dc2626' }, '&:disabled': { opacity: 0.6 } }}>
-            {deleteLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Deleting...</> : 'Delete'}
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleteLoading} sx={{ color: '#64748b', fontWeight: 600 }}>
+            Cancel
           </Button>
+          {/* DELETE BUTTON #2 — dialog confirm
+              Belt-and-suspenders: dialog shouldn't open for non-DRAFT,
+              but guard here too just in case. */}
+          <Tooltip title={!canDelete ? 'Only draft cycles can be deleted' : ''} disableHoverListener={canDelete}>
+            <span>
+              <Button
+                onClick={handleDelete}
+                disabled={deleteLoading || !canDelete}
+                sx={{
+                  bgcolor: '#ef4444', color: '#fff', fontWeight: 700, borderRadius: 2, px: 3,
+                  '&:hover': { bgcolor: '#dc2626' },
+                  '&:disabled': { opacity: 0.6 },
+                }}>
+                {deleteLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Deleting...</> : 'Delete'}
+              </Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </Dialog>
+
     </Box>
   );
 }

@@ -48,8 +48,9 @@ function AppRoutes() {
 
       {/* Protected */}
       <Route path={ROUTES.DASHBOARD}    element={<Protected><DashboardPage /></Protected>} />
-      <Route path={ROUTES.CYCLES}       element={<Protected><CyclesListPage /></Protected>} />
       <Route path={ROUTES.CYCLE_CREATE} element={<Protected><CycleCreatePage /></Protected>} />
+      <Route path={ROUTES.CYCLES}       element={<Protected><CyclesListPage /></Protected>} />
+      
 
       {/* Catch-all */}
       <Route path="/"  element={<Navigate to={ROUTES.DASHBOARD} replace />} />
@@ -62,7 +63,7 @@ export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>
