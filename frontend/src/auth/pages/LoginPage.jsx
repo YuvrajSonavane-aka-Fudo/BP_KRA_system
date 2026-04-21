@@ -5,14 +5,10 @@ import {
   CircularProgress, Paper, Stack, Chip
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import GoogleIcon from '@mui/icons-material/Google';
 import MicrosoftIcon from '@mui/icons-material/Window';
 import useAuth from '../useAuth';
 import ssoService from '../services/ssoService';
-// import tokenService from '../services/tokenService';
 import ROUTES from '../../config/routes';
-
-const IS_DEV = import.meta.env.DEV;
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -43,77 +39,81 @@ export default function LoginPage() {
       sx={{
         minHeight: '100vh',
         display: 'flex',
-        background: 'linear-gradient(135deg, #0f1b4c 0%, #1a2f6e 50%, #1e3a8a 100%)',
-        position: 'relative',
+        flexDirection: { xs: 'column', md: 'row' },
+        width: '100vw',
         overflow: 'hidden',
       }}
     >
-      {/* Decorative circles */}
-      <Box sx={{
-        position: 'absolute', top: -80, right: -80,
-        width: 320, height: 320, borderRadius: '50%',
-        background: 'rgba(255,255,255,0.04)', pointerEvents: 'none',
-      }} />
-      <Box sx={{
-        position: 'absolute', bottom: -120, left: -60,
-        width: 400, height: 400, borderRadius: '50%',
-        background: 'rgba(255,255,255,0.03)', pointerEvents: 'none',
-      }} />
-
-      {/* Left brand panel */}
+      {/* LEFT PANEL: Blue Branding (50%) */}
       <Box
         sx={{
           display: { xs: 'none', md: 'flex' },
-          flex: 1,
+          flex: 1, // Takes exactly 50%
           flexDirection: 'column',
           justifyContent: 'center',
-          px: 8,
+          alignItems: 'center', // Centers content horizontally in the left half
           color: '#fff',
+          background: 'linear-gradient(135deg, #0f1b4c 0%, #1a2f6e 100%)',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 4 }}>
-          <Box sx={{
-            width: 44, height: 44, borderRadius: 2,
-            bgcolor: 'rgba(255,255,255,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Typography fontWeight={800} fontSize={20} color="#fff">A</Typography>
-          </Box>
-          <Typography fontWeight={700} fontSize={20} color="rgba(255,255,255,0.9)">
-            Executive Portal
+        {/* Decorative circles */}
+        <Box sx={{
+          position: 'absolute', top: -50, right: -50,
+          width: 300, height: 300, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.04)',
+        }} />
+        <Box sx={{
+          position: 'absolute', bottom: -100, left: -50,
+          width: 350, height: 350, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.03)',
+        }} />
+
+        <Box sx={{ position: 'relative', zIndex: 1, px: 6, maxWidth: 500 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 4 }}>
+            <Box sx={{
+              width: 40, height: 40, borderRadius: 1.5,
+              bgcolor: 'rgba(255,255,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Typography fontWeight={800} fontSize={18}>A</Typography>
+            </Box>
+            <Typography fontWeight={600} fontSize={18} letterSpacing={0.5}>
+              Executive Portal
+            </Typography>
+          </Stack>
+
+          <Typography variant="h3" sx={{ fontWeight: 800, lineHeight: 1.2, mb: 2 }}>
+            KRA Management<br />
+            <Box component="span" sx={{ opacity: 0.5 }}>System</Box>
           </Typography>
-        </Stack>
+          
+          <Typography sx={{ opacity: 0.7, fontSize: 16, mb: 6 }}>
+            Manage performance cycles, assign KRAs, track assessments, and
+            publish results — all in one place.
+          </Typography>
 
-        <Typography variant="h3" sx={{ fontWeight: 800, color: "#fff", lineHeight: 1.2, mb: 2 }}>
-          KRA Management<br />
-          <Box component="span" sx={{ color: 'rgba(255,255,255,0.55)' }}>
-            System
-          </Box>
-        </Typography>
-        <Typography sx={{ color: "rgba(255,255,255,0.55)", fontSize: 15, maxWidth: 380 }}>
-          Manage performance cycles, assign KRAs, track assessments, and
-          publish results — all in one place.
-        </Typography>
-
-        <Stack spacing={2} mt={6}>
-          {['HR Command Center', 'KRA Cycle Management', 'Lead & Self Assessments', 'Reports & Analytics'].map((f) => (
-            <Stack key={f} direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#60a5fa' }} />
-              <Typography color="rgba(255,255,255,0.7)" fontSize={14}>{f}</Typography>
-            </Stack>
-          ))}
-        </Stack>
+          <Stack spacing={2.5}>
+            {['HR Command Center', 'KRA Cycle Management', 'Lead & Self Assessments', 'Reports & Analytics'].map((f) => (
+              <Stack key={f} direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#60a5fa' }} />
+                <Typography sx={{ opacity: 0.8, fontSize: 14, fontWeight: 500 }}>{f}</Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
       </Box>
 
-      {/* Right login card */}
+      {/* RIGHT PANEL: Login Form (50%) */}
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          flex: { xs: 1, md: '0 0 480px' },
+          flex: 1, // Takes exactly 50%
+          bgcolor: '#f8fafc', 
           px: 3,
-          py: 6,
         }}
       >
         <Paper
@@ -121,56 +121,54 @@ export default function LoginPage() {
           sx={{
             width: '100%',
             maxWidth: 420,
-            borderRadius: 3,
-            p: 4,
+            borderRadius: 5,
+            p: { xs: 4, md: 5 },
             bgcolor: '#fff',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.05), 0 10px 10px -5px rgba(0,0,0,0.02)',
           }}
         >
-          {/* Header */}
-          <Stack sx={{ alignItems: "center", mb: 3 }}>
+          <Stack sx={{ alignItems: "center", mb: 4 }}>
             <Box sx={{
-              width: 48, height: 48, borderRadius: 2,
+              width: 56, height: 56, borderRadius: '16px',
               bgcolor: '#1a2f6e',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              mb: 2,
+              mb: 2.5,
             }}>
-              <LockOutlinedIcon sx={{ color: '#fff', fontSize: 22 }} />
+              <LockOutlinedIcon sx={{ color: '#fff', fontSize: 28 }} />
             </Box>
-            <Typography variant="h6" fontWeight={700} color="#1a1a2e">
+            <Typography variant="h5" fontWeight={700} color="#1e293b">
               Sign in to your account
             </Typography>
-            <Typography variant="body2" color="text.secondary" mt={0.5}>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               KRA Management Platform
             </Typography>
           </Stack>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>
-          )}
+          {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>}
 
-          {/* Screen: Choice */}
-          {screen === 'choice' && (
-            <Stack spacing={2}>   
+          {screen === 'choice' ? (
+            <Stack spacing={2}>
               <Button
                 fullWidth
-                variant="contained"
+                variant="outlined"
                 size="large"
                 startIcon={<MicrosoftIcon />}
                 onClick={() => handleSSOLogin('microsoft')}
                 sx={{
-                  bgcolor: '#fff',
-                  color: '#1a1a2e',
-                  border: '1.5px solid #e2e8f0',
-                  boxShadow: 'none',
+                  py: 1.5,
+                  borderRadius: 2.5,
+                  textTransform: 'none',
                   fontWeight: 600,
-                  '&:hover': { bgcolor: '#f8fafc', boxShadow: 'none' },
+                  color: '#334155',
+                  borderColor: '#e2e8f0',
+                  '&:hover': { bgcolor: '#f1f5f9', borderColor: '#cbd5e1' }
                 }}
               >
                 Continue with Microsoft
               </Button>
 
-              <Divider sx={{ my: 1 }}>
-                <Typography variant="caption" color="text.secondary">or</Typography>
+              <Divider sx={{ my: 1.5 }}>
+                <Typography variant="caption" color="text.disabled" sx={{ px: 1 }}>or</Typography>
               </Divider>
 
               <Button
@@ -179,43 +177,37 @@ export default function LoginPage() {
                 size="large"
                 onClick={() => setScreen('email')}
                 sx={{
+                  py: 1.5,
+                  borderRadius: 2.5,
                   bgcolor: '#1a2f6e',
+                  textTransform: 'none',
                   fontWeight: 600,
-                  borderRadius: 2,
-                  '&:hover': { bgcolor: '#162560' },
+                  boxShadow: 'none',
+                  '&:hover': { bgcolor: '#0f1b4c', boxShadow: 'none' }
                 }}
               >
                 Sign in with Email
               </Button>
             </Stack>
-          )}
-
-          {/* Screen: Email + Password */}
-          {screen === 'email' && (
+          ) : (
             <Box component="form" onSubmit={handleEmailLogin}>
-              <Stack spacing={2}>
+              <Stack spacing={2.5}>
                 <TextField
                   label="Email address"
                   type="email"
+                  fullWidth
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
-                  fullWidth
-                  size="small"
-                  autoFocus
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}
                 />
                 <TextField
                   label="Password"
                   type="password"
+                  fullWidth
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
-                  fullWidth
-                  size="small"
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2.5 } }}
                 />
-
                 <Button
                   type="submit"
                   fullWidth
@@ -223,22 +215,20 @@ export default function LoginPage() {
                   size="large"
                   disabled={loading}
                   sx={{
+                    py: 1.5,
+                    borderRadius: 2.5,
                     bgcolor: '#1a2f6e',
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    mt: 1,
-                    '&:hover': { bgcolor: '#162560' },
+                    textTransform: 'none',
+                    fontWeight: 600
                   }}
                 >
-                  {loading ? <CircularProgress size={22} color="inherit" /> : 'Sign In'}
+                  {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
                 </Button>
-
                 <Button
                   fullWidth
                   variant="text"
-                  size="small"
-                  onClick={() => { setScreen('choice'); setError(''); }}
-                  sx={{ color: 'text.secondary', fontWeight: 500 }}
+                  onClick={() => setScreen('choice')}
+                  sx={{ textTransform: 'none', color: 'text.secondary', fontWeight: 500 }}
                 >
                   ← Back to sign in options
                 </Button>
@@ -246,11 +236,11 @@ export default function LoginPage() {
             </Box>
           )}
 
-          <Box sx={{ mt: 3, textAlign: "center" }}>
+          <Box sx={{ mt: 4, textAlign: "center" }}>
             <Chip
               label="Admin Access Only"
               size="small"
-              sx={{ bgcolor: '#f1f5f9', color: '#64748b', fontSize: 11 }}
+              sx={{ bgcolor: '#f1f5f9', color: '#64748b', fontWeight: 600, fontSize: 11 }}
             />
           </Box>
         </Paper>
