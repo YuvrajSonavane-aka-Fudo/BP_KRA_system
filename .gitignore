@@ -2,4 +2,9 @@ documents
 .env
 .venv
 db.sqlite3
+<<<<<<< HEAD
+node_modules
+
+=======
+>>>>>>> 538c460088555cd28a28526f0df9ea41ee75b0e2
 __pycache__
