@@ -10,17 +10,12 @@ const ssoService = {
       provider,
       response_type: 'code',
     });
-    window.location.href = `${env.API_BASE_URL}/api/v1/auth/sso/initiate?${params}`;
+    window.location.href = `http://localhost:8000/api/v1/auth/microsoft/login`;
   },
 
-  async handleCallback(code, provider) {
-    // Exchange SSO code for our JWT
-    const response = await axiosInstance.post('/api/v1/auth/sso', {
-      provider,
-      token: code,
-    });
+ async getCurrentUser() {
+    const response = await axiosInstance.get('auth/me');
     return response.data;
-    // Returns same shape as normal login: { access_token, refresh_token, employee_id, roles, full_name }
   },
 };
 

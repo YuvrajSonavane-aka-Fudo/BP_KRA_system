@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'kra_cycle',
     'kra_self_assessment',
     'kra_lead_view',
+    'auth_app',
     'kra_reports',
     'kra_assignment',
     'kra_library',
@@ -88,8 +89,12 @@ TEMPLATES = [
         },
     },
 ]
-CORS_ALLOW_ALL_ORIGINS = True
+# With this:
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+]
 CORS_ALLOW_CREDENTIALS = True
+
 
 
 WSGI_APPLICATION = 'backend.wsgi.application'
@@ -108,6 +113,16 @@ DATABASES = {
         'PORT': os.getenv('port'),
     }
 }
+
+AZURE_AD = {
+    'CLIENT_ID':     os.getenv('AZURE_CLIENT_ID'),
+    'CLIENT_SECRET': os.getenv('AZURE_CLIENT_SECRET'),
+    'TENANT_ID':     os.getenv('AZURE_TENANT_ID'),
+    'REDIRECT_URI':  os.getenv('AZURE_REDIRECT_URI', 'http://localhost:8000/api/v1/auth/microsoft/callback'),
+    'SCOPE':         ['User.Read'],
+}
+
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 
 # Password validation

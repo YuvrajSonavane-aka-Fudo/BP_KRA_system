@@ -25,5 +25,6 @@ urlpatterns = [
     path('api/v1/', include('kra_reports.urls')),
     path('api/v1/', include('kra_assignment.urls')),
     path('api/v1/', include('kra_library.urls')),
+    path('api/v1/', include('auth_app.urls')),
     
 ]
