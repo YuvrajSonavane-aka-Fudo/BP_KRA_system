@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'kra_lead_view',
     'kra_reports',
     'kra_assignment',
+    'kra_library',
     'corsheaders',
 ]
 
