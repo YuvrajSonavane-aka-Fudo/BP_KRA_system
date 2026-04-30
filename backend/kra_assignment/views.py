@@ -502,55 +502,197 @@ class KRAAssignmentUpdateDeleteView(APIView):
 
 class KRAAssignmentCloneView(APIView):
     """
-    POST /api/v1/kra/assignments/{employee_kra_cycle_id}/clone-from
-    Copies kra_level rows (nulling ratings/comments) from a source enrolment.
+    POST /api/v1/kra/assignments/clone-from
+
+    Clones KRA level rows from one source enrolment into one or more targets.
+    Ratings and comments are intentionally nulled on every clone.
+
+    Request body:
+        {
+            "source_employee_kra_cycle_id": 8,
+            "target_employee_kra_cycle_ids": [12, 15, 19],
+            "mode": "append"        ← optional, default is "skip"
+        }
+
+    mode options:
+        "skip"      – (default) skip targets that already have KRA rows
+        "append"    – add only the KRA rows not already present on the target
+        "overwrite" – delete all existing KRA rows on target then clone fresh
     """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, employee_kra_cycle_id):
-        source_id = request.data.get('source_employee_kra_cycle_id')
+    def post(self, request):
+        source_id  = request.data.get('source_employee_kra_cycle_id')
+        target_ids = request.data.get('target_employee_kra_cycle_ids', [])
+        mode       = request.data.get('mode', 'skip')
+
+        # ── Validate inputs ───────────────────────────────────────────────────
         if not source_id:
             return Response(
-                'source_employee_kra_cycle_id is required',
+                {'error': 'source_employee_kra_cycle_id is required'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        target       = get_object_or_404(EmployeeKRACycle, id=employee_kra_cycle_id)
-        source_levels = EmployeeKRALevel.objects.filter(
-            employee_kra_cycle_id=source_id
-        )
-
-        if not source_levels.exists():
-            return Response('Source assignment not found', status=status.HTTP_404_NOT_FOUND)
-
-        with transaction.atomic():
-            # Remove existing kra rows on target first
-            target.kra_level_rows.all().delete()
-
-            new_rows = EmployeeKRALevel.objects.bulk_create([
-                EmployeeKRALevel(
-                    employee_id=target.employee_id,
-                    kra_level_id=sl.kra_level_id,
-                    employee_kra_cycle=target,
-                    # Ratings and notes are intentionally left null on clone
-                )
-                for sl in source_levels
-            ])
-            _audit(
-                request,
-                "KRA_ASSIGNMENT_CLONED",
-                "EmployeeKRACycle",
-                target.id,
-                new_data={
-                    "source_employee_kra_cycle_id": source_id,
-                    "target_employee_kra_cycle_id": target.id,
-                    "kras_copied": len(new_rows),
-                }
+        if not target_ids:
+            return Response(
+                {'error': 'target_employee_kra_cycle_ids is required and cannot be empty'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        return Response({
-            'employee_kra_cycle_id': target.id,
-            'cloned_from':           source_id,
-            'kras_copied':           len(new_rows),
-            'message':               'KRAs cloned successfully',
-        }, status=status.HTTP_201_CREATED)
+        if not isinstance(target_ids, list):
+            return Response(
+                {'error': 'target_employee_kra_cycle_ids must be a list'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if mode not in ('skip', 'overwrite', 'append'):
+            return Response(
+                {'error': "mode must be one of: 'skip', 'overwrite', 'append'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if source_id in target_ids:
+            return Response(
+                {'error': 'source cannot also be a target'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Fetch source KRA rows ─────────────────────────────────────────────
+        source_levels = list(
+            EmployeeKRALevel.objects.filter(employee_kra_cycle_id=source_id)
+        )
+        if not source_levels:
+            return Response(
+                {'error': f'Source assignment {source_id} not found or has no KRA rows'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ── Validate all target IDs exist up front ────────────────────────────
+        existing_targets = {
+            ekc.id: ekc
+            for ekc in EmployeeKRACycle.objects.filter(id__in=target_ids)
+        }
+        missing = set(target_ids) - set(existing_targets.keys())
+        if missing:
+            return Response(
+                {
+                    'error': 'Some target IDs do not exist',
+                    'missing_target_ids': sorted(missing),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Process each target independently ─────────────────────────────────
+        cloned  = []
+        skipped = []
+        failed  = []
+
+        for target_id in target_ids:
+            target        = existing_targets[target_id]
+            existing_rows = target.kra_level_rows.count()
+
+            # mode=skip: protect targets that already have rows
+            if existing_rows and mode == 'skip':
+                skipped.append({
+                    'target_employee_kra_cycle_id': target_id,
+                    'reason': f'Already has {existing_rows} KRA row(s). Use mode=overwrite or mode=append.',
+                })
+                continue
+
+            try:
+                with transaction.atomic():
+
+                    if mode == 'overwrite' and existing_rows:
+                        # Wipe everything and start fresh
+                        target.kra_level_rows.all().delete()
+                        rows_to_clone = source_levels
+
+                    elif mode == 'append' and existing_rows:
+                        # Only clone KRA levels not already present on the target
+                        existing_kra_level_ids = set(
+                            target.kra_level_rows.values_list('kra_level_id', flat=True)
+                        )
+                        rows_to_clone = [
+                            sl for sl in source_levels
+                            if sl.kra_level_id not in existing_kra_level_ids
+                        ]
+                        if not rows_to_clone:
+                            skipped.append({
+                                'target_employee_kra_cycle_id': target_id,
+                                'reason': 'All source KRA rows already exist on this target — nothing to append.',
+                            })
+                            continue
+
+                    else:
+                        # mode=overwrite with no existing rows,
+                        # mode=append with no existing rows,
+                        # mode=skip with no existing rows — just clone everything
+                        rows_to_clone = source_levels
+
+                    new_rows = EmployeeKRALevel.objects.bulk_create([
+                        EmployeeKRALevel(
+                            employee_id=target.employee_id,
+                            kra_level_id=sl.kra_level_id,
+                            employee_kra_cycle=target,
+                            # Ratings and notes intentionally left null on clone
+                        )
+                        for sl in rows_to_clone
+                    ])
+
+                cloned.append({
+                    'target_employee_kra_cycle_id': target_id,
+                    'employee_id':                  target.employee_id,
+                    'kras_copied':                  len(new_rows),
+                    'mode_applied':                 mode,
+                })
+
+            except Exception as exc:
+                failed.append({
+                    'target_employee_kra_cycle_id': target_id,
+                    'reason': str(exc),
+                })
+
+        # ── Single audit entry covering the whole operation ───────────────────
+        _audit(
+            request,
+            'KRA_ASSIGNMENT_BULK_CLONED',
+            'EmployeeKRACycle',
+            source_id,
+            new_data={
+                'source_employee_kra_cycle_id': source_id,
+                'kras_in_source':               len(source_levels),
+                'total_targets':                len(target_ids),
+                'cloned_count':                 len(cloned),
+                'skipped_count':                len(skipped),
+                'failed_count':                 len(failed),
+                'mode':                         mode,
+                'cloned_target_ids':            [c['target_employee_kra_cycle_id'] for c in cloned],
+                'skipped_target_ids':           [s['target_employee_kra_cycle_id'] for s in skipped],
+                'failed_target_ids':            [f['target_employee_kra_cycle_id'] for f in failed],
+            },
+        )
+
+        # ── Pick the right HTTP status ────────────────────────────────────────
+        if cloned and (skipped or failed):
+            http_status = status.HTTP_207_MULTI_STATUS
+        elif not cloned and failed:
+            http_status = status.HTTP_400_BAD_REQUEST
+        else:
+            http_status = status.HTTP_201_CREATED
+
+        return Response(
+            {
+                'source_employee_kra_cycle_id': source_id,
+                'kras_in_source':               len(source_levels),
+                'cloned':                       cloned,
+                'skipped':                      skipped,
+                'failed':                       failed,
+                'summary': {
+                    'total_targets':  len(target_ids),
+                    'cloned_count':   len(cloned),
+                    'skipped_count':  len(skipped),
+                    'failed_count':   len(failed),
+                },
+            },
+            status=http_status,
+        )
