@@ -71,7 +71,17 @@ def _get_caller(request):
 
 
 def _is_hr(employee):
-    return employee.employee_roles.filter(role__name__in=HR_ROLES).exists()
+    # Check bridge table first, fall back to direct role FK
+    if employee.employee_roles.filter(role__name__in=HR_ROLES).exists():
+        return True
+    return bool(employee.role and employee.role.name in HR_ROLES)
+
+
+def _is_lead(employee):
+    # Check bridge table first, fall back to direct role FK
+    if employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists():
+        return True
+    return bool(employee.role and employee.role.name in LEAD_ROLES)
 
 
 def _audit(request, action, entity, entity_id, old_data=None, new_data=None):
@@ -697,7 +707,88 @@ class KRADetailView(APIView):
             id=kra_id,
         )
         return Response(_kra_dict(kra), status=status.HTTP_200_OK)
+    def put(self, request, kra_id):
+        return self._update(request, kra_id, partial=False)
 
+    def patch(self, request, kra_id):
+        return self._update(request, kra_id, partial=True)
+
+    # def _update(self, request, kra_id, partial=False):
+    #     caller = _get_caller(request)
+    #     if not _is_hr(caller):
+    #         return Response({"error": "Only HR can update KRAs"},
+    #                         status=status.HTTP_403_FORBIDDEN)
+
+    #     kra      = get_object_or_404(KRA, id=kra_id)
+    #     old_data = _kra_dict(kra, include_levels=False)
+    #     data     = request.data
+
+    #     name = data.get("name", kra.name or "").strip()
+    #     if not partial and not name:
+    #         return Response({"error": "name is required"},
+    #                         status=status.HTTP_400_BAD_REQUEST)
+
+    #     if "category_id" in data and data["category_id"]:
+    #         if not KRACategory.objects.filter(id=data["category_id"]).exists():
+    #             return Response(
+    #                 {"error": f"category_id {data['category_id']} does not exist"},
+    #                 status=status.HTTP_400_BAD_REQUEST,
+    #             )
+    #         kra.category_id = data["category_id"]
+
+    #     if name:
+    #         kra.name = name
+    #     if "description" in data:
+    #         kra.description = data["description"]
+    #     if "is_standard" in data:
+    #         kra.is_standard = data["is_standard"]
+
+    #     kra.save()
+
+    #     _audit(request, "KRA_UPDATED", "KRA", kra.id,
+    #            old_data=old_data, new_data=_kra_dict(kra, include_levels=False))
+
+    #     return Response(_kra_dict(kra), status=status.HTTP_200_OK)
+
+    # def put(self, request, kra_id):
+    #     return self._update(request, kra_id, partial=False)
+
+    # def patch(self, request, kra_id):
+    #     return self._update(request, kra_id, partial=True)
+
+    # def delete(self, request, kra_id):
+    #     caller = _get_caller(request)
+    #     if not _is_hr(caller):
+    #         return Response({"error": "Only HR can delete KRAs"},
+    #                         status=status.HTTP_403_FORBIDDEN)
+
+    #     kra = get_object_or_404(KRA, id=kra_id)
+
+    #     # Guard: KRALevel rows that are actively assigned to employees
+    #     active_assignments = kra.kra_levels.filter(
+    #         employee_kra_levels__isnull=False   # related_name on EmployeeKRALevel.kra_level
+    #     ).distinct().count()
+
+    #     if active_assignments:
+    #         return Response(
+    #             {
+    #                 "error": "Cannot delete KRA — its level variants are assigned to employees in active cycles",
+    #                 "assigned_kra_level_count": active_assignments,
+    #             },
+    #             status=status.HTTP_400_BAD_REQUEST,
+    #         )
+
+    #     _audit(request, "KRA_DELETED", "KRA", kra.id,
+    #            old_data=_kra_dict(kra))
+
+    #     with transaction.atomic():
+    #         kra.kra_levels.all().delete()   # cascade via related_name
+    #         kra.delete()
+
+    #     return Response(
+    #         {"message": f"KRA and all its level variants deleted successfully"},
+    #         status=status.HTTP_200_OK,
+    #     )
     def _update(self, request, kra_id, partial=False):
         caller = _get_caller(request)
         if not _is_hr(caller):
@@ -705,9 +796,10 @@ class KRADetailView(APIView):
                             status=status.HTTP_403_FORBIDDEN)
 
         kra      = get_object_or_404(KRA, id=kra_id)
-        old_data = _kra_dict(kra, include_levels=False)
+        old_data = _kra_dict(kra)
         data     = request.data
 
+        # ── Parent KRA fields ─────────────────────────────────────────────────
         name = data.get("name", kra.name or "").strip()
         if not partial and not name:
             return Response({"error": "name is required"},
@@ -728,52 +820,83 @@ class KRADetailView(APIView):
         if "is_standard" in data:
             kra.is_standard = data["is_standard"]
 
-        kra.save()
+        # ── Levels (optional in both PUT and PATCH) ───────────────────────────
+        levels_data = data.get("levels")   # None means "not provided — don't touch"
+
+        if levels_data is not None:
+
+            # Validate all level_ids and category_ids before touching the DB
+            submitted_level_ids = {l.get("level_id") for l in levels_data if l.get("level_id")}
+            submitted_cat_ids   = {l.get("category_id") for l in levels_data if l.get("category_id")}
+
+            if submitted_level_ids:
+                bad_levels = submitted_level_ids - set(
+                    Level.objects.filter(id__in=submitted_level_ids).values_list("id", flat=True)
+                )
+                if bad_levels:
+                    return Response(
+                        {"error": "Invalid level_id(s) in levels",
+                        "invalid_level_ids": sorted(bad_levels)},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            if submitted_cat_ids:
+                bad_cats = submitted_cat_ids - set(
+                    KRACategory.objects.filter(id__in=submitted_cat_ids).values_list("id", flat=True)
+                )
+                if bad_cats:
+                    return Response(
+                        {"error": "Invalid category_id(s) in levels",
+                        "invalid_category_ids": sorted(bad_cats)},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            # Check none of the levels being removed are assigned to employees
+            incoming_level_ids = {l.get("level_id") for l in levels_data if l.get("level_id")}
+            levels_being_removed = kra.kra_levels.exclude(level_id__in=incoming_level_ids)
+            actively_assigned = levels_being_removed.filter(
+                employee_kra_levels__isnull=False
+            ).distinct()
+
+            if actively_assigned.exists():
+                return Response(
+                    {
+                        "error": "Cannot remove level variants that are already assigned to employees",
+                        "blocked_level_ids": list(
+                            actively_assigned.values_list("level_id", flat=True)
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            with transaction.atomic():
+                kra.save()
+
+                # Delete levels not in the incoming list
+                levels_being_removed.delete()
+
+                # Upsert each incoming level
+                for l in levels_data:
+                    level_id    = l.get("level_id")
+                    level_name  = l.get("name", kra.name)
+                    category_id = l.get("category_id") or kra.category_id
+
+                    KRALevel.objects.update_or_create(
+                        kra=kra,
+                        level_id=level_id,
+                        defaults={
+                            "name":        level_name,
+                            "category_id": category_id,
+                        },
+                    )
+        else:
+            kra.save()
 
         _audit(request, "KRA_UPDATED", "KRA", kra.id,
-               old_data=old_data, new_data=_kra_dict(kra, include_levels=False))
+            old_data=old_data, new_data=_kra_dict(kra))
 
+        kra.refresh_from_db()
         return Response(_kra_dict(kra), status=status.HTTP_200_OK)
-
-    def put(self, request, kra_id):
-        return self._update(request, kra_id, partial=False)
-
-    def patch(self, request, kra_id):
-        return self._update(request, kra_id, partial=True)
-
-    def delete(self, request, kra_id):
-        caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can delete KRAs"},
-                            status=status.HTTP_403_FORBIDDEN)
-
-        kra = get_object_or_404(KRA, id=kra_id)
-
-        # Guard: KRALevel rows that are actively assigned to employees
-        active_assignments = kra.kra_levels.filter(
-            employee_kra_levels__isnull=False   # related_name on EmployeeKRALevel.kra_level
-        ).distinct().count()
-
-        if active_assignments:
-            return Response(
-                {
-                    "error": "Cannot delete KRA — its level variants are assigned to employees in active cycles",
-                    "assigned_kra_level_count": active_assignments,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        _audit(request, "KRA_DELETED", "KRA", kra.id,
-               old_data=_kra_dict(kra))
-
-        with transaction.atomic():
-            kra.kra_levels.all().delete()   # cascade via related_name
-            kra.delete()
-
-        return Response(
-            {"message": f"KRA and all its level variants deleted successfully"},
-            status=status.HTTP_200_OK,
-        )
 
 
 class KRACloneView(APIView):

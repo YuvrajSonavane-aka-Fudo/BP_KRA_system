@@ -19,8 +19,8 @@ const authApi = {
    * Called on app mount to restore persisted auth state.
    * The backend should return 401 if no valid session exists.
    */
-  // me: () =>
-  //   axiosInstance.get('auth/login'),
+  me: () =>
+    axiosInstance.get('auth/me'),
 };
 
 export default authApi;

@@ -35,11 +35,17 @@ def _get_caller(request):
 
 
 def _is_hr(employee):
-    return employee.employee_roles.filter(role__name__in=HR_ROLES).exists()
+    # Check bridge table first, fall back to direct role FK
+    if employee.employee_roles.filter(role__name__in=HR_ROLES).exists():
+        return True
+    return bool(employee.role and employee.role.name in HR_ROLES)
 
 
 def _is_lead(employee):
-    return employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists()
+    # Check bridge table first, fall back to direct role FK
+    if employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists():
+        return True
+    return bool(employee.role and employee.role.name in LEAD_ROLES)
 
 
 def _caller_can_act_on(caller, target_employee_id):
