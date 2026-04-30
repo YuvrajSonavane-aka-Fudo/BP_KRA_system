@@ -12,6 +12,8 @@ import SSOCallbackPage from './auth/pages/SSOCallbackPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import CyclesListPage from './pages/cycles/CyclesListPage';
 import CycleCreatePage from './pages/cycles/CycleCreatePage';
+import KRALibraryPage from './pages/kra_library/KRALibraryPage'; 
+import BulkAssignmentPage from './pages/assignments/BulkAssignmentPage';
 
 import ROUTES from './config/routes';
 import './assets/styles/global.css';
@@ -30,7 +32,6 @@ const theme = createTheme({
   },
 });
 
-/** Wrap a page with MainLayout + session guard */
 function Protected({ children }) {
   return (
     <ProtectedRoute>
@@ -50,7 +51,8 @@ function AppRoutes() {
       <Route path={ROUTES.DASHBOARD}    element={<Protected><DashboardPage /></Protected>} />
       <Route path={ROUTES.CYCLE_CREATE} element={<Protected><CycleCreatePage /></Protected>} />
       <Route path={ROUTES.CYCLES}       element={<Protected><CyclesListPage /></Protected>} />
-      
+      <Route path={ROUTES.KRA_LIBRARY}  element={<Protected><KRALibraryPage /></Protected>} />
+      <Route path={ROUTES.ASSIGNMENTS}  element={<Protected><BulkAssignmentPage /></Protected>} />
 
       {/* Catch-all */}
       <Route path="/"  element={<Navigate to={ROUTES.DASHBOARD} replace />} />

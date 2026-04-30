@@ -76,19 +76,12 @@ export default function Sidebar({ onToggle }) {
           flexShrink: 0,
         }}
       >
-        {/* Avatar + name */}
         <Stack direction="row" alignItems="center" spacing={collapsed ? 0 : 1.5} overflow="hidden">
           <Tooltip title={collapsed ? (user?.full_name || 'User') : ''} placement="right">
             <Avatar
               sx={{
-                width: 36,
-                height: 36,
-                fontSize: 14,
-                fontWeight: 800,
-                borderRadius: 1.5,
-                background: gradient,
-                flexShrink: 0,
-                cursor: 'default',
+                width: 36, height: 36, fontSize: 14, fontWeight: 800,
+                borderRadius: 1.5, background: gradient, flexShrink: 0, cursor: 'default',
               }}
             >
               {initials}
@@ -100,13 +93,7 @@ export default function Sidebar({ onToggle }) {
                 {user?.full_name || 'User'}
               </Typography>
               <Typography
-                sx={{
-                  fontSize: 10,
-                  color: 'rgba(255,255,255,0.45)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  fontWeight: 700,
-                }}
+                sx={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}
                 noWrap
               >
                 {user?.roles?.[0] || 'Admin'}
@@ -115,14 +102,12 @@ export default function Sidebar({ onToggle }) {
           )}
         </Stack>
 
-        {/* Collapse / expand toggle — always in the header */}
         <Tooltip title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right">
           <IconButton
             onClick={handleToggle}
             size="small"
             sx={{
-              flexShrink: 0,
-              ml: collapsed ? 0 : 0.5,
+              flexShrink: 0, ml: collapsed ? 0 : 0.5,
               color: 'rgba(255,255,255,0.4)',
               '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' },
             }}
@@ -139,35 +124,44 @@ export default function Sidebar({ onToggle }) {
             location.pathname === item.path ||
             (item.path !== ROUTES.DASHBOARD && location.pathname.startsWith(item.path));
 
-          const btn = (
-            <ListItemButton
-              key={item.label}
-              onClick={() => navigate(item.path)}
-              selected={active}
-              sx={{
-                borderRadius: 1.5,
-                mb: 0.5,
-                px: collapsed ? 0 : 1.5,
-                py: 1,
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                color: active ? '#fff' : 'rgba(255,255,255,0.55)',
-                bgcolor: active ? 'rgba(255,255,255,0.12) !important' : 'transparent',
-                borderRight: active ? '3px solid #60a5fa' : '3px solid transparent',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.07)', color: '#fff' },
-                transition: 'all 0.15s',
-                minHeight: 40,
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  minWidth: collapsed ? 0 : 34,
-                  color: 'inherit',
-                  justifyContent: 'center',
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              {!collapsed && (
+          const btnSx = {
+            borderRadius: 1.5,
+            mb: 0.5,
+            px: collapsed ? 0 : 1.5,
+            py: 1,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            color: active ? '#fff' : 'rgba(255,255,255,0.55)',
+            bgcolor: active ? 'rgba(255,255,255,0.12) !important' : 'transparent',
+            borderRight: active ? '3px solid #60a5fa' : '3px solid transparent',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.07)', color: '#fff' },
+            transition: 'all 0.15s',
+            minHeight: 40,
+          };
+
+          // ─── FIX: key must be on the outermost element returned from map() ───
+          // When collapsed, Tooltip is outermost → key on Tooltip ✓
+          // When expanded,  Box is outermost    → key on Box ✓
+          // Previously: key was on ListItemButton inside btn, which was then
+          // returned bare (no wrapper) in the expanded branch — React fell back
+          // to positional index, causing wrong onClick to fire on click.
+          if (collapsed) {
+            return (
+              <Tooltip key={item.label} title={item.label} placement="right">
+                <ListItemButton onClick={() => navigate(item.path)} selected={active} sx={btnSx}>
+                  <ListItemIcon sx={{ minWidth: 0, color: 'inherit', justifyContent: 'center' }}>
+                    {item.icon}
+                  </ListItemIcon>
+                </ListItemButton>
+              </Tooltip>
+            );
+          }
+
+          return (
+            <Box key={item.label}>
+              <ListItemButton onClick={() => navigate(item.path)} selected={active} sx={btnSx}>
+                <ListItemIcon sx={{ minWidth: 34, color: 'inherit', justifyContent: 'center' }}>
+                  {item.icon}
+                </ListItemIcon>
                 <ListItemText
                   primary={
                     <Typography sx={{ fontSize: 13.5, fontWeight: active ? 700 : 400 }}>
@@ -175,16 +169,8 @@ export default function Sidebar({ onToggle }) {
                     </Typography>
                   }
                 />
-              )}
-            </ListItemButton>
-          );
-
-          return collapsed ? (
-            <Tooltip key={item.label} title={item.label} placement="right">
-              {btn}
-            </Tooltip>
-          ) : (
-            btn
+              </ListItemButton>
+            </Box>
           );
         })}
       </List>
@@ -198,9 +184,7 @@ export default function Sidebar({ onToggle }) {
             <ListItemButton
               onClick={handleLogout}
               sx={{
-                borderRadius: 1.5,
-                px: 0,
-                py: 0.8,
+                borderRadius: 1.5, px: 0, py: 0.8,
                 justifyContent: 'center',
                 color: 'rgba(255,255,255,0.45)',
                 '&:hover': { color: '#fff' },
@@ -215,9 +199,7 @@ export default function Sidebar({ onToggle }) {
           <ListItemButton
             onClick={handleLogout}
             sx={{
-              borderRadius: 1.5,
-              px: 1.5,
-              py: 0.8,
+              borderRadius: 1.5, px: 1.5, py: 0.8,
               color: 'rgba(255,255,255,0.45)',
               '&:hover': { color: '#fff' },
             }}
