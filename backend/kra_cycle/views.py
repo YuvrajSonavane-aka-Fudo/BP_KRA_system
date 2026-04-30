@@ -638,7 +638,7 @@ class KRALibraryView(APIView):
 
         qs = KRA.objects.select_related('category').prefetch_related(
             'kra_levels__level',    # related_name 'kra_levels' on KRALevel.kra
-            'kra_levels__category', # requires 'category' field on KRALevel (see model NOTE)
+            'kra_levels__category', # requires 'category' field on KRALevel
         )
 
         if category_id:

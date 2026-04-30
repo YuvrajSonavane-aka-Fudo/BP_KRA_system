@@ -11,23 +11,23 @@ Add to urls.py:
     from . import library_views as v
 
     urlpatterns += [
-        # ── KRA Category ──────────────────────────────────────────────────
+        # KRA Category 
         path('api/v1/kra/categories',                  v.KRACategoryListCreateView.as_view()),
         path('api/v1/kra/categories/<int:category_id>', v.KRACategoryDetailView.as_view()),
         path('api/v1/kra/categories/<int:category_id>/clone', v.KRACategoryCloneView.as_view()),
 
-        # ── Level ─────────────────────────────────────────────────────────
+        # Level 
         path('api/v1/levels',                  v.LevelListCreateView.as_view()),
         path('api/v1/levels/<int:level_id>',   v.LevelDetailView.as_view()),
         path('api/v1/levels/<int:level_id>/clone', v.LevelCloneView.as_view()),
 
-        # ── KRA (parent + its KRALevel children) ──────────────────────────
+        # KRA (parent + its KRALevel children) 
         path('api/v1/kra/library',                 v.KRAListCreateView.as_view()),
         path('api/v1/kra/library/<int:kra_id>',    v.KRADetailView.as_view()),
         path('api/v1/kra/library/<int:kra_id>/clone', v.KRACloneView.as_view()),
 
-        # ── KRALevel (standalone management per KRA) ──────────────────────
-        path('api/v1/kra/library/<int:kra_id>/levels',                    v.KRALevelListCreateView.as_view()),
+        # KRALevel (standalone management per KRA) 
+        path('api/v1/kra/library/<int:kra_id>/levels', v.KRALevelListCreateView.as_view()),
         path('api/v1/kra/library/<int:kra_id>/levels/<int:kra_level_id>', v.KRALevelDetailView.as_view()),
         path('api/v1/kra/library/<int:kra_id>/levels/<int:kra_level_id>/clone', v.KRALevelCloneView.as_view()),
     ]
@@ -756,39 +756,40 @@ class KRADetailView(APIView):
     # def patch(self, request, kra_id):
     #     return self._update(request, kra_id, partial=True)
 
-    # def delete(self, request, kra_id):
-    #     caller = _get_caller(request)
-    #     if not _is_hr(caller):
-    #         return Response({"error": "Only HR can delete KRAs"},
-    #                         status=status.HTTP_403_FORBIDDEN)
+    def delete(self, request, kra_id):
+        caller = _get_caller(request)
+        if not _is_hr(caller):
+            return Response({"error": "Only HR can delete KRAs"},
+                            status=status.HTTP_403_FORBIDDEN)
 
-    #     kra = get_object_or_404(KRA, id=kra_id)
+        kra = get_object_or_404(KRA, id=kra_id)
 
-    #     # Guard: KRALevel rows that are actively assigned to employees
-    #     active_assignments = kra.kra_levels.filter(
-    #         employee_kra_levels__isnull=False   # related_name on EmployeeKRALevel.kra_level
-    #     ).distinct().count()
+        # Guard: KRALevel rows that are actively assigned to employees
+        active_assignments = kra.kra_levels.filter(
+            employee_kra_levels__isnull=False   # related_name on EmployeeKRALevel.kra_level
+        ).distinct().count()
 
-    #     if active_assignments:
-    #         return Response(
-    #             {
-    #                 "error": "Cannot delete KRA — its level variants are assigned to employees in active cycles",
-    #                 "assigned_kra_level_count": active_assignments,
-    #             },
-    #             status=status.HTTP_400_BAD_REQUEST,
-    #         )
+        if active_assignments:
+            return Response(
+                {
+                    "error": "Cannot delete KRA — its level variants are assigned to employees in active cycles",
+                    "assigned_kra_level_count": active_assignments,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-    #     _audit(request, "KRA_DELETED", "KRA", kra.id,
-    #            old_data=_kra_dict(kra))
+        _audit(request, "KRA_DELETED", "KRA", kra.id,
+               old_data=_kra_dict(kra))
 
-    #     with transaction.atomic():
-    #         kra.kra_levels.all().delete()   # cascade via related_name
-    #         kra.delete()
+        with transaction.atomic():
+            kra.kra_levels.all().delete()   # cascade via related_name
+            kra.delete()
 
-    #     return Response(
-    #         {"message": f"KRA and all its level variants deleted successfully"},
-    #         status=status.HTTP_200_OK,
-    #     )
+        return Response(
+            {"message": f"KRA and all its level variants deleted successfully"},
+            status=status.HTTP_200_OK,
+        )
+        
     def _update(self, request, kra_id, partial=False):
         caller = _get_caller(request)
         if not _is_hr(caller):
@@ -799,7 +800,7 @@ class KRADetailView(APIView):
         old_data = _kra_dict(kra)
         data     = request.data
 
-        # ── Parent KRA fields ─────────────────────────────────────────────────
+        #  Parent KRA fields 
         name = data.get("name", kra.name or "").strip()
         if not partial and not name:
             return Response({"error": "name is required"},
@@ -820,7 +821,7 @@ class KRADetailView(APIView):
         if "is_standard" in data:
             kra.is_standard = data["is_standard"]
 
-        # ── Levels (optional in both PUT and PATCH) ───────────────────────────
+        # Levels (optional in both PUT and PATCH) 
         levels_data = data.get("levels")   # None means "not provided — don't touch"
 
         if levels_data is not None:

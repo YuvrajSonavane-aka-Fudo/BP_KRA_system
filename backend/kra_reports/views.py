@@ -253,7 +253,7 @@ class ReportExportView(APIView):
         ws = wb.active
         ws.title = 'Performance Report'
 
-        # ── Header row ────────────────────────────────────────────────────────
+        #  Header row 
         header_fill = PatternFill('solid', fgColor='1F4E79')
         header_font = Font(bold=True, color='FFFFFF', name='Arial', size=11)
         headers = [
@@ -270,7 +270,7 @@ class ReportExportView(APIView):
             cell.fill      = header_fill
             cell.alignment = Alignment(horizontal='center', vertical='center')
 
-        # ── Data rows ─────────────────────────────────────────────────────────
+        # Data rows 
         alt_fill = PatternFill('solid', fgColor='D6E4F0')
         row_idx  = 2
 
