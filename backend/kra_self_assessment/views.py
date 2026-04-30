@@ -139,7 +139,7 @@ class SelfAssessmentSubmitView(APIView):
 
         data = request.data
 
-        # --- Capture OLD DATA for audit ---
+        # Capture OLD DATA for audit 
         old_data = {
             "self_rating_id": row.self_rating_id,
             "self_comment": row.self_comment,
@@ -149,7 +149,7 @@ class SelfAssessmentSubmitView(APIView):
 
         updated_fields = {}
 
-        # --- Apply updates ---
+        #  Apply updates 
         self_rating_id = data.get('self_rating_id')
         if self_rating_id is not None:
             if not Rating.objects.filter(id=self_rating_id).exists():
@@ -171,7 +171,7 @@ class SelfAssessmentSubmitView(APIView):
 
         row.save()
 
-        # --- AUDIT LOG ---
+        # AUDIT LOG 
         _audit(
             request,
             "SELF_ASSESSMENT_UPDATED",

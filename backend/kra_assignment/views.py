@@ -111,7 +111,7 @@ class KRABulkAssignmentEnrolView(APIView):
 
     Two modes depending on the request body shape:
 
-    ── Mode A: Shared KRAs (same kra_level_ids for everyone) ──────────────────
+    Mode A: Shared KRAs (same kra_level_ids for everyone) 
     Use this when all employees in the batch get the same KRA set.
 
         {
@@ -131,7 +131,7 @@ class KRABulkAssignmentEnrolView(APIView):
             }
         }
 
-    ── Mode B: Per-employee KRAs (each employee gets their own set) ────────────
+    Mode B: Per-employee KRAs (each employee gets their own set) 
     Use this when different employees need different KRAs / weightages.
 
         {
@@ -463,7 +463,7 @@ class KRAAssignmentUpdateDeleteView(APIView):
             'message':               'Assignment updated successfully',
         }, status=status.HTTP_200_OK)
 
-    # ── 12. Remove ───────────────────────────────────────────────────────────
+    # 12. Remove 
     def delete(self, request, employee_kra_cycle_id):
         caller = _get_caller(request)
         ekc    = get_object_or_404(EmployeeKRACycle, id=employee_kra_cycle_id)
@@ -526,7 +526,7 @@ class KRAAssignmentCloneView(APIView):
         target_ids = request.data.get('target_employee_kra_cycle_ids', [])
         mode       = request.data.get('mode', 'skip')
 
-        # ── Validate inputs ───────────────────────────────────────────────────
+        # Validate inputs 
         if not source_id:
             return Response(
                 {'error': 'source_employee_kra_cycle_id is required'},
@@ -557,7 +557,7 @@ class KRAAssignmentCloneView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # ── Fetch source KRA rows ─────────────────────────────────────────────
+        # Fetch source KRA rows 
         source_levels = list(
             EmployeeKRALevel.objects.filter(employee_kra_cycle_id=source_id)
         )
@@ -567,7 +567,7 @@ class KRAAssignmentCloneView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # ── Validate all target IDs exist up front ────────────────────────────
+        # Validate all target IDs exist up front 
         existing_targets = {
             ekc.id: ekc
             for ekc in EmployeeKRACycle.objects.filter(id__in=target_ids)
@@ -582,7 +582,7 @@ class KRAAssignmentCloneView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # ── Process each target independently ─────────────────────────────────
+        #  Process each target independently 
         cloned  = []
         skipped = []
         failed  = []
@@ -652,7 +652,7 @@ class KRAAssignmentCloneView(APIView):
                     'reason': str(exc),
                 })
 
-        # ── Single audit entry covering the whole operation ───────────────────
+        # Single audit entry covering the whole operation 
         _audit(
             request,
             'KRA_ASSIGNMENT_BULK_CLONED',
@@ -672,7 +672,7 @@ class KRAAssignmentCloneView(APIView):
             },
         )
 
-        # ── Pick the right HTTP status ────────────────────────────────────────
+        # Pick the right HTTP status 
         if cloned and (skipped or failed):
             http_status = status.HTTP_207_MULTI_STATUS
         elif not cloned and failed:
