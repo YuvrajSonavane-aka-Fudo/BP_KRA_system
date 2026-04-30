@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'kra_assignment',
     'kra_library',
     'corsheaders',
+    'django_celery_beat',
 ]
 
 
@@ -168,3 +169,29 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = False   # False for HTTP (local dev), True for HTTPS (prod)
 SESSION_SAVE_EVERY_REQUEST = True  # refresh session on every request
+
+
+CELERY_BROKER_URL     = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_TIMEZONE       = 'Asia/Kolkata'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = 'smtp.gmail.com'
+EMAIL_PORT          = 587
+EMAIL_USE_TLS       = True
+EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL  = 'KRA System <moonmxn690@gmail.com>'
+
+
+
+# from django.core.mail import send_mail
+
+# send_mail(
+#     subject='KRA System Test Email',
+#     message='If you see this, email is working correctly.',
+#     from_email=None,  
+#     recipient_list=['moonmxn690@gmail.com'],  # send to yourself first
+#     fail_silently=False,
+# )
