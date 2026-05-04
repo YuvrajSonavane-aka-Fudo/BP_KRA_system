@@ -683,10 +683,10 @@ class KRAAssignmentCloneView(APIView):
         return Response(
             {
                 'source_employee_kra_cycle_id': source_id,
-                'kras_in_source':               len(source_levels),
-                'cloned':                       cloned,
-                'skipped':                      skipped,
-                'failed':                       failed,
+                'kras_in_source':len(source_levels),
+                'cloned': cloned,
+                'skipped': skipped,
+                'failed': failed,
                 'summary': {
                     'total_targets':  len(target_ids),
                     'cloned_count':   len(cloned),
