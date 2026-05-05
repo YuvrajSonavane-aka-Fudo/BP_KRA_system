@@ -85,21 +85,43 @@ class EmployeeListView(APIView):
         # Pre-fetch cycle assignments in one query if cycle_id provided
 
 
-        cycle_map = {}
-        kra_map = {}  # employee_id → [kra_level_id, ...]
+        # cycle_map = {}
+        # kra_map = {}  # employee_id → [kra_level_id, ...]
+        # if cycle_id:
+        #     for ekc in EmployeeKRACycle.objects.filter(kra_cycle_id=cycle_id).values('employee_id', 'id'):
+        #         cycle_map[ekc['employee_id']] = ekc['id']
+
+        #     for ekl in EmployeeKRALevel.objects.filter(
+        #         employee_kra_cycle_id__in=cycle_map.values()
+        #     ).values('employee_id', 'kra_level_id', 'kra_level__kra_id','kra_level__name'):
+        #         kra_map.setdefault(ekl['employee_id'], []).append({
+        #             'kra_level_id': ekl['kra_level_id'],
+        #             'kra_id' : ekl['kra_level__kra_id'],
+        #             'name':         ekl['kra_level__name'],
+        #         })
+        cycle_map = {}   # employee_id → employee_kra_cycle_id
+        kra_map   = {}   # employee_id → [...]
+
         if cycle_id:
-            for ekc in EmployeeKRACycle.objects.filter(kra_cycle_id=cycle_id).values('employee_id', 'id'):
+            for ekc in EmployeeKRACycle.objects.filter(
+                kra_cycle_id=cycle_id
+            ).values('employee_id', 'id'):
                 cycle_map[ekc['employee_id']] = ekc['id']
+
+            # Invert cycle_map so we can look up employee_id from ekc_id
+            ekc_to_emp = {v: k for k, v in cycle_map.items()}
 
             for ekl in EmployeeKRALevel.objects.filter(
                 employee_kra_cycle_id__in=cycle_map.values()
-            ).values('employee_id', 'kra_level_id', 'kra_level__kra_id','kra_level__name'):
-                kra_map.setdefault(ekl['employee_id'], []).append({
+            ).values('employee_kra_cycle_id', 'kra_level_id', 'kra_level__kra_id', 'kra_level__kra__name').distinct():
+                emp_id = ekc_to_emp.get(ekl['employee_kra_cycle_id'])
+                if emp_id is None:
+                    continue
+                kra_map.setdefault(emp_id, []).append({
                     'kra_level_id': ekl['kra_level_id'],
-                    'kra_id' : ekl['kra_level__kra_id'],
-                    'name':         ekl['kra_level__name'],
+                    'kra_id':       ekl['kra_level__kra_id'],
+                    'name':         ekl['kra_level__kra__name'],
                 })
-
         employees = []
         for e in qs:
             employees.append(
@@ -124,77 +146,6 @@ class EmployeeListView(APIView):
 
 
 class KRABulkAssignmentEnrolView(APIView):
-    """
-    POST /api/v1/kra/cycles/{cycle_id}/assignments/bulk
-
-    Enrols multiple employees into a cycle in one request.
-
-    Two modes depending on the request body shape:
-
-    Mode A: Shared KRAs (same kra_level_ids for everyone)
-    Use this when all employees in the batch get the same KRA set.
-
-        {
-            "assignments": [
-                { "employee_id": 1001, "employee_level_id": 2 },
-                { "employee_id": 1002, "employee_level_id": 1 },
-                { "employee_id": 1003, "employee_level_id": 2 }
-            ],
-            "shared": {
-                "categories":    [
-                    { "category_id": 1,  "weightage": "40" },
-                    { "category_id": 2,  "weightage": "30" },
-                    { "category_id": 15, "weightage": "30" }
-                ],
-                "kra_level_ids": [10, 11, 7, 8],
-                "is_date_based": true
-            }
-        }
-
-    Mode B: Per-employee KRAs (each employee gets their own set)
-    Use this when different employees need different KRAs / weightages.
-
-        {
-            "assignments": [
-                {
-                    "employee_id":      1001,
-                    "employee_level_id": 2,
-                    "is_date_based":    true,
-                    "categories":       [
-                        { "category_id": 1,  "weightage": "50" },
-                        { "category_id": 15, "weightage": "50" }
-                    ],
-                    "kra_level_ids":    [10, 11]
-                },
-                {
-                    "employee_id":      1002,
-                    "employee_level_id": 1,
-                    "is_date_based":    false,
-                    "categories":       [
-                        { "category_id": 2,  "weightage": "60" },
-                        { "category_id": 15, "weightage": "40" }
-                    ],
-                    "kra_level_ids":    [7, 8, 9]
-                }
-            ]
-        }
-
-    Response always includes three lists:
-        enrolled  – successfully created, overwritten, or appended to
-        skipped   – already enrolled and enrol_mode=skip (default), or append found nothing new
-        failed    – validation errors per employee
-
-    Optional top-level flag:
-        "enrol_mode": "skip"       ← (default) already-enrolled employees are left untouched
-        "enrol_mode": "overwrite"  ← wipe and replace categories + KRA rows for already-enrolled
-                                     employees. Existing ratings/progress on KRA rows are lost.
-        "enrol_mode": "append"     ← add only KRA levels not already present; upsert category
-                                     weightages. Existing KRA rows (and their ratings) are preserved.
-
-    Each entry in `enrolled` includes an `enrol_mode` field showing which path was taken
-    ("new", "overwrite", or "append").
-    """
-
     permission_classes = [IsAuthenticated]
 
     def post(self, request, cycle_id):
@@ -202,8 +153,8 @@ class KRABulkAssignmentEnrolView(APIView):
         data = request.data
 
         assignments = data.get("assignments", [])
-        shared = data.get("shared")  # present only in Mode A
-        enrol_mode = data.get("enrol_mode", "skip")  # 'skip' | 'overwrite' | 'append'
+        shared = data.get("shared")
+        enrol_mode = data.get("enrol_mode", "skip")
 
         if enrol_mode not in ("skip", "overwrite", "append"):
             return Response(
@@ -219,9 +170,7 @@ class KRABulkAssignmentEnrolView(APIView):
 
         cycle = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
 
-        #  Pre-flight checks (done outside the transaction so we fail fast)
-
-        # 1. Collect all employee IDs being submitted
+        # 1. Collect all employee IDs
         employee_ids = []
         for idx, a in enumerate(assignments):
             eid = a.get("employee_id")
@@ -232,7 +181,7 @@ class KRABulkAssignmentEnrolView(APIView):
                 )
             employee_ids.append(eid)
 
-        # 2. Verify caller can act on every employee before touching the DB
+        # 2. Verify caller permissions
         unauthorized = [
             eid for eid in employee_ids if not _caller_can_act_on(caller, eid)
         ]
@@ -245,8 +194,7 @@ class KRABulkAssignmentEnrolView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # 3. Find which employees are already enrolled
-        # Map employee_id → EmployeeKRACycle so we can reassign if requested
+        # 3. Find already enrolled employees
         already_enrolled = {
             ekc.employee_id: ekc
             for ekc in EmployeeKRACycle.objects.filter(
@@ -255,12 +203,10 @@ class KRABulkAssignmentEnrolView(APIView):
             )
         }
 
-        # 4. Bulk-fetch employee records (for manager lookup)
+        # 4. Bulk-fetch employee records
         employee_map = {
             e.id: e
-            for e in Employee.objects.filter(id__in=employee_ids).select_related(
-                "manager"
-            )
+            for e in Employee.objects.filter(id__in=employee_ids).select_related("manager")
         }
 
         # 5. Validate shared weightage once if Mode A
@@ -268,6 +214,8 @@ class KRABulkAssignmentEnrolView(APIView):
             shared_categories = shared.get("categories", [])
             shared_kra_level_ids = shared.get("kra_level_ids", [])
             shared_is_date_based = shared.get("is_date_based", False)
+            shared_kra_level_to_kra_id = shared.get("kra_level_to_kra_id", {})
+
             try:
                 shared_weight = sum(
                     int(c.get("weightage", 0)) for c in shared_categories
@@ -279,9 +227,7 @@ class KRABulkAssignmentEnrolView(APIView):
                 )
             if shared_weight != 100:
                 return Response(
-                    {
-                        "error": f"shared.categories weightage must sum to 100, got {shared_weight}"
-                    },
+                    {"error": f"shared.categories weightage must sum to 100, got {shared_weight}"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -296,21 +242,33 @@ class KRABulkAssignmentEnrolView(APIView):
 
                 emp = employee_map.get(eid)
                 if not emp:
-                    failed.append(
-                        {
-                            "employee_id": eid,
-                            "reason": "Employee not found or inactive",
-                        }
-                    )
+                    failed.append({"employee_id": eid, "reason": "Employee not found or inactive"})
                     continue
 
                 # Resolve categories + KRAs for this employee
                 if shared:
-                    # Mode A — everyone shares the same KRA set
+                    # Mode A — resolve kra_level_ids scoped to this employee's level
                     categories = shared_categories
-                    kra_level_ids = shared_kra_level_ids
                     is_date_based = shared_is_date_based
                     total_weight = shared_weight
+
+                    if shared_kra_level_to_kra_id:
+                        kra_ids = list(shared_kra_level_to_kra_id.values())
+                        employee_level_id = a.get("employee_level_id")
+
+                        qs = KRALevel.objects.filter(kra_id__in=kra_ids)
+                        if employee_level_id is not None:
+                            qs = qs.filter(level_id=employee_level_id)
+
+                        resolved = {kl.kra_id: kl.id for kl in qs}
+                        kra_level_ids = [
+                            resolved[kra_id]
+                            for kra_id in kra_ids
+                            if kra_id in resolved
+                        ]
+                    else:
+                        kra_level_ids = shared_kra_level_ids
+
                 else:
                     # Mode B — per-employee config
                     categories = a.get("categories", [])
@@ -321,20 +279,10 @@ class KRABulkAssignmentEnrolView(APIView):
                             int(c.get("weightage", 0)) for c in categories
                         )
                     except (ValueError, TypeError):
-                        failed.append(
-                            {
-                                "employee_id": eid,
-                                "reason": "Invalid weightage value in categories",
-                            }
-                        )
+                        failed.append({"employee_id": eid, "reason": "Invalid weightage value in categories"})
                         continue
                     if total_weight != 100:
-                        failed.append(
-                            {
-                                "employee_id": eid,
-                                "reason": f"Category weightage must sum to 100, got {total_weight}",
-                            }
-                        )
+                        failed.append({"employee_id": eid, "reason": f"Category weightage must sum to 100, got {total_weight}"})
                         continue
 
                 existing_ekc = already_enrolled.get(eid)
@@ -352,14 +300,16 @@ class KRABulkAssignmentEnrolView(APIView):
 
                     ekc = existing_ekc
 
-                    # Update scalar fields that may have changed
-                    if "employee_level_id" in a:
-                        ekc.employee_level_id = a["employee_level_id"]
+                    # Update scalar fields
+                    update_fields = ["is_date_based"]
                     ekc.is_date_based = is_date_based
-                    ekc.save(update_fields=["employee_level_id", "is_date_based"])
+                    new_level_id = a.get("employee_level_id")
+                    if new_level_id is not None:
+                        ekc.employee_level_id = new_level_id
+                        update_fields.append("employee_level_id")
+                    ekc.save(update_fields=update_fields)
 
                     if enrol_mode == "overwrite":
-                        # Replace everything — wipe existing categories & KRA rows
                         ekc.categories.all().delete()
                         EmployeeKRACycleCategory.objects.bulk_create(
                             [
@@ -386,14 +336,11 @@ class KRABulkAssignmentEnrolView(APIView):
                         kras_added = len(new_kra_rows)
 
                     else:  # append
-                        # Categories: upsert — update weightage if category already exists,
-                        # insert if it's new. Never delete existing ones.
                         existing_cats = {c.category_id: c for c in ekc.categories.all()}
                         new_cat_rows = []
                         for cat in categories:
                             cid = cat["category_id"]
                             if cid in existing_cats:
-                                # Update weightage in place
                                 existing_cats[cid].weightage = str(cat["weightage"])
                                 existing_cats[cid].save(update_fields=["weightage"])
                             else:
@@ -407,14 +354,11 @@ class KRABulkAssignmentEnrolView(APIView):
                         if new_cat_rows:
                             EmployeeKRACycleCategory.objects.bulk_create(new_cat_rows)
 
-                        # KRA levels: add only those not already present, preserving
-                        # existing rows (and any ratings / progress on them).
                         existing_kra_level_ids = set(
                             ekc.kra_level_rows.values_list("kra_level_id", flat=True)
                         )
                         to_add = [
-                            kl_id
-                            for kl_id in kra_level_ids
+                            kl_id for kl_id in kra_level_ids
                             if kl_id not in existing_kra_level_ids
                         ]
                         if not to_add:
@@ -448,7 +392,7 @@ class KRABulkAssignmentEnrolView(APIView):
                     )
 
                 else:
-                    # New enrolment — create the pivot record
+                    # New enrolment
                     ekc = EmployeeKRACycle.objects.create(
                         employee_id=eid,
                         kra_cycle=cycle,
@@ -456,10 +400,9 @@ class KRABulkAssignmentEnrolView(APIView):
                         stage_id=1,
                         is_date_based=is_date_based,
                         employee_manager_id=emp.manager_id,
-                        employee_level_id=a.get("employee_level_id"),
+                        employee_level_id=a.get("employee_level_id") or None,
                     )
 
-                    # Categories
                     EmployeeKRACycleCategory.objects.bulk_create(
                         [
                             EmployeeKRACycleCategory(
@@ -471,7 +414,6 @@ class KRABulkAssignmentEnrolView(APIView):
                         ]
                     )
 
-                    # KRA level rows
                     EmployeeKRALevel.objects.bulk_create(
                         [
                             EmployeeKRALevel(
@@ -492,7 +434,6 @@ class KRABulkAssignmentEnrolView(APIView):
                         }
                     )
 
-        # Audit (one entry covering the whole bulk operation)
         _audit(
             request,
             "KRA_BULK_ASSIGNED",
@@ -513,8 +454,6 @@ class KRABulkAssignmentEnrolView(APIView):
             },
         )
 
-        # Use 207 Multi-Status when there's a mix of outcomes,
-        # 201 when everything enrolled cleanly, 400 if everything failed.
         if enrolled and (skipped or failed):
             http_status = status.HTTP_207_MULTI_STATUS
         elif not enrolled and failed:
@@ -584,8 +523,9 @@ class KRAAssignmentUpdateDeleteView(APIView):
             )
 
         with transaction.atomic():
-            if "employee_level_id" in data:
-                ekc.employee_level_id = data["employee_level_id"]
+            new_level_id = data.get("employee_level_id")
+            if new_level_id is not None:
+                ekc.employee_level_id = new_level_id
             if "is_date_based" in data:
                 ekc.is_date_based = data["is_date_based"]
             ekc.save()
