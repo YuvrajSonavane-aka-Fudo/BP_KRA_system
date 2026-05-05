@@ -379,9 +379,9 @@ function ClonePanel({ employees, sourceEmployee, onClone, cloning }) {
                   onClick={(e) => e.stopPropagation()}
                   sx={{ p: 0, mr: 1.25, flexShrink: 0 }}
                 />
-                <Avatar sx={{ width: 28, height: 28, fontSize: 10, fontWeight: 700, background: gradient, mr: 1, flexShrink: 0 }}>
+                {/* <Avatar sx={{ width: 28, height: 28, fontSize: 10, fontWeight: 700, background: gradient, mr: 1, flexShrink: 0 }}>
                   {getInitials(emp.full_name)}
-                </Avatar>
+                </Avatar> */}
                 <Box minWidth={0}>
                   <Typography fontSize={12} fontWeight={600} color="#1e293b" noWrap>{emp.full_name}</Typography>
                   <Typography fontSize={10} color="#94a3b8" noWrap>
@@ -474,9 +474,9 @@ export default function EmployeeKRAView({
         <Box sx={{ background: gradient, px: 3, py: 2.5, color: '#fff', borderRadius: '12px 12px 0 0' }}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
             <Stack direction="row" alignItems="center" spacing={1.5}>
-              <Avatar sx={{ width: 42, height: 42, fontSize: 15, fontWeight: 800, bgcolor: 'rgba(255,255,255,0.2)', border: '2px solid rgba(255,255,255,0.35)' }}>
+              {/* <Avatar sx={{ width: 42, height: 42, fontSize: 15, fontWeight: 800, bgcolor: 'rgba(255,255,255,0.2)', border: '2px solid rgba(255,255,255,0.35)' }}>
                 {getInitials(employee.full_name)}
-              </Avatar>
+              </Avatar> */}
               <Box>
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <Typography fontWeight={800} fontSize="1rem" lineHeight={1.2}>{employee.full_name}</Typography>

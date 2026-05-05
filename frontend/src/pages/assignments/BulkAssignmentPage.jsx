@@ -536,9 +536,9 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
               <Stack direction="row" alignItems="center" gap={1.25} flex={1} minWidth={0} ml={0.5}
                 onClick={() => isAssigned && onView(emp)}
                 sx={{ cursor: isAssigned ? 'pointer' : 'default' }}>
-                <Avatar sx={{ width: 32, height: 32, fontSize: 11, fontWeight: 800, background: G, flexShrink: 0, borderRadius: 1.5 }}>
+                {/* <Avatar sx={{ width: 32, height: 32, fontSize: 11, fontWeight: 800, background: G, flexShrink: 0, borderRadius: 1.5 }}>
                   {initials(emp.full_name)}
-                </Avatar>
+                </Avatar> */}
                 <Box minWidth={0}>
                   <Stack direction="row" alignItems="center" gap={0.5}>
                     <Typography fontSize={12.5} fontWeight={600}
@@ -743,7 +743,7 @@ export default function BulkAssignmentPage() {
   const [selectedKraLevelIds, setSelectedKraLevelIds] = useState([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
   const [assigning,      setAssigning]      = useState(false);
-  const [weightageModal, setWeightageModal] = useState({ open: false, mode: 'assign', employee: null, prefill: null });
+  const [weightageModal, setWeightageModal] = useState({ open: false, mode: 'assign', employee: null, prefill: null, enrolMode: 'skip' });
   const [viewEmployee,   setViewEmployee]   = useState(null);
   const [cloneDefault,   setCloneDefault]   = useState(false);
 
@@ -858,10 +858,21 @@ export default function BulkAssignmentPage() {
       category_name: categories.find(c => c.id === cid)?.name ?? `Category ${cid}`,
       weightage: '',
     }));
-    setWeightageModal({ open: true, mode: 'assign', employee: null, prefill: { categories: prefillCats, kra_level_ids: decodedLevelIds } });
+
+    // If any selected employees are already enrolled, default to 'append' so the
+    // user sees the enrol_mode picker pre-set to a sensible value.
+    const anyAlreadyEnrolled = employees.some(
+      e => selectedEmployeeIds.includes(e.employee_id) && e.assigned_to_cycle,
+    );
+
+    setWeightageModal({
+      open: true, mode: 'assign', employee: null,
+      prefill: { categories: prefillCats, kra_level_ids: decodedLevelIds },
+      enrolMode: anyAlreadyEnrolled ? 'append' : 'skip',
+    });
   };
 
-  const handleConfirmAssign = async ({ categories: cats, kra_level_ids, is_date_based }) => {
+  const handleConfirmAssign = async ({ categories: cats, kra_level_ids, is_date_based, enrol_mode }) => {
     setAssigning(true);
     setWeightageModal(m => ({ ...m, open: false }));
     try {
@@ -869,6 +880,7 @@ export default function BulkAssignmentPage() {
       const payload = {
         assignments: selEmps.map(e => ({ employee_id: e.employee_id, employee_level_id: e.level_id ?? null })),
         shared: { categories: cats, kra_level_ids, is_date_based: is_date_based ?? false },
+        enrol_mode: enrol_mode ?? 'skip',
       };
       const res = await bulkAssignKRAs(activeCycle.id, payload);
       const { enrolled = [], skipped = [], failed = [] } = res.data;
@@ -876,7 +888,13 @@ export default function BulkAssignmentPage() {
       await handleRefresh(activeCycle.id);
       setSelectedKraLevelIds([]); setSelectedEmployeeIds([]);
       if (failed.length === 0) {
-        showToast(`${enrolled.length > 0 ? `${enrolled.length} assigned.` : ''}${skipped.length > 0 ? ` ${skipped.length} updated.` : ''}`, 'success');
+        const newCount       = enrolled.filter(e => e.enrol_mode === 'new').length;
+        const updatedCount   = enrolled.filter(e => e.enrol_mode !== 'new').length;
+        const parts = [];
+        if (newCount)     parts.push(`${newCount} assigned`);
+        if (updatedCount) parts.push(`${updatedCount} ${enrol_mode === 'overwrite' ? 'overwritten' : 'appended'}`);
+        if (skipped.length) parts.push(`${skipped.length} skipped`);
+        showToast(parts.join(', ') + '.', 'success');
       } else {
         showToast(enrolled.length > 0 ? `${enrolled.length} assigned, ${failed.length} failed.` : 'Assignment failed.', enrolled.length > 0 ? 'warning' : 'error');
       }
@@ -893,6 +911,7 @@ export default function BulkAssignmentPage() {
       prefill: cached ? { categories: cached.categories, kra_level_ids: cached.kra_level_ids } : { categories: [], kra_level_ids: [] } });
   };
 
+  // Edit always uses PUT /assignments/{id} — enrol_mode is not relevant here.
   const handleConfirmEdit = async ({ categories: cats, kra_level_ids, is_date_based }) => {
     const { employee } = weightageModal;
     setWeightageModal(m => ({ ...m, open: false }));
@@ -936,7 +955,7 @@ export default function BulkAssignmentPage() {
 
   const handleCloneTo = async (targetIds) => {
     try {
-      await cloneAssignmentToMany(targetIds, viewEmployee.employee_kra_cycle_id);
+      await cloneAssignmentToMany(viewEmployee.employee_kra_cycle_id, targetIds);
       await handleRefresh(activeCycle.id);
       showToast(`KRAs copied to ${targetIds.length} employee${targetIds.length !== 1 ? 's' : ''}.`, 'success');
       setViewEmployee(null); setCloneDefault(false);
@@ -1044,6 +1063,8 @@ export default function BulkAssignmentPage() {
 
       <ManageWeightageModal open={weightageModal.open} mode={weightageModal.mode}
         employee={weightageModal.employee} prefill={weightageModal.prefill}
+        enrolMode={weightageModal.enrolMode}
+        onEnrolModeChange={val => setWeightageModal(m => ({ ...m, enrolMode: val }))}
         kraLibrary={kraLibrary} categories={categories}
         selectedEmployeeIds={selectedEmployeeIds} employees={employees}
         activeCycleId={activeCycle?.id}
