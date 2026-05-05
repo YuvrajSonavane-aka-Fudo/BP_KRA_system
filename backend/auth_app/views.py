@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 
-from kra_cycle.models import Employee
+from kra_cycle.models import Employee, AuditLog
 
 
 def _build_msal_app():
@@ -53,9 +53,21 @@ class MicrosoftCallbackView(APIView):
 
         if error:
             desc = request.GET.get('error_description', 'Microsoft login failed')
+            AuditLog.objects.create(
+                action='LOGIN_FAILED',
+                entity='Employee',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                new_data={'reason': 'microsoft_oauth_error', 'error': error, 'description': desc},
+            )
             return redirect(f"{settings.FRONTEND_URL}/login?error={desc}")
 
         if not code:
+            AuditLog.objects.create(
+                action='LOGIN_FAILED',
+                entity='Employee',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                new_data={'reason': 'missing_code'},
+            )
             return redirect(f"{settings.FRONTEND_URL}/login?error=missing_code")
 
         # Exchange the auth code for an access token
@@ -68,6 +80,12 @@ class MicrosoftCallbackView(APIView):
 
         if 'error' in result:
             desc = result.get('error_description', 'Token exchange failed')
+            AuditLog.objects.create(
+                action='LOGIN_FAILED',
+                entity='Employee',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                new_data={'reason': 'token_exchange_failed', 'description': desc},
+            )
             return redirect(f"{settings.FRONTEND_URL}/login?error={desc}")
 
         # Microsoft puts the user's email in 'preferred_username' (UPN)
@@ -75,6 +93,12 @@ class MicrosoftCallbackView(APIView):
         email  = claims.get('preferred_username') or claims.get('email', '')
 
         if not email:
+            AuditLog.objects.create(
+                action='LOGIN_FAILED',
+                entity='Employee',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                new_data={'reason': 'no_email_in_token'},
+            )
             return redirect(f"{settings.FRONTEND_URL}/login?error=no_email_in_token")
 
         # Match against your Employee table
@@ -86,11 +110,26 @@ class MicrosoftCallbackView(APIView):
                 .get(email__iexact=email, active=True)
             )
         except Employee.DoesNotExist:
+            AuditLog.objects.create(
+                action='LOGIN_FAILED',
+                entity='Employee',
+                ip_address=request.META.get('REMOTE_ADDR'),
+                new_data={'reason': 'employee_not_found', 'email': email},
+            )
             return redirect(f"{settings.FRONTEND_URL}/login?error=employee_not_found")
 
         # Write the same session key your existing auth reads
         request.session['employee_id'] = employee.id
         request.session.save()
+
+        AuditLog.objects.create(
+            employee=employee,
+            action='LOGIN_SUCCESS',
+            entity='Employee',
+            entity_id=employee.id,
+            ip_address=request.META.get('REMOTE_ADDR'),
+            new_data={'email': employee.email, 'method': 'microsoft_oauth'},
+        )
 
         return redirect(f"{settings.FRONTEND_URL}/dashboard")
 
@@ -103,7 +142,16 @@ class MicrosoftLogoutView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        employee_id = request.session.get('employee_id')
         request.session.flush()
+
+        AuditLog.objects.create(
+            employee_id=employee_id,
+            action='LOGOUT',
+            entity='Employee',
+            entity_id=employee_id,
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
         ms_logout = (
             f"https://login.microsoftonline.com/{settings.AZURE_AD['TENANT_ID']}"
             f"/oauth2/v2.0/logout"
