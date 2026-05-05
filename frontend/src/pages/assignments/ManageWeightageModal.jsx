@@ -46,10 +46,10 @@ export default function ManageWeightageModal({
   onConfirm, onClose,
 }) {
   const [categoryWeightages, setCategoryWeightages] = useState([]);
-  const [isDateBased, setIsDateBased]               = useState(false);
-  const [fieldErrors, setFieldErrors]               = useState({}); // per-category error
-  const [globalError, setGlobalError]               = useState('');
-  const [submitting, setSubmitting]                 = useState(false);
+  const [isDateBased, setIsDateBased] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({}); // per-category error
+  const [globalError, setGlobalError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const isEdit = mode === 'edit';
 
@@ -75,15 +75,15 @@ export default function ManageWeightageModal({
     if (uniqueCategoryIds.length > 0) {
       // Assign mode — build from selected KRAs
       const init = uniqueCategoryIds.map((cid) => {
-        const existing  = prefillCats.find((c) => c.category_id === cid);
-        const cat       = categories.find((c) => c.id === cid);
+        const existing = prefillCats.find((c) => c.category_id === cid);
+        const cat = categories.find((c) => c.id === cid);
         // Get is_standard from the first KRA in this category
         const sampleKRA = selectedKras.find((k) => k.category_id === cid);
         return {
-          category_id:   cid,
+          category_id: cid,
           category_name: cat?.name ?? sampleKRA?.category_name ?? `Category ${cid}`,
-          is_standard:   sampleKRA?.is_standard ?? true,
-          weightage:     existing?.weightage ? String(existing.weightage) : '',
+          is_standard: sampleKRA?.is_standard ?? true,
+          weightage: existing?.weightage ? String(existing.weightage) : '',
           // KRAs in this category that are selected
           kra_names: selectedKras
             .filter((k) => k.category_id === cid)
@@ -95,14 +95,14 @@ export default function ManageWeightageModal({
       // Edit mode — use cached categories
       setCategoryWeightages(
         prefillCats.map((c) => {
-          const cat       = categories.find((cat) => cat.id === c.category_id);
+          const cat = categories.find((cat) => cat.id === c.category_id);
           const sampleKRA = kraLibrary.find((k) => k.category_id === c.category_id);
           return {
-            category_id:   c.category_id,
+            category_id: c.category_id,
             category_name: c.category_name ?? cat?.name ?? `Category ${c.category_id}`,
-            is_standard:   sampleKRA?.is_standard ?? true,
-            weightage:     String(c.weightage ?? ''),
-            kra_names:     [],
+            is_standard: sampleKRA?.is_standard ?? true,
+            weightage: String(c.weightage ?? ''),
+            kra_names: [],
           };
         })
       );
@@ -121,7 +121,7 @@ export default function ManageWeightageModal({
     return sum + (isNaN(v) ? 0 : v);
   }, 0);
 
-  const isValid         = Math.abs(totalWeightage - 100) < 0.001;
+  const isValid = Math.abs(totalWeightage - 100) < 0.001;
   const remainingWeight = parseFloat((100 - totalWeightage).toFixed(1));
 
   // ── Field change ───────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ export default function ManageWeightageModal({
   const distributeEvenly = () => {
     const count = categoryWeightages.length;
     if (count === 0) return;
-    const base      = Math.floor(100 / count);
+    const base = Math.floor(100 / count);
     const remainder = 100 - base * (count - 1);
     setCategoryWeightages((prev) =>
       prev.map((c, i) => ({
@@ -192,11 +192,12 @@ export default function ManageWeightageModal({
       await onConfirm({
         categories: categoryWeightages.map((c) => ({
           category_id: c.category_id,
-          weightage:   String(parseFloat(c.weightage)),
+          weightage: String(parseFloat(c.weightage)),
         })),
         kra_level_ids: selectedKraLevelIds,
+        kra_level_to_kra_id: prefill?.kra_level_to_kra_id ?? {},  // ← forward it
         is_date_based: isDateBased,
-        enrol_mode:    enrolMode ?? 'skip',
+        enrol_mode: enrolMode ?? 'skip',
       });
     } finally {
       setSubmitting(false);
@@ -212,7 +213,7 @@ export default function ManageWeightageModal({
 
   // How many of the target employees are already enrolled in this cycle
   const alreadyEnrolledCount = isEdit ? 0 : targetEmployees.filter((e) => e.assigned_to_cycle).length;
-  const showEnrolModePicker  = !isEdit && alreadyEnrolledCount > 0;
+  const showEnrolModePicker = !isEdit && alreadyEnrolledCount > 0;
 
   // ── Progress bar color ─────────────────────────────────────────────────────
   const progressColor = isValid ? '#16a34a' : totalWeightage > 100 ? '#dc2626' : '#f59e0b';
@@ -287,8 +288,8 @@ export default function ManageWeightageModal({
             </Typography>
             <Stack spacing={0.75}>
               {[
-                { value: 'skip',      label: 'Skip',      desc: 'Leave existing assignments untouched. Only new employees will be assigned.' },
-                { value: 'append',    label: 'Append',    desc: 'Add these KRAs to existing assignments. Already-present KRAs are preserved with their ratings.' },
+                { value: 'skip', label: 'Skip', desc: 'Leave existing assignments untouched. Only new employees will be assigned.' },
+                { value: 'append', label: 'Append', desc: 'Add these KRAs to existing assignments. Already-present KRAs are preserved with their ratings.' },
                 { value: 'overwrite', label: 'Overwrite', desc: 'Replace all existing KRAs and categories. Existing ratings and progress will be lost.' },
               ].map((opt) => {
                 const isSelected = enrolMode === opt.value;
@@ -421,9 +422,9 @@ export default function ManageWeightageModal({
         {/* Category inputs */}
         <Stack spacing={1.5} mb={2}>
           {categoryWeightages.map((cat) => {
-            const val      = parseFloat(cat.weightage);
+            const val = parseFloat(cat.weightage);
             const hasError = fieldErrors[cat.category_id];
-            const pct      = isNaN(val) ? 0 : Math.min(val, 100);
+            const pct = isNaN(val) ? 0 : Math.min(val, 100);
 
             return (
               <Box
