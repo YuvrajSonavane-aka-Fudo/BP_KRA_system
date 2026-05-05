@@ -6,6 +6,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from datetime import datetime, date, time
+from django.utils.timezone import make_aware
+
 from .models import (
     Employee,
     KRACycle,
@@ -277,7 +280,13 @@ def _clone_assignments(source_cycle, new_cycle, caller):
         },
     } 
 
-
+def _parse_date(value):
+    """Accepts '2026-05-13' or '2026-05-13T00:00:00', always returns aware datetime."""
+    try:
+        d = date.fromisoformat(value)  # handles date-only strings
+        return make_aware(datetime.combine(d, time.min))
+    except ValueError:
+        return make_aware(datetime.fromisoformat(value.replace('Z', '')))
 
 # 1. Authentication
 
@@ -445,14 +454,23 @@ class KRACycleListCreateView(APIView):
 
         stage_map = {s.id: s for s in existing_stages}
 
+        try:
+            cycle_start = _parse_date(data["start_date"])
+            cycle_end   = _parse_date(data["end_date"])
+        except (ValueError, AttributeError):
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         with transaction.atomic():
             first_stage = stage_map[stages_data[0]["stage_id"]]
 
             cycle = KRACycle.objects.create(
                 name        = data["name"],
                 description = data.get("description", ""),
-                start_date  = data["start_date"],
-                end_date    = data["end_date"],
+                start_date  = cycle_start,
+                end_date    = cycle_end,
                 status      = "DRAFT",
                 stage       = first_stage,
                 is_deleted  = False,
@@ -463,11 +481,17 @@ class KRACycleListCreateView(APIView):
                     if field not in s:
                         raise ValueError(f"Missing {field} in stages entry")
 
+                try:
+                    stage_start = _parse_date(s["start_date"])
+                    stage_end   = _parse_date(s["end_date"])
+                except (ValueError, AttributeError):
+                    raise ValueError(f"Invalid date format in stage {s['stage_id']}")
+
                 KRACycleStage.objects.create(
                     kra_cycle  = cycle,
                     stage      = stage_map[s["stage_id"]],
-                    start_date = s["start_date"],
-                    end_date   = s["end_date"],
+                    start_date = stage_start,
+                    end_date   = stage_end,
                     is_deleted = False,
                 )
 
@@ -690,13 +714,22 @@ class KRACycleCloneView(APIView):
 
         clone_assignments = data.get('clone_assignments', True)
 
+        try:
+            clone_start = _parse_date(data['start_date'])
+            clone_end   = _parse_date(data['end_date'])
+        except (ValueError, AttributeError):
+            return Response(
+                {'error': 'Invalid date format. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # ── Step 1: Clone the cycle shell + stage windows ─────────────────────
         with transaction.atomic():
             new_cycle = KRACycle.objects.create(
                 name=data['name'],
                 description=source.description,
-                start_date=data['start_date'],
-                end_date=data['end_date'],
+                start_date=clone_start,
+                end_date=clone_end,
                 status='DRAFT',
                 is_deleted=False,
             )
