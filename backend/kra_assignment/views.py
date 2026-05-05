@@ -160,17 +160,19 @@ class KRABulkAssignmentEnrolView(APIView):
         }
 
     Response always includes three lists:
-        enrolled  – successfully created or reassigned
-        skipped   – already enrolled and reassign=false (default)
+        enrolled  – successfully created, overwritten, or appended to
+        skipped   – already enrolled and enrol_mode=skip (default), or append found nothing new
         failed    – validation errors per employee
 
     Optional top-level flag:
-        "reassign": true   ← if an employee is already enrolled, replace their
-                             categories and KRA level rows in-place (preserving
-                             the EmployeeKRACycle record and any cycle-level data).
-                             Each reassigned entry in `enrolled` will have
-                             "reassigned": true.
-                             Default is false (already-enrolled employees are skipped).
+        "enrol_mode": "skip"       ← (default) already-enrolled employees are left untouched
+        "enrol_mode": "overwrite"  ← wipe and replace categories + KRA rows for already-enrolled
+                                     employees. Existing ratings/progress on KRA rows are lost.
+        "enrol_mode": "append"     ← add only KRA levels not already present; upsert category
+                                     weightages. Existing KRA rows (and their ratings) are preserved.
+
+    Each entry in `enrolled` includes an `enrol_mode` field showing which path was taken
+    ("new", "overwrite", or "append").
     """
     permission_classes = [IsAuthenticated]
 
@@ -179,8 +181,14 @@ class KRABulkAssignmentEnrolView(APIView):
         data   = request.data
 
         assignments = data.get('assignments', [])
-        shared      = data.get('shared')          # present only in Mode A
-        reassign    = data.get('reassign', False)  # if True, re-assign KRAs for already-enrolled employees
+        shared      = data.get('shared')               # present only in Mode A
+        enrol_mode  = data.get('enrol_mode', 'skip')   # 'skip' | 'overwrite' | 'append'
+
+        if enrol_mode not in ('skip', 'overwrite', 'append'):
+            return Response(
+                {'error': "enrol_mode must be one of: 'skip', 'overwrite', 'append'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not assignments:
             return Response(
@@ -298,17 +306,14 @@ class KRABulkAssignmentEnrolView(APIView):
                 existing_ekc = already_enrolled.get(eid)
 
                 if existing_ekc:
-                    if not reassign:
-                        # Default behaviour: skip silently
+                    if enrol_mode == 'skip':
                         skipped.append({
                             'employee_id':           eid,
                             'employee_kra_cycle_id': existing_ekc.id,
-                            'reason':                'Already enrolled in this cycle. Pass reassign=true to override.',
+                            'reason':                'Already enrolled in this cycle. Use enrol_mode=overwrite or enrol_mode=append to modify.',
                         })
                         continue
 
-                    # reassign=true: replace categories & KRA rows on the existing record,
-                    # preserving any ratings / progress stored on the EmployeeKRACycle itself.
                     ekc = existing_ekc
 
                     # Update scalar fields that may have changed
@@ -317,33 +322,82 @@ class KRABulkAssignmentEnrolView(APIView):
                     ekc.is_date_based = is_date_based
                     ekc.save(update_fields=['employee_level_id', 'is_date_based'])
 
-                    # Replace categories
-                    ekc.categories.all().delete()
-                    EmployeeKRACycleCategory.objects.bulk_create([
-                        EmployeeKRACycleCategory(
-                            employee_kra_cycle=ekc,
-                            category_id=cat['category_id'],
-                            weightage=str(cat['weightage']),
-                        )
-                        for cat in categories
-                    ])
+                    if enrol_mode == 'overwrite':
+                        # Replace everything — wipe existing categories & KRA rows
+                        ekc.categories.all().delete()
+                        EmployeeKRACycleCategory.objects.bulk_create([
+                            EmployeeKRACycleCategory(
+                                employee_kra_cycle=ekc,
+                                category_id=cat['category_id'],
+                                weightage=str(cat['weightage']),
+                            )
+                            for cat in categories
+                        ])
 
-                    # Replace KRA level rows (clears old assignments including any done ones)
-                    ekc.kra_level_rows.all().delete()
-                    EmployeeKRALevel.objects.bulk_create([
-                        EmployeeKRALevel(
-                            employee_id=eid,
-                            kra_level_id=kl_id,
-                            employee_kra_cycle=ekc,
+                        ekc.kra_level_rows.all().delete()
+                        new_kra_rows = EmployeeKRALevel.objects.bulk_create([
+                            EmployeeKRALevel(
+                                employee_id=eid,
+                                kra_level_id=kl_id,
+                                employee_kra_cycle=ekc,
+                            )
+                            for kl_id in kra_level_ids
+                        ])
+                        kras_added = len(new_kra_rows)
+
+                    else:  # append
+                        # Categories: upsert — update weightage if category already exists,
+                        # insert if it's new. Never delete existing ones.
+                        existing_cats = {
+                            c.category_id: c
+                            for c in ekc.categories.all()
+                        }
+                        new_cat_rows = []
+                        for cat in categories:
+                            cid = cat['category_id']
+                            if cid in existing_cats:
+                                # Update weightage in place
+                                existing_cats[cid].weightage = str(cat['weightage'])
+                                existing_cats[cid].save(update_fields=['weightage'])
+                            else:
+                                new_cat_rows.append(
+                                    EmployeeKRACycleCategory(
+                                        employee_kra_cycle=ekc,
+                                        category_id=cid,
+                                        weightage=str(cat['weightage']),
+                                    )
+                                )
+                        if new_cat_rows:
+                            EmployeeKRACycleCategory.objects.bulk_create(new_cat_rows)
+
+                        # KRA levels: add only those not already present, preserving
+                        # existing rows (and any ratings / progress on them).
+                        existing_kra_level_ids = set(
+                            ekc.kra_level_rows.values_list('kra_level_id', flat=True)
                         )
-                        for kl_id in kra_level_ids
-                    ])
+                        to_add = [kl_id for kl_id in kra_level_ids if kl_id not in existing_kra_level_ids]
+                        if not to_add:
+                            skipped.append({
+                                'employee_id':           eid,
+                                'employee_kra_cycle_id': ekc.id,
+                                'reason':                'append: all submitted KRA levels already exist on this employee — nothing added.',
+                            })
+                            continue
+                        new_kra_rows = EmployeeKRALevel.objects.bulk_create([
+                            EmployeeKRALevel(
+                                employee_id=eid,
+                                kra_level_id=kl_id,
+                                employee_kra_cycle=ekc,
+                            )
+                            for kl_id in to_add
+                        ])
+                        kras_added = len(new_kra_rows)
 
                     enrolled.append({
                         'employee_id':           eid,
                         'employee_kra_cycle_id': ekc.id,
-                        'kras_assigned':         len(kra_level_ids),
-                        'reassigned':            True,
+                        'kras_added':            kras_added,
+                        'enrol_mode':            enrol_mode,
                     })
 
                 else:
@@ -381,8 +435,8 @@ class KRABulkAssignmentEnrolView(APIView):
                     enrolled.append({
                         'employee_id':           eid,
                         'employee_kra_cycle_id': ekc.id,
-                        'kras_assigned':         len(kra_level_ids),
-                        'reassigned':            False,
+                        'kras_added':            len(kra_level_ids),
+                        'enrol_mode':            'new',
                     })
 
         # Audit (one entry covering the whole bulk operation) 
@@ -395,7 +449,7 @@ class KRABulkAssignmentEnrolView(APIView):
                 'cycle_id':        cycle_id,
                 'assigned_by':     caller.id,
                 'mode':            'shared' if shared else 'per_employee',
-                'reassign':        reassign,
+                'enrol_mode':      enrol_mode,
                 'total_submitted': len(assignments),
                 'enrolled_count':  len(enrolled),
                 'skipped_count':   len(skipped),
