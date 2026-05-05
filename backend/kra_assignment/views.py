@@ -160,9 +160,17 @@ class KRABulkAssignmentEnrolView(APIView):
         }
 
     Response always includes three lists:
-        enrolled  – successfully created
-        skipped   – already enrolled (not re-created)
+        enrolled  – successfully created or reassigned
+        skipped   – already enrolled and reassign=false (default)
         failed    – validation errors per employee
+
+    Optional top-level flag:
+        "reassign": true   ← if an employee is already enrolled, replace their
+                             categories and KRA level rows in-place (preserving
+                             the EmployeeKRACycle record and any cycle-level data).
+                             Each reassigned entry in `enrolled` will have
+                             "reassigned": true.
+                             Default is false (already-enrolled employees are skipped).
     """
     permission_classes = [IsAuthenticated]
 
@@ -172,6 +180,7 @@ class KRABulkAssignmentEnrolView(APIView):
 
         assignments = data.get('assignments', [])
         shared      = data.get('shared')          # present only in Mode A
+        reassign    = data.get('reassign', False)  # if True, re-assign KRAs for already-enrolled employees
 
         if not assignments:
             return Response(
@@ -208,13 +217,15 @@ class KRABulkAssignmentEnrolView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # 3. Find which employees are already enrolled (skip them, don't error)
-        already_enrolled = set(
-            EmployeeKRACycle.objects.filter(
+        # 3. Find which employees are already enrolled
+        # Map employee_id → EmployeeKRACycle so we can reassign if requested
+        already_enrolled = {
+            ekc.employee_id: ekc
+            for ekc in EmployeeKRACycle.objects.filter(
                 kra_cycle_id=cycle_id,
                 employee_id__in=employee_ids,
-            ).values_list('employee_id', flat=True)
-        )
+            )
+        }
 
         # 4. Bulk-fetch employee records (for manager lookup)
         employee_map = {
@@ -248,14 +259,6 @@ class KRABulkAssignmentEnrolView(APIView):
         with transaction.atomic():
             for a in assignments:
                 eid = a['employee_id']
-
-                # Already enrolled — skip silently
-                if eid in already_enrolled:
-                    skipped.append({
-                        'employee_id': eid,
-                        'reason':      'Already enrolled in this cycle',
-                    })
-                    continue
 
                 emp = employee_map.get(eid)
                 if not emp:
@@ -292,42 +295,95 @@ class KRABulkAssignmentEnrolView(APIView):
                         })
                         continue
 
-                # Create the pivot record
-                ekc = EmployeeKRACycle.objects.create(
-                    employee_id=eid,
-                    kra_cycle=cycle,
-                    status='Draft',
-                    stage_id=1,
-                    is_date_based=is_date_based,
-                    employee_manager_id=emp.manager_id,
-                    employee_level_id=a.get('employee_level_id'),
-                )
+                existing_ekc = already_enrolled.get(eid)
 
-                # Categories
-                EmployeeKRACycleCategory.objects.bulk_create([
-                    EmployeeKRACycleCategory(
-                        employee_kra_cycle=ekc,
-                        category_id=cat['category_id'],
-                        weightage=str(cat['weightage']),
-                    )
-                    for cat in categories
-                ])
+                if existing_ekc:
+                    if not reassign:
+                        # Default behaviour: skip silently
+                        skipped.append({
+                            'employee_id':           eid,
+                            'employee_kra_cycle_id': existing_ekc.id,
+                            'reason':                'Already enrolled in this cycle. Pass reassign=true to override.',
+                        })
+                        continue
 
-                # KRA level rows
-                EmployeeKRALevel.objects.bulk_create([
-                    EmployeeKRALevel(
+                    # reassign=true: replace categories & KRA rows on the existing record,
+                    # preserving any ratings / progress stored on the EmployeeKRACycle itself.
+                    ekc = existing_ekc
+
+                    # Update scalar fields that may have changed
+                    if 'employee_level_id' in a:
+                        ekc.employee_level_id = a['employee_level_id']
+                    ekc.is_date_based = is_date_based
+                    ekc.save(update_fields=['employee_level_id', 'is_date_based'])
+
+                    # Replace categories
+                    ekc.categories.all().delete()
+                    EmployeeKRACycleCategory.objects.bulk_create([
+                        EmployeeKRACycleCategory(
+                            employee_kra_cycle=ekc,
+                            category_id=cat['category_id'],
+                            weightage=str(cat['weightage']),
+                        )
+                        for cat in categories
+                    ])
+
+                    # Replace KRA level rows (clears old assignments including any done ones)
+                    ekc.kra_level_rows.all().delete()
+                    EmployeeKRALevel.objects.bulk_create([
+                        EmployeeKRALevel(
+                            employee_id=eid,
+                            kra_level_id=kl_id,
+                            employee_kra_cycle=ekc,
+                        )
+                        for kl_id in kra_level_ids
+                    ])
+
+                    enrolled.append({
+                        'employee_id':           eid,
+                        'employee_kra_cycle_id': ekc.id,
+                        'kras_assigned':         len(kra_level_ids),
+                        'reassigned':            True,
+                    })
+
+                else:
+                    # New enrolment — create the pivot record
+                    ekc = EmployeeKRACycle.objects.create(
                         employee_id=eid,
-                        kra_level_id=kl_id,
-                        employee_kra_cycle=ekc,
+                        kra_cycle=cycle,
+                        status='Draft',
+                        stage_id=1,
+                        is_date_based=is_date_based,
+                        employee_manager_id=emp.manager_id,
+                        employee_level_id=a.get('employee_level_id'),
                     )
-                    for kl_id in kra_level_ids
-                ])
 
-                enrolled.append({
-                    'employee_id':           eid,
-                    'employee_kra_cycle_id': ekc.id,
-                    'kras_assigned':         len(kra_level_ids),
-                })
+                    # Categories
+                    EmployeeKRACycleCategory.objects.bulk_create([
+                        EmployeeKRACycleCategory(
+                            employee_kra_cycle=ekc,
+                            category_id=cat['category_id'],
+                            weightage=str(cat['weightage']),
+                        )
+                        for cat in categories
+                    ])
+
+                    # KRA level rows
+                    EmployeeKRALevel.objects.bulk_create([
+                        EmployeeKRALevel(
+                            employee_id=eid,
+                            kra_level_id=kl_id,
+                            employee_kra_cycle=ekc,
+                        )
+                        for kl_id in kra_level_ids
+                    ])
+
+                    enrolled.append({
+                        'employee_id':           eid,
+                        'employee_kra_cycle_id': ekc.id,
+                        'kras_assigned':         len(kra_level_ids),
+                        'reassigned':            False,
+                    })
 
         # Audit (one entry covering the whole bulk operation) 
         _audit(
@@ -339,6 +395,7 @@ class KRABulkAssignmentEnrolView(APIView):
                 'cycle_id':        cycle_id,
                 'assigned_by':     caller.id,
                 'mode':            'shared' if shared else 'per_employee',
+                'reassign':        reassign,
                 'total_submitted': len(assignments),
                 'enrolled_count':  len(enrolled),
                 'skipped_count':   len(skipped),
