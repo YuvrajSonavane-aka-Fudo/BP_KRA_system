@@ -155,7 +155,7 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
   }, [kras, typeFilter, levelFilter, search, categories]);
 
   const allVisibleIds = useMemo(
-    () => grouped.flatMap(g => g.kras.flatMap(k => (k.levels ?? []).map(l => l.kra_level_id))),
+    () => grouped.flatMap(g => g.kras.flatMap(k => (k.levels ?? []).map(l => `${k.id}_${l.level_id}`))),
     [grouped]
   );
 
@@ -270,7 +270,7 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
             <Typography fontSize={11} color="#cbd5e1" mt={0.25}>Try adjusting your filters</Typography>
           </Box>
         ) : grouped.map(group => {
-          const catLevelIds = group.kras.flatMap(k => (k.levels ?? []).map(l => l.kra_level_id));
+          const catLevelIds = group.kras.flatMap(k => (k.levels ?? []).map(l => `${k.id}_${l.level_id}`));
           const catAll      = catLevelIds.length > 0 && catLevelIds.every(id => selectedKraLevelIds.includes(id));
           const catSome     = catLevelIds.some(id => selectedKraLevelIds.includes(id));
           const isOpen      = !!expanded[group.cid];
@@ -333,7 +333,7 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map(kra =>
                       (kra.levels ?? []).map(level => {
-                        const kraLevelId   = level.kra_level_id;
+                        const kraLevelId   = `${kra.id}_${level.level_id}`;
                         const isSelected   = selectedKraLevelIds.includes(kraLevelId);
                         const ktc          = typeColor(kra.is_standard);
                         const dupCount     = employeeDuplicateMap?.[kraLevelId] ?? 0;
@@ -408,11 +408,10 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
   const [search, setSearch]     = useState('');
   const [tab, setTab]           = useState(0);
   const [deptFilter, setDept]   = useState('');
-  const [vertFilter, setVert]   = useState('');
+
   const [levelFilter, setLevel] = useState('');
 
   const depts  = useMemo(() => [...new Set(employees.map(e => e.department).filter(Boolean))].sort(), [employees]);
-  const verts  = useMemo(() => [...new Set(employees.map(e => e.vertical).filter(Boolean))].sort(), [employees]);
   const levels = useMemo(() => [...new Set(employees.map(e => e.level).filter(Boolean))].sort(), [employees]);
 
   const filtered = useMemo(() => {
@@ -420,20 +419,19 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
     if (tab === 1) list = list.filter(e => e.assigned_to_cycle);
     if (tab === 2) list = list.filter(e => !e.assigned_to_cycle);
     if (deptFilter)  list = list.filter(e => e.department === deptFilter);
-    if (vertFilter)  list = list.filter(e => e.vertical   === vertFilter);
     if (levelFilter) list = list.filter(e => e.level      === levelFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(e => e.full_name.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q));
     }
     return list;
-  }, [employees, tab, deptFilter, vertFilter, levelFilter, search]);
+  }, [employees, tab, deptFilter, levelFilter, search]);
 
   const assigned   = employees.filter(e => e.assigned_to_cycle).length;
   const unassigned = employees.filter(e => !e.assigned_to_cycle).length;
   const allSel     = filtered.length > 0 && filtered.every(e => selectedEmployeeIds.includes(e.employee_id));
   const someSel    = filtered.some(e => selectedEmployeeIds.includes(e.employee_id));
-  const hasFilters = deptFilter || vertFilter || levelFilter;
+  const hasFilters = deptFilter || levelFilter;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -470,7 +468,7 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
           }}
           sx={{ flex: 1, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36, bgcolor: '#f8fafc' } }} />
         <Tooltip title="Filters">
-          <Badge badgeContent={hasFilters ? (!!deptFilter + !!vertFilter + !!levelFilter) : 0} color="primary"
+          <Badge badgeContent={hasFilters ? (!!deptFilter + !!levelFilter) : 0} color="primary"
             sx={{ '& .MuiBadge-badge': { fontSize: 8, height: 14, minWidth: 14 } }}>
             <IconButton size="small"
               sx={{ border: `1px solid ${hasFilters ? '#93c5fd' : '#e2e8f0'}`, borderRadius: 1.5,
@@ -485,7 +483,6 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
       <Stack direction="row" gap={1} mb={1.5}>
         {[
           { val: deptFilter, set: setDept,  items: depts,  placeholder: 'Department' },
-          { val: vertFilter, set: setVert,  items: verts,  placeholder: 'Vertical' },
           { val: levelFilter, set: setLevel, items: levels, placeholder: 'Level' },
         ].map((f, i) => (
           <FormControl key={i} size="small" sx={{ flex: 1 }}>
@@ -499,7 +496,7 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
           </FormControl>
         ))}
         {hasFilters && (
-          <Button size="small" onClick={() => { setDept(''); setVert(''); setLevel(''); }}
+          <Button size="small" onClick={() => { setDept(''); setLevel(''); }}
             sx={{ fontSize: 10, color: '#64748b', minWidth: 0, px: 1, height: 30, flexShrink: 0 }}>Clear</Button>
         )}
       </Stack>
@@ -560,7 +557,7 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
               </Stack>
               <Box sx={{ width: 130, mr: 1, flexShrink: 0 }}>
                 <Typography fontSize={11} color="#374151" noWrap fontWeight={500}>{emp.title || '—'}</Typography>
-                <Typography fontSize={10} color="#94a3b8" noWrap>{[emp.level, emp.department].filter(Boolean).join(' · ')}</Typography>
+                <Typography fontSize={10} color="#94a3b8" noWrap>{[emp.department, emp.level].filter(Boolean).join(' · ')}</Typography>
               </Box>
               <Stack direction="row" gap={0} sx={{ width: 60, justifyContent: 'center', flexShrink: 0 }}>
                 {isAssigned && (
@@ -847,14 +844,21 @@ export default function BulkAssignmentPage() {
   const handleAssignClick = () => {
     if (selectedKraLevelIds.length === 0) { showToast('Select at least one KRA before assigning.', 'warning'); return; }
     if (selectedEmployeeIds.length === 0) { showToast('Select at least one employee.', 'warning'); return; }
-    const selectedKras = kraLibrary.filter(k => (k.levels ?? []).some(l => selectedKraLevelIds.includes(l.kra_level_id)));
+
+    // Decode composite keys "kraId_levelId" back to plain level_id numbers for API
+    const decodedLevelIds = selectedKraLevelIds.map(key => {
+      const parts = String(key).split('_');
+      return Number(parts[parts.length - 1]);
+    });
+
+    const selectedKras = kraLibrary.filter(k => (k.levels ?? []).some(l => decodedLevelIds.includes(l.level_id) && selectedKraLevelIds.includes(`${k.id}_${l.level_id}`)));
     const uniqueCatIds = [...new Set(selectedKras.map(k => k.category_id))];
     const prefillCats  = uniqueCatIds.map(cid => ({
       category_id: cid,
       category_name: categories.find(c => c.id === cid)?.name ?? `Category ${cid}`,
       weightage: '',
     }));
-    setWeightageModal({ open: true, mode: 'assign', employee: null, prefill: { categories: prefillCats, kra_level_ids: selectedKraLevelIds } });
+    setWeightageModal({ open: true, mode: 'assign', employee: null, prefill: { categories: prefillCats, kra_level_ids: decodedLevelIds } });
   };
 
   const handleConfirmAssign = async ({ categories: cats, kra_level_ids, is_date_based }) => {
