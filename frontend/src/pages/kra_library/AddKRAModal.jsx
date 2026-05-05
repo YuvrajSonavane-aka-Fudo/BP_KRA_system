@@ -62,13 +62,15 @@ export default function AddKRAModal({ open, onClose, onSaved, kra, categories = 
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
     try {
-      // ── FIX: backend expects `levels: [{ level_id, name? }]` not `level_ids` ──
-      // The backend KRALibraryListCreateView.post reads data.get("levels", [])
-      // and for PATCH KRADetailView._update reads data.get("levels")
+      // Derive is_standard from the selected category
+      const selectedCategory = categories.find(c => String(c.id) === String(categoryId));
+      const isStandard = selectedCategory ? selectedCategory.is_standard : true;
+
       const payload = {
         name:        name.trim(),
         description: description.trim(),
         category_id: Number(categoryId),
+        is_standard: isStandard, // false if custom category, true if standard
         levels: selectedLevels.map(id => ({
           level_id: id,
           // name defaults to KRA name on the backend if omitted
