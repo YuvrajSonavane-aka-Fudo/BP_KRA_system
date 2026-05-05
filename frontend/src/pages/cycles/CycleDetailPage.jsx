@@ -3,7 +3,7 @@ import {
   Box, Typography, Stack, Paper, Button, Chip,
   CircularProgress, Alert, Divider, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Tooltip,
+  Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -16,7 +16,7 @@ import PauseIcon from '@mui/icons-material/Pause';
 import BlockIcon from '@mui/icons-material/Block';
 import { useNavigate, useParams } from 'react-router-dom';
 import ROUTES from '../../config/routes';
-import { getCycleById, updateCycle, cloneCycle, advanceCycleStage, getCycles } from '../../api/cyclesApi';
+import { getCycles, updateCycle, advanceCycleStage } from '../../api/cyclesApi';
 import { invalidateCyclesCache } from '../../hooks/useCycles';
 import useRoleAccess from '../../hooks/useRoleAccess';
 
@@ -56,6 +56,15 @@ const ACTION_CONFIG = {
   CANCELLED: { label: 'Cancel',      icon: <BlockIcon />,       color: '#fee2e2', textColor: '#991b1b', borderColor: '#fca5a5' },
 };
 
+/** Safely format any date string — handles ISO datetime (2024-06-14T00:00:00) and plain YYYY-MM-DD */
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const clean = String(dateStr).split('T')[0];
+  const d = new Date(clean + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 export default function CycleDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -66,13 +75,6 @@ export default function CycleDetailPage() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
-  const [cloneOpen, setCloneOpen]       = useState(false);
-  const [cloneName, setCloneName]       = useState('');
-  const [cloneStart, setCloneStart]     = useState('');
-  const [cloneEnd, setCloneEnd]         = useState('');
-  const [cloneLoading, setCloneLoading] = useState(false);
-  const [cloneError, setCloneError]     = useState('');
 
   const [deleteOpen, setDeleteOpen]       = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -89,12 +91,12 @@ export default function CycleDetailPage() {
   const fetchCycle = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [cycleRes, allRes] = await Promise.all([
-        getCycleById(id),
-        getCycles(),
-      ]);
-      setCycle(cycleRes.data);
-      setAllCycles(allRes.data?.cycles ?? allRes.data ?? []);
+      const res = await getCycles();
+      const cycles = res.data?.cycles ?? res.data ?? [];
+      setAllCycles(cycles);
+      const found = cycles.find(c => String(c.id) === String(id));
+      if (!found) throw new Error('Cycle not found');
+      setCycle(found);
     } catch (err) {
       setError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to load cycle.');
     } finally { setLoading(false); }
@@ -156,22 +158,12 @@ export default function CycleDetailPage() {
     } finally { setAdvanceLoading(false); }
   }
 
-  async function handleClone() {
-    if (!cloneName || !cloneStart || !cloneEnd) { setCloneError('All fields are required.'); return; }
-    setCloneLoading(true); setCloneError('');
-    try {
-      const res = await cloneCycle(id, { name: cloneName, start_date: cloneStart, end_date: cloneEnd });
-      invalidateCyclesCache();
-      setCloneOpen(false);
-      navigate(ROUTES.CYCLE_DETAIL.replace(':id', res.data.id));
-    } catch (err) {
-      setCloneError(err?.response?.data?.error || err?.response?.data?.detail || 'Clone failed. Please try again.');
-    } finally { setCloneLoading(false); }
+  function handleOpenClone() {
+    navigate(ROUTES.CYCLE_CLONE.replace(':id', id));
   }
 
-  // ── DELETE: only DRAFT cycles allowed ──────────────────────────────────────
   async function handleDelete() {
-    if (currentStatus !== 'DRAFT') return; // 🛡️ hard guard
+    if (currentStatus !== 'DRAFT') return;
     setDeleteLoading(true); setDeleteError('');
     try {
       await updateCycle(id, { is_deleted: true });
@@ -204,14 +196,19 @@ export default function CycleDetailPage() {
   const isFrozen         = currentStatus === 'CLOSED' || currentStatus === 'CANCELLED';
   const otherActiveCycle = getOtherActiveCycle();
 
-  // ── Delete permission: only DRAFT ─────────────────────────────────────────
   const canDelete     = currentStatus === 'DRAFT';
   const deleteTooltip = canDelete ? 'Delete cycle' : 'Only draft cycles can be deleted';
 
   return (
-    <Box sx={{ maxWidth: 1000, mx: 'auto' }}>
+    <Box sx={{
+    maxWidth: 1000, mx: 'auto',
+    height: '100vh', overflow: 'auto', p: { xs: 2, md: 3 },
+    '&::-webkit-scrollbar': { width: 5 },
+    '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+    '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 99 },
+  }}>
 
-      {/* ── Page Header ─────────────────────────────────────────────────────── */}
+      {/* ── Page Header ── */}
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={3}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <IconButton onClick={() => navigate(ROUTES.DASHBOARD)} sx={{ color: '#64748b' }}>
@@ -223,7 +220,10 @@ export default function CycleDetailPage() {
               <Chip label={cycle.status.replace('_', ' ')} size="small"
                 sx={{ fontSize: 10, fontWeight: 700, height: 22, borderRadius: '9999px', ...(STATUS_STYLES[currentStatus] ?? STATUS_STYLES.DRAFT) }} />
             </Stack>
-            <Typography sx={{ fontSize: 13, color: '#64748b', mt: 0.3 }}>{cycle.start_date} — {cycle.end_date}</Typography>
+            {/* ✅ Fixed: use formatDate() to strip T00:00:00 */}
+            <Typography sx={{ fontSize: 13, color: '#64748b', mt: 0.3 }}>
+              {formatDate(cycle.start_date)} — {formatDate(cycle.end_date)}
+            </Typography>
           </Box>
         </Stack>
 
@@ -236,26 +236,17 @@ export default function CycleDetailPage() {
           {canManageCycles && (
             <>
               <Tooltip title="Clone this cycle">
-                <Button
-                  startIcon={<ContentCopyIcon />}
-                  onClick={() => { setCloneName(`${cycle.name} (Copy)`); setCloneStart(''); setCloneEnd(''); setCloneError(''); setCloneOpen(true); }}
+                <Button startIcon={<ContentCopyIcon />} onClick={handleOpenClone}
                   sx={{ color: '#64748b', fontWeight: 600, border: '1px solid #e2e8f0', borderRadius: 2 }}>
                   Clone
                 </Button>
               </Tooltip>
-
-              {/* DELETE BUTTON #1 — header
-                  Disabled for every status except DRAFT.
-                  <span> wrapper needed so Tooltip shows on disabled button. */}
               <Tooltip title={deleteTooltip}>
                 <span>
-                  <Button
-                    startIcon={<DeleteOutlineIcon />}
-                    disabled={!canDelete}
+                  <Button startIcon={<DeleteOutlineIcon />} disabled={!canDelete}
                     onClick={() => { if (!canDelete) return; setDeleteError(''); setDeleteOpen(true); }}
                     sx={{
-                      color: '#ef4444', fontWeight: 600,
-                      border: '1px solid #fecaca', borderRadius: 2,
+                      color: '#ef4444', fontWeight: 600, border: '1px solid #fecaca', borderRadius: 2,
                       '&:hover': { bgcolor: '#fef2f2' },
                       '&.Mui-disabled': { color: '#fca5a5', borderColor: '#fee2e2', bgcolor: 'transparent' },
                     }}>
@@ -268,14 +259,13 @@ export default function CycleDetailPage() {
         </Stack>
       </Stack>
 
-      {/* Alerts */}
       {successMsg && (
         <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setSuccessMsg('')}>
           {successMsg}
         </Alert>
       )}
 
-      {/* ── Stage Stepper ───────────────────────────────────────────────────── */}
+      {/* ── Stage Stepper ── */}
       <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(197,197,211,0.2)', boxShadow: shadow, mb: 3, overflow: 'hidden' }}>
         <Box sx={{ background: gradient, p: 3, color: '#fff' }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
@@ -326,7 +316,7 @@ export default function CycleDetailPage() {
         </Box>
       </Paper>
 
-      {/* ── Cycle Info + Actions ─────────────────────────────────────────────── */}
+      {/* ── Cycle Info + Actions ── */}
       <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(197,197,211,0.2)', boxShadow: shadow, overflow: 'hidden' }}>
         <Box sx={{ p: 3 }}>
           <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
@@ -357,11 +347,12 @@ export default function CycleDetailPage() {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3}>
               <Box flex={1}>
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>Start Date</Typography>
-                <Typography sx={{ fontSize: 14, color: '#374151' }}>{cycle.start_date}</Typography>
+                {/* ✅ Fixed: formatDate() handles ISO datetime strings */}
+                <Typography sx={{ fontSize: 14, color: '#374151' }}>{formatDate(cycle.start_date)}</Typography>
               </Box>
               <Box flex={1}>
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', mb: 0.5 }}>End Date</Typography>
-                <Typography sx={{ fontSize: 14, color: '#374151' }}>{cycle.end_date}</Typography>
+                <Typography sx={{ fontSize: 14, color: '#374151' }}>{formatDate(cycle.end_date)}</Typography>
               </Box>
             </Stack>
           </Stack>
@@ -388,11 +379,8 @@ export default function CycleDetailPage() {
                   return (
                     <Tooltip key={targetStatus} title={isDisabled ? 'Another cycle is already active. Close or put it on hold first.' : ''} disableHoverListener={!isDisabled}>
                       <span>
-                        <Button
-                          variant={isGradient ? 'contained' : 'outlined'}
-                          startIcon={cfg.icon}
-                          disabled={isDisabled}
-                          onClick={() => handleOpenStatusChange(targetStatus)}
+                        <Button variant={isGradient ? 'contained' : 'outlined'} startIcon={cfg.icon}
+                          disabled={isDisabled} onClick={() => handleOpenStatusChange(targetStatus)}
                           sx={isGradient
                             ? { background: isDisabled ? undefined : gradient, color: isDisabled ? undefined : '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&.Mui-disabled': { opacity: 0.45 } }
                             : { fontWeight: 700, borderRadius: 2, px: 3, color: cfg.textColor, borderColor: cfg.borderColor, bgcolor: cfg.color, '&:hover': { opacity: 0.85 } }
@@ -415,7 +403,6 @@ export default function CycleDetailPage() {
           </>
         )}
 
-        {/* Frozen notice */}
         {isFrozen && (
           <>
             <Divider />
@@ -428,7 +415,7 @@ export default function CycleDetailPage() {
         )}
       </Paper>
 
-      {/* ── CONFIRM STATUS CHANGE DIALOG ────────────────────────────────────── */}
+      {/* ── CONFIRM STATUS CHANGE DIALOG ── */}
       <Dialog open={!!confirmAction} onClose={() => !confirmLoading && setConfirmAction(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         {confirmAction && (() => {
           const cfg = ACTION_CONFIG[confirmAction];
@@ -439,7 +426,7 @@ export default function CycleDetailPage() {
               <DialogContent>
                 {isBlocked ? (
                   <Alert severity="error" sx={{ fontSize: 13 }}>
-                    <strong>Action not allowed.</strong> "{getOtherActiveCycle()?.name}" is currently active. Please close it or put it on hold before activating this cycle. Only one cycle can be active at a time.
+                    <strong>Action not allowed.</strong> "{getOtherActiveCycle()?.name}" is currently active. Please close it or put it on hold before activating this cycle.
                   </Alert>
                 ) : (
                   <Typography sx={{ fontSize: 14, color: '#374151' }}>
@@ -470,7 +457,7 @@ export default function CycleDetailPage() {
         })()}
       </Dialog>
 
-      {/* ── ADVANCE STAGE DIALOG ────────────────────────────────────────────── */}
+      {/* ── ADVANCE STAGE DIALOG ── */}
       <Dialog open={advanceOpen} onClose={() => !advanceLoading && setAdvanceOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, color: '#1E3A8A', fontSize: '1.1rem' }}>Advance to Next Stage</DialogTitle>
         <DialogContent>
@@ -491,33 +478,7 @@ export default function CycleDetailPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ── CLONE DIALOG ────────────────────────────────────────────────────── */}
-      <Dialog open={cloneOpen} onClose={() => !cloneLoading && setCloneOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#1E3A8A', fontSize: '1.1rem' }}>Clone Cycle</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ fontSize: 13, color: '#64748b', mb: 2 }}>Cloning from: <strong>{cycle.name}</strong></Typography>
-          <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
-            Cycle details and employee assignments will be cloned. Individual KRA assignments will not be carried over.
-          </Alert>
-          {cloneError && <Alert severity="error" sx={{ mb: 2 }}>{cloneError}</Alert>}
-          <Stack spacing={2} mt={1}>
-            <TextField label="New Cycle Name" fullWidth value={cloneName} onChange={e => setCloneName(e.target.value)} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-            <Stack direction="row" spacing={2}>
-              <TextField label="Start Date" type="date" fullWidth value={cloneStart} onChange={e => setCloneStart(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-              <TextField label="End Date" type="date" fullWidth value={cloneEnd} onChange={e => setCloneEnd(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setCloneOpen(false)} disabled={cloneLoading} sx={{ color: '#64748b', fontWeight: 600 }}>Cancel</Button>
-          <Button onClick={handleClone} disabled={cloneLoading}
-            sx={{ background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }}>
-            {cloneLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Cloning...</> : 'Clone Cycle'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* ── DELETE DIALOG ───────────────────────────────────────────────────── */}
+      {/* ── DELETE DIALOG ── */}
       <Dialog open={deleteOpen} onClose={() => !deleteLoading && setDeleteOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, color: '#ef4444', fontSize: '1.1rem' }}>Delete Cycle</DialogTitle>
         <DialogContent>
@@ -527,22 +488,11 @@ export default function CycleDetailPage() {
           {deleteError && <Alert severity="error" sx={{ mt: 2 }}>{deleteError}</Alert>}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDeleteOpen(false)} disabled={deleteLoading} sx={{ color: '#64748b', fontWeight: 600 }}>
-            Cancel
-          </Button>
-          {/* DELETE BUTTON #2 — dialog confirm
-              Belt-and-suspenders: dialog shouldn't open for non-DRAFT,
-              but guard here too just in case. */}
+          <Button onClick={() => setDeleteOpen(false)} disabled={deleteLoading} sx={{ color: '#64748b', fontWeight: 600 }}>Cancel</Button>
           <Tooltip title={!canDelete ? 'Only draft cycles can be deleted' : ''} disableHoverListener={canDelete}>
             <span>
-              <Button
-                onClick={handleDelete}
-                disabled={deleteLoading || !canDelete}
-                sx={{
-                  bgcolor: '#ef4444', color: '#fff', fontWeight: 700, borderRadius: 2, px: 3,
-                  '&:hover': { bgcolor: '#dc2626' },
-                  '&:disabled': { opacity: 0.6 },
-                }}>
+              <Button onClick={handleDelete} disabled={deleteLoading || !canDelete}
+                sx={{ bgcolor: '#ef4444', color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { bgcolor: '#dc2626' }, '&:disabled': { opacity: 0.6 } }}>
                 {deleteLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Deleting...</> : 'Delete'}
               </Button>
             </span>
