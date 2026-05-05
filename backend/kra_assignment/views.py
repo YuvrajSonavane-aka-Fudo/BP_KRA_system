@@ -93,9 +93,10 @@ class EmployeeListView(APIView):
 
             for ekl in EmployeeKRALevel.objects.filter(
                 employee_kra_cycle_id__in=cycle_map.values()
-            ).values('employee_id', 'kra_level_id', 'kra_level__name'):
+            ).values('employee_id', 'kra_level_id', 'kra_level__kra_id','kra_level__name'):
                 kra_map.setdefault(ekl['employee_id'], []).append({
                     'kra_level_id': ekl['kra_level_id'],
+                    'kra_id' : ekl['kra_level__kra_id'],
                     'name':         ekl['kra_level__name'],
                 })
 
