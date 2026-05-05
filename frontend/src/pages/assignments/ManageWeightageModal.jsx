@@ -39,6 +39,7 @@ function KRATypeBadge({ isStandard }) {
 
 export default function ManageWeightageModal({
   open, mode, employee, prefill,
+  enrolMode, onEnrolModeChange,
   kraLibrary, categories,
   selectedEmployeeIds, employees,
   activeCycleId,
@@ -195,6 +196,7 @@ export default function ManageWeightageModal({
         })),
         kra_level_ids: selectedKraLevelIds,
         is_date_based: isDateBased,
+        enrol_mode:    enrolMode ?? 'skip',
       });
     } finally {
       setSubmitting(false);
@@ -207,6 +209,10 @@ export default function ManageWeightageModal({
     : employees.filter((e) => selectedEmployeeIds.includes(e.employee_id));
 
   const hasNoCategories = categoryWeightages.length === 0;
+
+  // How many of the target employees are already enrolled in this cycle
+  const alreadyEnrolledCount = isEdit ? 0 : targetEmployees.filter((e) => e.assigned_to_cycle).length;
+  const showEnrolModePicker  = !isEdit && alreadyEnrolledCount > 0;
 
   // ── Progress bar color ─────────────────────────────────────────────────────
   const progressColor = isValid ? '#16a34a' : totalWeightage > 100 ? '#dc2626' : '#f59e0b';
@@ -266,6 +272,67 @@ export default function ManageWeightageModal({
       </DialogTitle>
 
       <DialogContent sx={{ px: 3, py: 2.5 }}>
+
+        {/* ── Enrol mode picker — only shown when some selected employees are already enrolled ── */}
+        {showEnrolModePicker && (
+          <Box sx={{ mb: 2.5, p: 1.75, borderRadius: 2, border: '1px solid #fde68a', bgcolor: '#fffbeb' }}>
+            <Stack direction="row" alignItems="center" gap={0.75} mb={1.25}>
+              <InfoOutlinedIcon sx={{ fontSize: 14, color: '#b45309' }} />
+              <Typography fontSize={12} fontWeight={700} color="#92400e">
+                {alreadyEnrolledCount} of {targetEmployees.length} employee{targetEmployees.length !== 1 ? 's' : ''} already {alreadyEnrolledCount === 1 ? 'has' : 'have'} KRAs assigned
+              </Typography>
+            </Stack>
+            <Typography fontSize={11} color="#78350f" mb={1.25}>
+              Choose how to handle their existing assignments:
+            </Typography>
+            <Stack spacing={0.75}>
+              {[
+                { value: 'skip',      label: 'Skip',      desc: 'Leave existing assignments untouched. Only new employees will be assigned.' },
+                { value: 'append',    label: 'Append',    desc: 'Add these KRAs to existing assignments. Already-present KRAs are preserved with their ratings.' },
+                { value: 'overwrite', label: 'Overwrite', desc: 'Replace all existing KRAs and categories. Existing ratings and progress will be lost.' },
+              ].map((opt) => {
+                const isSelected = enrolMode === opt.value;
+                const borderColor = isSelected
+                  ? opt.value === 'overwrite' ? '#fca5a5' : '#93c5fd'
+                  : '#e2e8f0';
+                const bgColor = isSelected
+                  ? opt.value === 'overwrite' ? '#fff1f2' : '#eff6ff'
+                  : '#fafafa';
+                return (
+                  <Box
+                    key={opt.value}
+                    onClick={() => onEnrolModeChange(opt.value)}
+                    sx={{
+                      px: 1.5, py: 1, borderRadius: 1.75, cursor: 'pointer',
+                      border: `1.5px solid ${borderColor}`,
+                      bgcolor: bgColor,
+                      transition: 'all 0.15s',
+                      '&:hover': { borderColor: opt.value === 'overwrite' ? '#fca5a5' : '#93c5fd', bgcolor: opt.value === 'overwrite' ? '#fff1f2' : '#eff6ff' },
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" gap={1.25}>
+                      <Box sx={{
+                        width: 15, height: 15, borderRadius: '50%', flexShrink: 0,
+                        border: `2px solid ${isSelected ? (opt.value === 'overwrite' ? '#ef4444' : '#2563eb') : '#cbd5e1'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {isSelected && (
+                          <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: opt.value === 'overwrite' ? '#ef4444' : '#2563eb' }} />
+                        )}
+                      </Box>
+                      <Box>
+                        <Typography fontSize={12} fontWeight={700} color={isSelected ? (opt.value === 'overwrite' ? '#dc2626' : '#1d4ed8') : '#374151'}>
+                          {opt.label}
+                        </Typography>
+                        <Typography fontSize={10.5} color="#6b7280">{opt.desc}</Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                );
+              })}
+            </Stack>
+          </Box>
+        )}
 
         {/* No categories warning */}
         {hasNoCategories && (
@@ -491,7 +558,11 @@ export default function ManageWeightageModal({
             </Stack>
           ) : isEdit
             ? 'Save Changes'
-            : `Assign to ${targetEmployees.length} Employee${targetEmployees.length !== 1 ? 's' : ''}`
+            : enrolMode === 'overwrite'
+              ? `Overwrite ${targetEmployees.length} Employee${targetEmployees.length !== 1 ? 's' : ''}`
+              : enrolMode === 'append'
+                ? `Append to ${targetEmployees.length} Employee${targetEmployees.length !== 1 ? 's' : ''}`
+                : `Assign to ${targetEmployees.length} Employee${targetEmployees.length !== 1 ? 's' : ''}`
           }
         </Button>
       </DialogActions>
