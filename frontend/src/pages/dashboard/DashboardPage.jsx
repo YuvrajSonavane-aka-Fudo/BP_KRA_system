@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Stack, Paper, Button, Chip,
   CircularProgress, Alert, Tabs, Tab, IconButton,
@@ -6,33 +6,39 @@ import {
   TablePagination, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Tooltip, InputAdornment, Drawer, Divider,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import AddIcon                from '@mui/icons-material/Add';
+import TrendingUpIcon         from '@mui/icons-material/TrendingUp';
+import PendingActionsIcon     from '@mui/icons-material/PendingActions';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import SearchIcon from '@mui/icons-material/Search';
+import ContentCopyIcon        from '@mui/icons-material/ContentCopy';
+import DeleteOutlineIcon      from '@mui/icons-material/DeleteOutline';
+import SearchIcon             from '@mui/icons-material/Search';
 import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
-import BlockIcon from '@mui/icons-material/Block';
-import SkipNextIcon from '@mui/icons-material/SkipNext';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
-import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
-import { useNavigate } from 'react-router-dom';
-import ROUTES from '../../config/routes';
+import BlockIcon              from '@mui/icons-material/Block';
+import SkipNextIcon           from '@mui/icons-material/SkipNext';
+import PlayArrowIcon          from '@mui/icons-material/PlayArrow';
+import PauseIcon              from '@mui/icons-material/Pause';
+import PowerSettingsNewIcon   from '@mui/icons-material/PowerSettingsNew';
+import CheckCircleIcon        from '@mui/icons-material/CheckCircle';
+import OpenInNewIcon          from '@mui/icons-material/OpenInNew';
+import EditIcon               from '@mui/icons-material/Edit';
+import CloseIcon              from '@mui/icons-material/Close';
+import { useNavigate }        from 'react-router-dom';
+import ROUTES                 from '../../config/routes';
 import { useCycles, invalidateCyclesCache } from '../../hooks/useCycles';
-import { cloneCycle, updateCycle, advanceCycleStage } from '../../api/cyclesApi';
-import useRoleAccess from '../../hooks/useRoleAccess';
+import { updateCycle, advanceCycleStage }   from '../../api/cyclesApi';
+import useRoleAccess          from '../../hooks/useRoleAccess';
+
+// ── The two wizard modals (separate files, clean & lean) ─────────────────────
+import CycleCreateModal from '../cycles/CycleCreateModal';
+import CycleCloneModal  from '../cycles/CycleCloneModal';
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
+  const clean = String(dateStr).split('T')[0];
+  const d = new Date(clean + 'T00:00:00');
   if (isNaN(d)) return dateStr;
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
@@ -80,13 +86,10 @@ const TAB_LABELS  = ['All', 'Active', 'Draft', 'Closed', 'On Hold', 'Inactive', 
 function BannerStageStepper({ currentStageId, canAdvance, onAdvance }) {
   return (
     <Box sx={{ position: 'relative', mt: 1.5, pb: 0.5 }}>
-      <Box sx={{
-        position: 'absolute', top: 13, left: '9%', right: '9%',
-        height: 2, bgcolor: 'rgba(255,255,255,0.2)', zIndex: 0,
-      }} />
+      <Box sx={{ position: 'absolute', top: 13, left: '9%', right: '9%', height: 2, bgcolor: 'rgba(255,255,255,0.2)', zIndex: 0 }} />
       <Stack direction="row" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1, px: 1 }}>
         {STAGES.map((stage, i) => {
-          const n = i + 1;
+          const n        = i + 1;
           const isDone   = n < currentStageId;
           const isActive = n === currentStageId;
           const isNext   = canAdvance && n === currentStageId + 1;
@@ -95,13 +98,8 @@ function BannerStageStepper({ currentStageId, canAdvance, onAdvance }) {
               <Stack
                 alignItems="center" spacing={0.75}
                 sx={{
-                  width: '18%',
-                  cursor: isNext ? 'pointer' : 'default',
-                  '&:hover .sdot': isNext ? {
-                    bgcolor: 'rgba(96,165,250,0.45) !important',
-                    border: '2px solid rgba(96,165,250,0.8) !important',
-                    transform: 'scale(1.18)',
-                  } : {},
+                  width: '18%', cursor: isNext ? 'pointer' : 'default',
+                  '&:hover .sdot': isNext ? { bgcolor: 'rgba(96,165,250,0.45) !important', border: '2px solid rgba(96,165,250,0.8) !important', transform: 'scale(1.18)' } : {},
                 }}
                 onClick={isNext ? onAdvance : undefined}
               >
@@ -142,30 +140,30 @@ function BannerStageStepper({ currentStageId, canAdvance, onAdvance }) {
 function CycleDetailDrawer({ open, cycle, onClose, canManageCycles, onAdvanceStage, onStatusChange, onClone, onDelete, onNavigate, hasAnotherActiveCycle }) {
   if (!cycle) return null;
   const currentStatus    = cycle.status;
-  const currentStageId   = cycle.current_stage?.id ?? null;
+  const currentStageId   = cycle.current_stage?.id ?? 1;
+  const currentStageName = cycle.current_stage?.name ?? STAGES[0].name;
   const availableActions = STATUS_ACTIONS[currentStatus] ?? [];
   const canAdvance       = currentStatus === 'ACTIVE' && canManageCycles && currentStageId && currentStageId < 5;
   const isFrozen         = currentStatus === 'CLOSED' || currentStatus === 'CANCELLED';
-
-  // ── Delete permission: only DRAFT ─────────────────────────────────────────
-  const canDelete     = currentStatus === 'DRAFT';
-  const deleteTooltip = canDelete ? 'Delete cycle' : 'Only draft cycles can be deleted';
+  const canDelete        = currentStatus === 'DRAFT';
+  const deleteTooltip    = canDelete ? 'Delete cycle' : 'Only draft cycles can be deleted';
 
   return (
     <Drawer anchor="right" open={open} onClose={onClose}
       PaperProps={{ sx: { width: { xs: '100vw', sm: 420 }, borderRadius: '12px 0 0 12px', boxShadow: '-8px 0 32px rgba(0,0,0,0.10)' } }}
     >
-      {/* Gradient header with stepper */}
+      {/* Gradient header */}
       <Box sx={{ background: gradient, px: 3, pt: 3, pb: 2.5, color: '#fff' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
           <Box flex={1} minWidth={0} pr={1}>
             <Stack direction="row" alignItems="center" spacing={1} mb={0.5} flexWrap="wrap" gap={0.5}>
               <Chip label={cycle.status.replace('_', ' ')} size="small"
                 sx={{ height: 18, fontSize: 9, fontWeight: 700, ...(STATUS_STYLES[currentStatus] ?? STATUS_STYLES.DRAFT) }} />
-              {cycle.current_stage && (
-                <Chip label={`Stage ${cycle.current_stage.id}: ${STAGES.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name}`} size="small"
-                  sx={{ bgcolor: 'rgba(96,165,250,0.25)', color: '#bfdbfe', fontSize: 9, fontWeight: 600, height: 18 }} />
-              )}
+              <Chip
+                label={`Stage ${currentStageId}: ${STAGES.find(s => s.id === currentStageId)?.name ?? currentStageName}`}
+                size="small"
+                sx={{ bgcolor: 'rgba(96,165,250,0.25)', color: '#bfdbfe', fontSize: 9, fontWeight: 600, height: 18 }}
+              />
             </Stack>
             <Typography fontWeight={800} sx={{ fontSize: '1.05rem', lineHeight: 1.3 }}>{cycle.name}</Typography>
             <Typography fontSize={11} sx={{ opacity: 0.7, mt: 0.3 }}>{formatDate(cycle.start_date)} — {formatDate(cycle.end_date)}</Typography>
@@ -216,10 +214,10 @@ function CycleDetailDrawer({ open, cycle, onClose, canManageCycles, onAdvanceSta
         </Typography>
         <Stack spacing={1.5} mb={3}>
           {[
-            { label: 'Cycle Name', value: cycle.name },
+            { label: 'Cycle Name',  value: cycle.name },
             { label: 'Description', value: cycle.description || '—' },
-            { label: 'Start Date', value: formatDate(cycle.start_date) },
-            { label: 'End Date', value: formatDate(cycle.end_date) },
+            { label: 'Start Date',  value: formatDate(cycle.start_date) },
+            { label: 'End Date',    value: formatDate(cycle.end_date) },
           ].map(({ label, value }) => (
             <Box key={label}>
               <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</Typography>
@@ -228,7 +226,7 @@ function CycleDetailDrawer({ open, cycle, onClose, canManageCycles, onAdvanceSta
           ))}
         </Stack>
 
-        <Divider sx={{ mb: 2.5 }} />
+        <Divider sx={{ my: 2.5 }} />
 
         {canManageCycles && (
           <>
@@ -250,16 +248,14 @@ function CycleDetailDrawer({ open, cycle, onClose, canManageCycles, onAdvanceSta
             )}
 
             {availableActions.map((targetStatus) => {
-              const cfg = ACTION_CONFIG[targetStatus];
-              const isGrad = targetStatus === 'ACTIVE';
+              const cfg        = ACTION_CONFIG[targetStatus];
+              const isGrad     = targetStatus === 'ACTIVE';
               const isDisabled = targetStatus === 'ACTIVE' && hasAnotherActiveCycle;
               return (
                 <Tooltip key={targetStatus} title={isDisabled ? 'Another cycle is already active. Close or put it on hold first.' : ''} disableHoverListener={!isDisabled}>
                   <span style={{ display: 'block', marginBottom: 8 }}>
                     <Button
-                      fullWidth
-                      startIcon={cfg.icon}
-                      disabled={isDisabled}
+                      fullWidth startIcon={cfg.icon} disabled={isDisabled}
                       onClick={() => !isDisabled && onStatusChange(cycle, targetStatus)}
                       sx={isGrad
                         ? { justifyContent: 'flex-start', fontWeight: 700, fontSize: 13, background: isDisabled ? undefined : gradient, color: isDisabled ? undefined : '#fff', borderRadius: 2, '&:hover': { background: gradient, opacity: 0.9 }, '&.Mui-disabled': { opacity: 0.45 } }
@@ -272,29 +268,16 @@ function CycleDetailDrawer({ open, cycle, onClose, canManageCycles, onAdvanceSta
               );
             })}
 
-            {/* Clone + Delete row */}
             <Stack direction="row" spacing={1} mt={1.5}>
-              <Button
-                startIcon={<ContentCopyIcon />}
-                onClick={() => onClone(cycle)}
+              <Button startIcon={<ContentCopyIcon />} onClick={() => onClone(cycle)}
                 sx={{ flex: 1, fontWeight: 600, fontSize: 12, color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 2 }}>
                 Clone
               </Button>
-
-              {/* DRAWER DELETE BUTTON — disabled for non-DRAFT */}
               <Tooltip title={deleteTooltip}>
                 <span style={{ flex: 1 }}>
-                  <Button
-                    fullWidth
-                    startIcon={<DeleteOutlineIcon />}
-                    disabled={!canDelete}
+                  <Button fullWidth startIcon={<DeleteOutlineIcon />} disabled={!canDelete}
                     onClick={() => { if (!canDelete) return; onDelete(cycle); }}
-                    sx={{
-                      fontWeight: 600, fontSize: 12, color: '#ef4444',
-                      border: '1px solid #fecaca', borderRadius: 2,
-                      '&:hover': { bgcolor: '#fef2f2' },
-                      '&.Mui-disabled': { color: '#fca5a5', borderColor: '#fee2e2', bgcolor: 'transparent' },
-                    }}>
+                    sx={{ fontWeight: 600, fontSize: 12, color: '#ef4444', border: '1px solid #fecaca', borderRadius: 2, '&:hover': { bgcolor: '#fef2f2' }, '&.Mui-disabled': { color: '#fca5a5', borderColor: '#fee2e2', bgcolor: 'transparent' } }}>
                     Delete
                   </Button>
                 </span>
@@ -318,41 +301,39 @@ function CycleDetailDrawer({ open, cycle, onClose, canManageCycles, onAdvanceSta
   );
 }
 
-/* ── Main Page ──────────────────────────────────────────────────────────── */
+/* ── Main Page ──────────────────────────────────────────────────────────────── */
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { canManageCycles } = useRoleAccess();
   const { data: allCycles, loading, error, refetch } = useCycles();
 
-  const [tab, setTab] = useState(0);
-  const [page, setPage] = useState(0);
+  const [tab, setTab]       = useState(0);
+  const [page, setPage]     = useState(0);
   const [search, setSearch] = useState('');
   const rowsPerPage = 5;
 
-  const [drawerCycle, setDrawerCycle]   = useState(null);
-  const [successMsg, setSuccessMsg]     = useState('');
+  const [drawerCycle, setDrawerCycle] = useState(null);
+  const [successMsg,  setSuccessMsg]  = useState('');
 
-  const [cloneOpen, setCloneOpen]       = useState(false);
-  const [cloneSource, setCloneSource]   = useState(null);
-  const [cloneName, setCloneName]       = useState('');
-  const [cloneStart, setCloneStart]     = useState('');
-  const [cloneEnd, setCloneEnd]         = useState('');
-  const [cloneLoading, setCloneLoading] = useState(false);
-  const [cloneError, setCloneError]     = useState('');
+  // ── Wizard modal state ───────────────────────────────────────────────────
+  const [createOpen, setCreateOpen] = useState(false);
+  const [cloneOpen,  setCloneOpen]  = useState(false);
+  const [cloneId,    setCloneId]    = useState(null);
 
-  const [deleteOpen, setDeleteOpen]       = useState(false);
-  const [deleteTarget, setDeleteTarget]   = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError]     = useState('');
+  // ── Other dialog state (advance, status change, delete) ──────────────────
+  const [deleteOpen,     setDeleteOpen]     = useState(false);
+  const [deleteTarget,   setDeleteTarget]   = useState(null);
+  const [deleteLoading,  setDeleteLoading]  = useState(false);
+  const [deleteError,    setDeleteError]    = useState('');
 
-  const [advanceOpen, setAdvanceOpen]       = useState(false);
-  const [advanceTarget, setAdvanceTarget]   = useState(null);
+  const [advanceOpen,    setAdvanceOpen]    = useState(false);
+  const [advanceTarget,  setAdvanceTarget]  = useState(null);
   const [advanceLoading, setAdvanceLoading] = useState(false);
-  const [advanceError, setAdvanceError]     = useState('');
+  const [advanceError,   setAdvanceError]   = useState('');
 
-  const [confirmAction, setConfirmAction]   = useState(null); // { cycle, targetStatus }
+  const [confirmAction,  setConfirmAction]  = useState(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
-  const [confirmError, setConfirmError]     = useState('');
+  const [confirmError,   setConfirmError]   = useState('');
 
   function flash(msg) { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(''), 4000); }
 
@@ -371,20 +352,26 @@ export default function DashboardPage() {
   ];
 
   const filteredByTab = useMemo(() => {
-    const sf = TAB_FILTERS[tab];
+    const sf   = TAB_FILTERS[tab];
     const base = sf ? (allCycles ?? []).filter(c => c.status === sf) : (allCycles ?? []);
     if (!search.trim()) return base;
     const q = search.toLowerCase();
-    return base.filter(c => c.name?.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q) || c.current_stage?.name?.toLowerCase().includes(q));
+    return base.filter(c =>
+      c.name?.toLowerCase().includes(q) ||
+      c.description?.toLowerCase().includes(q) ||
+      c.current_stage?.name?.toLowerCase().includes(q)
+    );
   }, [allCycles, tab, search]);
 
+  // ── open clone → close drawer, open modal ───────────────────────────────
   function openClone(cycle) {
-    setCloneSource(cycle); setCloneName(`${cycle.name} (Copy)`); setCloneStart(''); setCloneEnd(''); setCloneError(''); setCloneOpen(true); setDrawerCycle(null);
+    setDrawerCycle(null);
+    setCloneId(cycle.id);
+    setCloneOpen(true);
   }
 
-  // ── openDelete: guard — only allow DRAFT ──────────────────────────────────
   function openDelete(cycle) {
-    if (cycle.status !== 'DRAFT') return; // 🛡️ hard guard
+    if (cycle.status !== 'DRAFT') return;
     setDeleteTarget(cycle); setDeleteError(''); setDeleteOpen(true); setDrawerCycle(null);
   }
 
@@ -395,7 +382,7 @@ export default function DashboardPage() {
       const alreadyActive = (allCycles ?? []).find(c => c.status === 'ACTIVE' && c.id !== cycle.id);
       if (alreadyActive) {
         setConfirmAction({ cycle, targetStatus });
-        setConfirmError(`"${alreadyActive.name}" is currently active. You must close it or put it on hold before activating another cycle. Only one cycle can be active at a time.`);
+        setConfirmError(`"${alreadyActive.name}" is currently active. You must close it or put it on hold before activating another cycle.`);
         return;
       }
     }
@@ -404,27 +391,16 @@ export default function DashboardPage() {
     setDrawerCycle(null);
   }
 
-  async function handleClone() {
-    if (!cloneName || !cloneStart || !cloneEnd) { setCloneError('All fields are required.'); return; }
-    setCloneLoading(true); setCloneError('');
-    try {
-      const res = await cloneCycle(cloneSource.id, { name: cloneName, start_date: cloneStart, end_date: cloneEnd });
-      invalidateCyclesCache(); refetch(); setCloneOpen(false);
-      navigate(ROUTES.CYCLE_DETAIL.replace(':id', res.data.id));
-    } catch (err) { setCloneError(err?.response?.data?.error || err?.response?.data?.detail || 'Clone failed. Please try again.'); }
-    finally { setCloneLoading(false); }
-  }
-
-  // ── handleDelete: only DRAFT cycles allowed ────────────────────────────────
   async function handleDelete() {
-    if (deleteTarget?.status !== 'DRAFT') return; // 🛡️ hard guard
+    if (deleteTarget?.status !== 'DRAFT') return;
     setDeleteLoading(true); setDeleteError('');
     try {
       await updateCycle(deleteTarget.id, { is_deleted: true });
       invalidateCyclesCache(); refetch(); setDeleteOpen(false);
       flash(`"${deleteTarget.name}" has been deleted.`);
-    } catch (err) { setDeleteError(err?.response?.data?.error || err?.response?.data?.detail || 'Delete failed. Please try again.'); }
-    finally { setDeleteLoading(false); }
+    } catch (err) {
+      setDeleteError(err?.response?.data?.error || err?.response?.data?.detail || 'Delete failed. Please try again.');
+    } finally { setDeleteLoading(false); }
   }
 
   async function handleAdvanceStage() {
@@ -434,8 +410,9 @@ export default function DashboardPage() {
       const res = await advanceCycleStage(advanceTarget.id, {});
       invalidateCyclesCache(); await refetch(); setAdvanceOpen(false);
       flash(res.data?.message || 'Stage advanced successfully.');
-    } catch (err) { setAdvanceError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to advance stage. Please try again.'); }
-    finally { setAdvanceLoading(false); }
+    } catch (err) {
+      setAdvanceError(err?.response?.data?.error || err?.response?.data?.detail || 'Failed to advance stage. Please try again.');
+    } finally { setAdvanceLoading(false); }
   }
 
   async function handleStatusChange() {
@@ -444,7 +421,7 @@ export default function DashboardPage() {
     if (targetStatus === 'ACTIVE') {
       const alreadyActive = (allCycles ?? []).find(c => c.status === 'ACTIVE' && c.id !== tc.id);
       if (alreadyActive) {
-        setConfirmError(`"${alreadyActive.name}" is currently active. You must close it or put it on hold before activating another cycle. Only one cycle can be active at a time.`);
+        setConfirmError(`"${alreadyActive.name}" is currently active. You must close it or put it on hold first.`);
         setConfirmLoading(false);
         return;
       }
@@ -455,8 +432,9 @@ export default function DashboardPage() {
       invalidateCyclesCache(); await refetch(); setConfirmAction(null);
       const labels = { ACTIVE: 'activated', ON_HOLD: 'put on hold', INACTIVE: 'deactivated', CLOSED: 'closed', CANCELLED: 'cancelled' };
       flash(`Cycle "${tc.name}" ${labels[targetStatus] ?? 'updated'} successfully.${targetStatus === 'ACTIVE' ? ' Notifications sent to all VLs and HRs.' : ''}`);
-    } catch (err) { setConfirmError(err?.response?.data?.error || err?.response?.data?.detail || 'Action failed. Please try again.'); }
-    finally { setConfirmLoading(false); }
+    } catch (err) {
+      setConfirmError(err?.response?.data?.error || err?.response?.data?.detail || 'Action failed. Please try again.');
+    } finally { setConfirmLoading(false); }
   }
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
@@ -468,33 +446,38 @@ export default function DashboardPage() {
   return (
     <Box sx={{ height: '100vh', p: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: '#f8fafc', gap: 1.5, boxSizing: 'border-box' }}>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexShrink={0}>
         <Box>
           <Typography fontWeight={800} color="#0f172a" sx={{ fontSize: '1.15rem', lineHeight: 1.2 }}>Performance Dashboard</Typography>
           <Typography fontSize={12} color="#64748b">Real-time KRA cycle overview</Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
-          {canManageCycles && (
-            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => navigate(ROUTES.CYCLE_CREATE)}
-              sx={{ px: 2.5, background: gradient, borderRadius: 2, fontWeight: 700, '&:hover': { background: gradient, opacity: 0.9 } }}>
-              New Cycle
-            </Button>
-          )}
-        </Stack>
+        {canManageCycles && (
+          <Button
+            variant="contained" size="small" startIcon={<AddIcon />}
+            onClick={() => setCreateOpen(true)}
+            sx={{ px: 2.5, background: gradient, borderRadius: 2, fontWeight: 700, '&:hover': { background: gradient, opacity: 0.9 } }}
+          >
+            New Cycle
+          </Button>
+        )}
       </Stack>
 
-      {successMsg && <Alert severity="success" onClose={() => setSuccessMsg('')} sx={{ borderRadius: 2, flexShrink: 0 }}>{successMsg}</Alert>}
+      {successMsg && (
+        <Alert severity="success" onClose={() => setSuccessMsg('')} sx={{ borderRadius: 2, flexShrink: 0 }}>
+          {successMsg}
+        </Alert>
+      )}
 
-      {/* Stat cards */}
+      {/* ── Stat cards ── */}
       <Stack direction="row" spacing={1.5} flexShrink={0}>
         {[
-          { label: 'Total',     value: allCycles?.length ?? 0,  icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,         color: '#1e40af', bg: '#dbeafe' },
-          { label: 'Active',    value: activeCycles.length,     icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,         color: '#15803d', bg: '#dcfce7' },
-          { label: 'Draft',     value: draftCycles.length,      icon: <PendingActionsIcon sx={{ fontSize: 16 }} />,     color: '#d97706', bg: '#fef3c7' },
-          { label: 'On Hold',   value: onHoldCycles.length,     icon: <PauseCircleOutlineIcon sx={{ fontSize: 16 }} />, color: '#9a3412', bg: '#fde8d8' },
-          { label: 'Closed',    value: closedCycles.length,     icon: <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />, color: '#334155', bg: '#f1f5f9' },
-          { label: 'Cancelled', value: cancelledCycles.length,  icon: <BlockIcon sx={{ fontSize: 16 }} />,              color: '#991b1b', bg: '#fee2e2' },
+          { label: 'Total',     value: allCycles?.length ?? 0, icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,         color: '#1e40af', bg: '#dbeafe' },
+          { label: 'Active',    value: activeCycles.length,    icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,         color: '#15803d', bg: '#dcfce7' },
+          { label: 'Draft',     value: draftCycles.length,     icon: <PendingActionsIcon sx={{ fontSize: 16 }} />,     color: '#d97706', bg: '#fef3c7' },
+          { label: 'On Hold',   value: onHoldCycles.length,    icon: <PauseCircleOutlineIcon sx={{ fontSize: 16 }} />, color: '#9a3412', bg: '#fde8d8' },
+          { label: 'Closed',    value: closedCycles.length,    icon: <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />, color: '#334155', bg: '#f1f5f9' },
+          { label: 'Cancelled', value: cancelledCycles.length, icon: <BlockIcon sx={{ fontSize: 16 }} />,              color: '#991b1b', bg: '#fee2e2' },
         ].map((item, i) => (
           <Paper key={i} elevation={0} sx={{ flex: 1, p: 1.5, borderRadius: 2, border: '1px solid #e2e8f0', '&:hover': { boxShadow: '0 4px 12px -2px rgba(0,0,0,0.08)' } }}>
             <Stack direction="row" spacing={1} alignItems="center">
@@ -508,7 +491,7 @@ export default function DashboardPage() {
         ))}
       </Stack>
 
-      {/* Active cycle banner */}
+      {/* ── Active cycle banner ── */}
       {activeCycle && (() => {
         const sid       = activeCycle.current_stage?.id ?? 1;
         const canAdvBnr = canManageCycles && sid < 5;
@@ -530,16 +513,14 @@ export default function DashboardPage() {
                   <Typography fontWeight={800} sx={{ fontSize: '1.05rem', lineHeight: 1.2 }} noWrap>{activeCycle.name}</Typography>
                   <Typography fontSize={11} sx={{ opacity: 0.75, mt: 0.25 }}>{formatDate(activeCycle.start_date)} — {formatDate(activeCycle.end_date)}</Typography>
                 </Box>
-                <Stack direction="row" spacing={0.75} alignItems="center" flexShrink={0} ml={2}>
-                  {canManageCycles && (
-                    <Tooltip title="Cycle actions">
-                      <IconButton size="small" onClick={() => setDrawerCycle(activeCycle)}
-                        sx={{ bgcolor: '#fff', color: '#1e3a8a', fontWeight: 700, borderRadius: 2, px: 2.5, fontSize: 12, '&:hover': { bgcolor: '#f0f6ff' } }}>
-                        <EditIcon sx={{ fontSize: 15 }} />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Stack>
+                {canManageCycles && (
+                  <Tooltip title="Cycle actions">
+                    <IconButton size="small" onClick={() => setDrawerCycle(activeCycle)}
+                      sx={{ bgcolor: '#fff', color: '#1e3a8a', borderRadius: 2, ml: 2, '&:hover': { bgcolor: '#f0f6ff' } }}>
+                      <EditIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </Stack>
               <BannerStageStepper currentStageId={sid} canAdvance={canAdvBnr} onAdvance={() => openAdvance(activeCycle)} />
             </Box>
@@ -547,17 +528,23 @@ export default function DashboardPage() {
         );
       })()}
 
-      {/* Cycles table */}
+      {/* ── Cycles table ── */}
       <Paper sx={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden', minHeight: 0 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between"
           sx={{ borderBottom: '1px solid #f1f5f9', px: 1.5, bgcolor: '#fff', flexShrink: 0 }}>
-          <Tabs value={tab} onChange={(_, v) => { setTab(v); setPage(0); }} variant="scrollable" scrollButtons={false}
-            sx={{ minHeight: 40, flex: 1, '& .MuiTab-root': { fontSize: 11, fontWeight: 600, textTransform: 'none', minHeight: 40, py: 0, px: 1.5 }, '& .Mui-selected': { color: '#1E3A8A' }, '& .MuiTabs-indicator': { bgcolor: '#1E3A8A' } }}>
+          <Tabs
+            value={tab} onChange={(_, v) => { setTab(v); setPage(0); }}
+            variant="scrollable" scrollButtons={false}
+            sx={{ minHeight: 40, flex: 1, '& .MuiTab-root': { fontSize: 11, fontWeight: 600, textTransform: 'none', minHeight: 40, py: 0, px: 1.5 }, '& .Mui-selected': { color: '#1E3A8A' }, '& .MuiTabs-indicator': { bgcolor: '#1E3A8A' } }}
+          >
             {TAB_LABELS.map((label, i) => <Tab key={label} label={`${label} (${tabCounts[i]})`} />)}
           </Tabs>
-          <TextField size="small" placeholder="Search cycles…" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
+          <TextField
+            size="small" placeholder="Search cycles…" value={search}
+            onChange={e => { setSearch(e.target.value); setPage(0); }}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#94a3b8' }} /></InputAdornment> }}
-            sx={{ ml: 1.5, width: 190, flexShrink: 0, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 32 } }} />
+            sx={{ ml: 1.5, width: 190, flexShrink: 0, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 32 } }}
+          />
         </Stack>
 
         <TableContainer sx={{ flex: 1, overflow: 'auto', '&::-webkit-scrollbar': { width: 0, height: 0 }, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -571,8 +558,12 @@ export default function DashboardPage() {
             </TableHead>
             <TableBody>
               {filteredByTab.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((cycle) => {
-                // Per-row delete permission
                 const rowCanDelete = cycle.status === 'DRAFT';
+                const stageId      = cycle.current_stage?.id ?? 1;
+                const stageName    = cycle.current_stage
+                  ? (STAGES.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name)
+                  : STAGES[0].name;
+
                 return (
                   <TableRow key={cycle.id} hover sx={{ height: 44, cursor: 'pointer' }} onClick={() => setDrawerCycle(cycle)}>
                     <TableCell onClick={e => e.stopPropagation()}>
@@ -586,16 +577,12 @@ export default function DashboardPage() {
                       {formatDate(cycle.start_date)} — {formatDate(cycle.end_date)}
                     </TableCell>
                     <TableCell>
-                      {cycle.current_stage ? (
-                        <Stack direction="row" alignItems="center" spacing={0.75}>
-                          <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#dbeafe', color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
-                            {cycle.current_stage.id}
-                          </Box>
-                          <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#1E3A8A' }}>
-                            {STAGES.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name}
-                          </Typography>
-                        </Stack>
-                      ) : <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>—</Typography>}
+                      <Stack direction="row" alignItems="center" spacing={0.75}>
+                        <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#dbeafe', color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                          {stageId}
+                        </Box>
+                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#1E3A8A' }}>{stageName}</Typography>
+                      </Stack>
                     </TableCell>
                     <TableCell>
                       <Chip label={cycle.status.replace('_', ' ')} size="small"
@@ -615,19 +602,11 @@ export default function DashboardPage() {
                                 <ContentCopyIcon sx={{ fontSize: 15 }} />
                               </IconButton>
                             </Tooltip>
-
-                            {/* TABLE DELETE ICON — disabled for non-DRAFT */}
                             <Tooltip title={rowCanDelete ? 'Delete' : 'Only draft cycles can be deleted'}>
                               <span>
-                                <IconButton
-                                  size="small"
-                                  disabled={!rowCanDelete}
+                                <IconButton size="small" disabled={!rowCanDelete}
                                   onClick={() => rowCanDelete && openDelete(cycle)}
-                                  sx={{
-                                    color: '#94a3b8',
-                                    '&:hover': { color: '#ef4444' },
-                                    '&.Mui-disabled': { color: '#e2e8f0' },
-                                  }}>
+                                  sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' }, '&.Mui-disabled': { color: '#e2e8f0' } }}>
                                   <DeleteOutlineIcon sx={{ fontSize: 15 }} />
                                 </IconButton>
                               </span>
@@ -653,8 +632,13 @@ export default function DashboardPage() {
         <TablePagination rowsPerPageOptions={[5]} component="div"
           count={filteredByTab.length} rowsPerPage={rowsPerPage} page={page}
           onPageChange={(_, newPage) => setPage(newPage)}
-          sx={{ borderTop: '1px solid #f1f5f9', minHeight: 40, flexShrink: 0, '& .MuiToolbar-root': { minHeight: 40 } }} />
+          sx={{ borderTop: '1px solid #f1f5f9', minHeight: 40, flexShrink: 0, '& .MuiToolbar-root': { minHeight: 40 } }}
+        />
       </Paper>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODALS & DIALOGS
+      ══════════════════════════════════════════════════════════════════════ */}
 
       {/* Cycle detail drawer */}
       <CycleDetailDrawer
@@ -668,6 +652,21 @@ export default function DashboardPage() {
         onDelete={openDelete}
         onNavigate={(c) => navigate(ROUTES.CYCLE_DETAIL.replace(':id', c.id))}
         hasAnotherActiveCycle={drawerCycle ? (allCycles ?? []).some(c => c.status === 'ACTIVE' && c.id !== drawerCycle.id) : false}
+      />
+
+      {/* ✅ Create wizard — replaces old ROUTES.CYCLE_CREATE navigation */}
+      <CycleCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={() => { refetch(); flash('Cycle created successfully.'); }}
+      />
+
+      {/* ✅ Clone wizard — replaces old ROUTES.CYCLE_CLONE navigation */}
+      <CycleCloneModal
+        open={cloneOpen}
+        cycleId={cloneId}
+        onClose={() => { setCloneOpen(false); setCloneId(null); }}
+        onSuccess={() => { refetch(); flash('Cycle cloned successfully.'); }}
       />
 
       {/* Advance stage dialog */}
@@ -696,8 +695,8 @@ export default function DashboardPage() {
       {/* Confirm status change dialog */}
       <Dialog open={!!confirmAction} onClose={() => !confirmLoading && setConfirmAction(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         {confirmAction && (() => {
-          const cfg      = ACTION_CONFIG[confirmAction.targetStatus];
-          const isGrd    = confirmAction.targetStatus === 'ACTIVE';
+          const cfg       = ACTION_CONFIG[confirmAction.targetStatus];
+          const isGrd     = confirmAction.targetStatus === 'ACTIVE';
           const isBlocked = confirmAction.targetStatus === 'ACTIVE' && (allCycles ?? []).some(c => c.status === 'ACTIVE' && c.id !== confirmAction.cycle.id);
           return (
             <>
@@ -705,12 +704,11 @@ export default function DashboardPage() {
               <DialogContent>
                 {isBlocked ? (
                   <Alert severity="error" sx={{ fontSize: 13 }}>
-                    <strong>Action not allowed.</strong> Another cycle is already active. Please close it or put it on hold before activating this one. Only one cycle can be active at a time.
+                    <strong>Action not allowed.</strong> Another cycle is already active. Please close it or put it on hold before activating this one.
                   </Alert>
                 ) : (
                   <Typography sx={{ fontSize: 14, color: '#374151' }}>
-                    Are you sure you want to <strong>{cfg.label.toLowerCase()}</strong> the cycle{' '}
-                    <strong>"{confirmAction.cycle.name}"</strong>?
+                    Are you sure you want to <strong>{cfg.label.toLowerCase()}</strong> the cycle <strong>"{confirmAction.cycle.name}"</strong>?
                   </Typography>
                 )}
                 {confirmAction.targetStatus === 'ACTIVE' && !isBlocked && (
@@ -737,30 +735,6 @@ export default function DashboardPage() {
         })()}
       </Dialog>
 
-      {/* Clone dialog */}
-      <Dialog open={cloneOpen} onClose={() => !cloneLoading && setCloneOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#1E3A8A', fontSize: '1rem' }}>Clone Cycle</DialogTitle>
-        <DialogContent>
-          {cloneSource && <Typography sx={{ fontSize: 13, color: '#64748b', mb: 1.5 }}>Cloning from: <strong>{cloneSource.name}</strong></Typography>}
-          <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>Cycle details and employee assignments will be cloned. Individual KRA assignments will not be carried over.</Alert>
-          {cloneError && <Alert severity="error" sx={{ mb: 2 }}>{cloneError}</Alert>}
-          <Stack spacing={2} mt={1}>
-            <TextField label="New Cycle Name" fullWidth value={cloneName} onChange={e => setCloneName(e.target.value)} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-            <Stack direction="row" spacing={2}>
-              <TextField label="Start Date" type="date" fullWidth value={cloneStart} onChange={e => setCloneStart(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-              <TextField label="End Date" type="date" fullWidth value={cloneEnd} onChange={e => setCloneEnd(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }} />
-            </Stack>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setCloneOpen(false)} disabled={cloneLoading} sx={{ color: '#64748b', fontWeight: 600 }}>Cancel</Button>
-          <Button onClick={handleClone} disabled={cloneLoading}
-            sx={{ background: gradient, color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { background: gradient, opacity: 0.9 }, '&:disabled': { opacity: 0.6 } }}>
-            {cloneLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Cloning...</> : 'Clone Cycle'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Delete dialog */}
       <Dialog open={deleteOpen} onClose={() => !deleteLoading && setDeleteOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 800, color: '#ef4444', fontSize: '1rem' }}>Delete Cycle</DialogTitle>
@@ -774,18 +748,10 @@ export default function DashboardPage() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={() => setDeleteOpen(false)} disabled={deleteLoading} sx={{ color: '#64748b', fontWeight: 600 }}>Cancel</Button>
-
-          {/* DIALOG DELETE BUTTON — belt-and-suspenders guard for non-DRAFT */}
           <Tooltip title={deleteTarget?.status !== 'DRAFT' ? 'Only draft cycles can be deleted' : ''} disableHoverListener={deleteTarget?.status === 'DRAFT'}>
             <span>
-              <Button
-                onClick={handleDelete}
-                disabled={deleteLoading || deleteTarget?.status !== 'DRAFT'}
-                sx={{
-                  bgcolor: '#ef4444', color: '#fff', fontWeight: 700, borderRadius: 2, px: 3,
-                  '&:hover': { bgcolor: '#dc2626' },
-                  '&:disabled': { opacity: 0.6 },
-                }}>
+              <Button onClick={handleDelete} disabled={deleteLoading || deleteTarget?.status !== 'DRAFT'}
+                sx={{ bgcolor: '#ef4444', color: '#fff', fontWeight: 700, borderRadius: 2, px: 3, '&:hover': { bgcolor: '#dc2626' }, '&:disabled': { opacity: 0.6 } }}>
                 {deleteLoading ? <><CircularProgress size={14} color="inherit" sx={{ mr: 1 }} />Deleting...</> : 'Delete'}
               </Button>
             </span>

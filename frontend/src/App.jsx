@@ -11,7 +11,9 @@ import SSOCallbackPage from './auth/pages/SSOCallbackPage';
 
 import DashboardPage from './pages/dashboard/DashboardPage';
 import CyclesListPage from './pages/cycles/CyclesListPage';
-import CycleCreatePage from './pages/cycles/CycleCreatePage';
+import CycleCreatePage from './pages/cycles/CycleCreateModal';
+import CycleDetailPage from './pages/cycles/CycleDetailPage';
+import CycleClonePage from './pages/cycles/CycleCloneModal';
 import KRALibraryPage from './pages/kra_library/KRALibraryPage'; 
 import BulkAssignmentPage from './pages/assignments/BulkAssignmentPage';
 
@@ -50,6 +52,8 @@ function AppRoutes() {
       {/* Protected */}
       <Route path={ROUTES.DASHBOARD}    element={<Protected><DashboardPage /></Protected>} />
       <Route path={ROUTES.CYCLE_CREATE} element={<Protected><CycleCreatePage /></Protected>} />
+      <Route path={ROUTES.CYCLE_CLONE}  element={<Protected><CycleClonePage /></Protected>} />
+      <Route path={ROUTES.CYCLE_DETAIL} element={<Protected><CycleDetailPage /></Protected>} />
       <Route path={ROUTES.CYCLES}       element={<Protected><CyclesListPage /></Protected>} />
       <Route path={ROUTES.KRA_LIBRARY}  element={<Protected><KRALibraryPage /></Protected>} />
       <Route path={ROUTES.ASSIGNMENTS}  element={<Protected><BulkAssignmentPage /></Protected>} />
