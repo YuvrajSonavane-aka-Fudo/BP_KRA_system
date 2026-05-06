@@ -666,7 +666,7 @@ export default function DashboardPage() {
         open={cloneOpen}
         cycleId={cloneId}
         onClose={() => { setCloneOpen(false); setCloneId(null); }}
-        onSuccess={() => { refetch(); flash('Cycle cloned successfully.'); }}
+        onSuccess={() => { setCloneOpen(false); setCloneId(null);   refetch(); flash('Cycle cloned successfully.'); }}
       />
 
       {/* Advance stage dialog */}
