@@ -103,6 +103,7 @@ class EmployeeListView(APIView):
         #         })
         cycle_map = {}   # employee_id → employee_kra_cycle_id
         kra_map   = {}   # employee_id → [...]
+        category_map = {} 
 
         if cycle_id:
             for ekc in EmployeeKRACycle.objects.filter(
@@ -124,6 +125,16 @@ class EmployeeListView(APIView):
                     'kra_id':       ekl['kra_level__kra_id'],
                     'name':         ekl['kra_level__kra__name'],
                 })
+        for ekc_cat in EmployeeKRACycleCategory.objects.filter(
+                employee_kra_cycle_id__in=cycle_map.values()
+            ).values('employee_kra_cycle_id', 'category_id', 'weightage'):
+                emp_id = ekc_to_emp.get(ekc_cat['employee_kra_cycle_id'])
+                if emp_id is None:
+                    continue
+                category_map.setdefault(emp_id, []).append({
+                    'category_id': ekc_cat['category_id'],
+                    'weightage':   ekc_cat['weightage'],
+                })
         employees = []
         for e in qs:
             employees.append(
@@ -140,6 +151,7 @@ class EmployeeListView(APIView):
                     "roles": list(e.employee_roles.values_list("name", flat=True)),
                     "assigned_to_cycle": e.id in cycle_map,
                     "employee_kra_cycle_id": cycle_map.get(e.id),
+                    'assigned_categories': category_map.get(e.id, []),  # ← add this
                     'assigned_kras': kra_map.get(e.id, []),
                 }
             )
@@ -228,11 +240,7 @@ class KRABulkAssignmentEnrolView(APIView):
                     {"error": "shared.categories contains an invalid weightage value"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if shared_weight != 100:
-                return Response(
-                    {"error": f"shared.categories weightage must sum to 100, got {shared_weight}"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            
 
         # Process each assignment
         enrolled = []
@@ -290,9 +298,7 @@ class KRABulkAssignmentEnrolView(APIView):
                     except (ValueError, TypeError):
                         failed.append({"employee_id": eid, "reason": "Invalid weightage value in categories"})
                         continue
-                    if total_weight != 100:
-                        failed.append({"employee_id": eid, "reason": f"Category weightage must sum to 100, got {total_weight}"})
-                        continue
+                    
 
                 existing_ekc = already_enrolled.get(eid)
 
@@ -318,6 +324,8 @@ class KRABulkAssignmentEnrolView(APIView):
                         update_fields.append("employee_level_id")
                     ekc.save(update_fields=update_fields)
 
+                    skipped_cats = []
+                    kras_added = 0 
                     if enrol_mode == "overwrite":
                         ekc.categories.all().delete()
                         EmployeeKRACycleCategory.objects.bulk_create(
@@ -346,50 +354,42 @@ class KRABulkAssignmentEnrolView(APIView):
 
                     else:  # append
                         existing_cats = {c.category_id: c for c in ekc.categories.all()}
+                        current_total = sum(int(c.weightage) for c in existing_cats.values())
+                        remaining = 100 - current_total
                         new_cat_rows = []
+                        skipped_cats = []
                         for cat in categories:
                             cid = cat["category_id"]
+                            cat_weight = int(cat["weightage"])
                             if cid in existing_cats:
-                                existing_cats[cid].weightage = str(cat["weightage"])
+                                freed = int(existing_cats[cid].weightage)
+                                effective_remaining = remaining + freed
+                                if cat_weight > effective_remaining:
+                                    skipped_cats.append({
+                                        "category_id": cid,
+                                        "reason": f"weightage {cat_weight}% exceeds remaining {effective_remaining}%",
+                                    })
+                                    continue
+                                existing_cats[cid].weightage = str(cat_weight)
                                 existing_cats[cid].save(update_fields=["weightage"])
+                                remaining = effective_remaining - cat_weight
                             else:
+                                if cat_weight > remaining:
+                                    skipped_cats.append({
+                                        "category_id": cid,
+                                        "reason": f"weightage {cat_weight}% exceeds remaining {remaining}%",
+                                    })
+                                    continue
                                 new_cat_rows.append(
                                     EmployeeKRACycleCategory(
                                         employee_kra_cycle=ekc,
                                         category_id=cid,
-                                        weightage=str(cat["weightage"]),
+                                        weightage=str(cat_weight),
                                     )
                                 )
+                                remaining -= cat_weight
                         if new_cat_rows:
                             EmployeeKRACycleCategory.objects.bulk_create(new_cat_rows)
-
-                        existing_kra_level_ids = set(
-                            ekc.kra_level_rows.values_list("kra_level_id", flat=True)
-                        )
-                        to_add = [
-                            kl_id for kl_id in kra_level_ids
-                            if kl_id not in existing_kra_level_ids
-                        ]
-                        if not to_add:
-                            skipped.append(
-                                {
-                                    "employee_id": eid,
-                                    "employee_kra_cycle_id": ekc.id,
-                                    "reason": "append: all submitted KRA levels already exist on this employee — nothing added.",
-                                }
-                            )
-                            continue
-                        new_kra_rows = EmployeeKRALevel.objects.bulk_create(
-                            [
-                                EmployeeKRALevel(
-                                    employee_id=eid,
-                                    kra_level_id=kl_id,
-                                    employee_kra_cycle=ekc,
-                                )
-                                for kl_id in to_add
-                            ]
-                        )
-                        kras_added = len(new_kra_rows)
 
                     enrolled.append(
                         {
@@ -397,6 +397,12 @@ class KRABulkAssignmentEnrolView(APIView):
                             "employee_kra_cycle_id": ekc.id,
                             "kras_added": kras_added,
                             "enrol_mode": enrol_mode,
+                            "assigned_categories": [
+                                {"category_id": c.category_id, "weightage": c.weightage}
+                                for c in ekc.categories.all()
+                            ],
+                            "total_weightage": sum(int(c.weightage) for c in ekc.categories.all()),
+                            "skipped_categories": skipped_cats,
                         }
                     )
 
@@ -435,13 +441,18 @@ class KRABulkAssignmentEnrolView(APIView):
                     )
 
                     enrolled.append(
-                        {
-                            "employee_id": eid,
-                            "employee_kra_cycle_id": ekc.id,
-                            "kras_added": len(kra_level_ids),
-                            "enrol_mode": "new",
-                        }
-                    )
+                    {
+                        "employee_id": eid,
+                        "employee_kra_cycle_id": ekc.id,
+                        "kras_added": len(kra_level_ids),
+                        "enrol_mode": "new",
+                        "assigned_categories": [
+                            {"category_id": cat["category_id"], "weightage": str(cat["weightage"])}
+                            for cat in categories
+                        ],
+                        "total_weightage": sum(int(cat["weightage"]) for cat in categories),
+                    }
+                )
 
         _audit(
             request,
@@ -526,10 +537,7 @@ class KRAAssignmentUpdateDeleteView(APIView):
                 "Invalid weightage value", status=status.HTTP_400_BAD_REQUEST
             )
 
-        if total_weight != 100:
-            return Response(
-                "Category weightage must sum to 100", status=status.HTTP_400_BAD_REQUEST
-            )
+        
 
         with transaction.atomic():
             new_level_id = data.get("employee_level_id")
