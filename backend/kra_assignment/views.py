@@ -1,3 +1,4 @@
+from collections import defaultdict
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
@@ -5,6 +6,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
 
 from kra_cycle.models import (
     Employee,
@@ -212,9 +214,10 @@ class KRABulkAssignmentEnrolView(APIView):
         # 5. Validate shared weightage once if Mode A
         if shared:
             shared_categories = shared.get("categories", [])
-            shared_kra_level_ids = shared.get("kra_level_ids", [])
+            shared_kra_level_ids = shared.get("kra_level_ids", [])       # legacy / test format
+            shared_kra_selections = shared.get("kra_selections", [])      # new frontend format
             shared_is_date_based = shared.get("is_date_based", False)
-            shared_kra_level_to_kra_id = shared.get("kra_level_to_kra_id", {})
+    
 
             try:
                 shared_weight = sum(
@@ -247,25 +250,31 @@ class KRABulkAssignmentEnrolView(APIView):
 
                 # Resolve categories + KRAs for this employee
                 if shared:
-                    # Mode A — resolve kra_level_ids scoped to this employee's level
                     categories = shared_categories
                     is_date_based = shared_is_date_based
                     total_weight = shared_weight
 
-                    if shared_kra_level_to_kra_id:
-                        kra_ids = list(shared_kra_level_to_kra_id.values())
+                    if shared_kra_selections:
                         employee_level_id = a.get("employee_level_id")
+                        kra_level_ids = []
+                        for sel in shared_kra_selections:
+                            kra_id = sel.get("kra_id")
+                            level_id = sel.get("kra_level_id")  # this is actually seniority level_id
 
-                        qs = KRALevel.objects.filter(kra_id__in=kra_ids)
-                        if employee_level_id is not None:
-                            qs = qs.filter(level_id=employee_level_id)
+                            # Look up the correct KRALevel row using kra_id + seniority level_id
+                            match = KRALevel.objects.filter(
+                                kra_id=kra_id,
+                                level_id=level_id,
+                            ).values_list("id", flat=True).first()
 
-                        resolved = {kl.kra_id: kl.id for kl in qs}
-                        kra_level_ids = [
-                            resolved[kra_id]
-                            for kra_id in kra_ids
-                            if kra_id in resolved
-                        ]
+                            if match:
+                                kra_level_ids.append(match)
+                            else:
+                                # No exact match — skip this selection and log it
+                                failed.append({
+                                    "employee_id": eid,
+                                    "reason": f"No KRALevel found for kra_id={kra_id} at level_id={level_id}",
+                                })
                     else:
                         kra_level_ids = shared_kra_level_ids
 

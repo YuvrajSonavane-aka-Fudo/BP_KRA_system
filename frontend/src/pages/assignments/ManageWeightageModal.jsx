@@ -10,6 +10,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BusinessIcon from '@mui/icons-material/Business';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
@@ -47,7 +48,7 @@ export default function ManageWeightageModal({
 }) {
   const [categoryWeightages, setCategoryWeightages] = useState([]);
   const [isDateBased, setIsDateBased] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({}); // per-category error
+  const [fieldErrors, setFieldErrors] = useState({});
   const [globalError, setGlobalError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -57,7 +58,7 @@ export default function ManageWeightageModal({
   const selectedKraLevelIds = prefill?.kra_level_ids ?? [];
 
   const selectedKras = useMemo(
-    () => kraLibrary.filter((k) => k.levels.some((l) => selectedKraLevelIds.includes(l.kra_level_id))),
+    () => kraLibrary.filter((k) => k.levels.some((l) => selectedKraLevelIds.includes(l.kra_level_id ?? l.id))),
     [kraLibrary, selectedKraLevelIds]
   );
 
@@ -73,26 +74,33 @@ export default function ManageWeightageModal({
     const prefillCats = prefill?.categories ?? [];
 
     if (uniqueCategoryIds.length > 0) {
-      // Assign mode — build from selected KRAs
       const init = uniqueCategoryIds.map((cid) => {
-        const existing = prefillCats.find((c) => c.category_id === cid);
-        const cat = categories.find((c) => c.id === cid);
-        // Get is_standard from the first KRA in this category
-        const sampleKRA = selectedKras.find((k) => k.category_id === cid);
-        return {
-          category_id: cid,
-          category_name: cat?.name ?? sampleKRA?.category_name ?? `Category ${cid}`,
-          is_standard: sampleKRA?.is_standard ?? true,
-          weightage: existing?.weightage ? String(existing.weightage) : '',
-          // KRAs in this category that are selected
-          kra_names: selectedKras
-            .filter((k) => k.category_id === cid)
-            .map((k) => k.name),
-        };
+      const existing = prefillCats.find((c) => c.category_id === cid);
+      const cat = categories.find((c) => c.id === cid);
+      const sampleKRA = selectedKras.find((k) => k.category_id === cid);
+
+      // Build names WITH level suffix so "test L1" and "test Senior" show separately
+      const kraNames = [];
+      kraLibrary.forEach(kra => {
+        if (kra.category_id !== cid) return;
+        (kra.levels ?? []).forEach(level => {
+          const compositeKey = `${kra.id}_${level.kra_level_id ?? level.id}`;
+          if (selectedKraLevelIds.includes(compositeKey)) {
+            kraNames.push(`${kra.name} (${level.level_name})`);
+          }
+        });
       });
+
+      return {
+        category_id: cid,
+        category_name: cat?.name ?? sampleKRA?.category_name ?? `Category ${cid}`,
+        is_standard: sampleKRA?.is_standard ?? true,
+        weightage: existing?.weightage ? String(existing.weightage) : '',
+        kra_names: kraNames,
+      };
+    });
       setCategoryWeightages(init);
     } else if (prefillCats.length > 0) {
-      // Edit mode — use cached categories
       setCategoryWeightages(
         prefillCats.map((c) => {
           const cat = categories.find((cat) => cat.id === c.category_id);
@@ -126,7 +134,6 @@ export default function ManageWeightageModal({
 
   // ── Field change ───────────────────────────────────────────────────────────
   const handleWeightageChange = (categoryId, raw) => {
-    // Allow only numbers and a single decimal point
     const value = raw.replace(/[^0-9.]/g, '');
     setGlobalError('');
     setFieldErrors((prev) => ({ ...prev, [categoryId]: '' }));
@@ -152,6 +159,9 @@ export default function ManageWeightageModal({
   };
 
   // ── Validate ───────────────────────────────────────────────────────────────
+  // ─── FIX Bug 3: Validate only checks per-field errors (empty / negative / >100)
+  // The 100% total is now a WARNING shown in the UI, not a hard block.
+  // Submit is always allowed as long as individual fields are valid numbers.
   const validate = () => {
     const errors = {};
     let valid = true;
@@ -170,16 +180,18 @@ export default function ManageWeightageModal({
       }
     });
 
+    setFieldErrors(errors);
+
+    // ─── FIX Bug 3: Show warning for non-100% total but DO NOT block submit ──
     if (valid && !isValid) {
       setGlobalError(
         totalWeightage > 100
-          ? `Total is ${totalWeightage.toFixed(1)}% — please reduce by ${(totalWeightage - 100).toFixed(1)}% to reach exactly 100%.`
-          : `Total is ${totalWeightage.toFixed(1)}% — please add ${remainingWeight}% more to reach exactly 100%.`
+          ? `Total is ${totalWeightage.toFixed(1)}% — consider reducing by ${(totalWeightage - 100).toFixed(1)}% to reach exactly 100%.`
+          : `Total is ${totalWeightage.toFixed(1)}% — ${remainingWeight}% unallocated. You can still save.`
       );
-      return false;
+      // NOTE: We intentionally do NOT return false here — submit proceeds
     }
 
-    setFieldErrors(errors);
     return valid;
   };
 
@@ -195,7 +207,8 @@ export default function ManageWeightageModal({
           weightage: String(parseFloat(c.weightage)),
         })),
         kra_level_ids: selectedKraLevelIds,
-        kra_level_to_kra_id: prefill?.kra_level_to_kra_id ?? {},  // ← forward it
+        kra_selections: prefill?.kra_selections ?? [],
+        kra_level_to_kra_id: prefill?.kra_level_to_kra_id ?? {},
         is_date_based: isDateBased,
         enrol_mode: enrolMode ?? 'skip',
       });
@@ -211,7 +224,6 @@ export default function ManageWeightageModal({
 
   const hasNoCategories = categoryWeightages.length === 0;
 
-  // How many of the target employees are already enrolled in this cycle
   const alreadyEnrolledCount = isEdit ? 0 : targetEmployees.filter((e) => e.assigned_to_cycle).length;
   const showEnrolModePicker = !isEdit && alreadyEnrolledCount > 0;
 
@@ -274,7 +286,7 @@ export default function ManageWeightageModal({
 
       <DialogContent sx={{ px: 3, py: 2.5 }}>
 
-        {/* ── Enrol mode picker — only shown when some selected employees are already enrolled ── */}
+        {/* ── Enrol mode picker ── */}
         {showEnrolModePicker && (
           <Box sx={{ mb: 2.5, p: 1.75, borderRadius: 2, border: '1px solid #fde68a', bgcolor: '#fffbeb' }}>
             <Stack direction="row" alignItems="center" gap={0.75} mb={1.25}>
@@ -354,13 +366,19 @@ export default function ManageWeightageModal({
               </Typography>
             </Stack>
             <Stack direction="row" flexWrap="wrap" gap={0.5}>
-              {selectedKras.map((kra) => (
-                <Stack key={kra.id} direction="row" alignItems="center" spacing={0.4}
-                  sx={{ bgcolor: '#fff', border: '1px solid #e2e8f0', borderRadius: 1.5, px: 0.75, py: 0.35 }}>
-                  <Typography fontSize={10.5} fontWeight={600} color="#1e293b">{kra.name}</Typography>
-                  <KRATypeBadge isStandard={kra.is_standard} />
-                </Stack>
-              ))}
+              {kraLibrary.flatMap(kra =>
+                (kra.levels ?? [])
+                  .filter(level => selectedKraLevelIds.includes(level.kra_level_id ?? level.id))
+                  .map(level => (
+                    <Stack key={`${kra.id}_${level.kra_level_id ?? level.id}`} direction="row" alignItems="center" spacing={0.4}
+                      sx={{ bgcolor: '#fff', border: '1px solid #e2e8f0', borderRadius: 1.5, px: 0.75, py: 0.35 }}>
+                      <Typography fontSize={10.5} fontWeight={600} color="#1e293b">
+                        {kra.name} <Box component="span" sx={{ color: '#94a3b8', fontWeight: 400 }}>({level.level_name})</Box>
+                      </Typography>
+                      <KRATypeBadge isStandard={kra.is_standard} />
+                    </Stack>
+                  ))
+              )}
             </Stack>
           </Box>
         )}
@@ -371,7 +389,8 @@ export default function ManageWeightageModal({
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
           <Box>
             <Typography fontSize={13} fontWeight={700} color="#1e293b">Category Weightage</Typography>
-            <Typography fontSize={11} color="#64748b">All categories must add up to exactly 100%</Typography>
+            {/* ─── FIX Bug 3: Changed "must add up to exactly 100%" to advisory text ── */}
+            <Typography fontSize={11} color="#64748b">Ideally all categories should add up to 100%</Typography>
           </Box>
           {categoryWeightages.length > 1 && (
             <Button
@@ -406,14 +425,14 @@ export default function ManageWeightageModal({
             {!isValid && totalWeightage > 0 && (
               <Typography fontSize={10.5} sx={{ color: progressColor, mt: 0.5 }}>
                 {totalWeightage > 100
-                  ? `${(totalWeightage - 100).toFixed(1)}% over the limit — reduce some categories`
-                  : `${remainingWeight}% still to be allocated`
+                  ? `${(totalWeightage - 100).toFixed(1)}% over — you may still save`
+                  : `${remainingWeight}% unallocated — you may still save`
                 }
               </Typography>
             )}
             {isValid && (
               <Typography fontSize={10.5} color="#16a34a" fontWeight={600} mt={0.5}>
-                ✓ Weightage is balanced
+                ✓ Weightage is balanced at 100%
               </Typography>
             )}
           </Box>
@@ -437,7 +456,6 @@ export default function ManageWeightageModal({
               >
                 <Stack direction="row" alignItems="flex-start" spacing={1.5}>
                   <Box flex={1} minWidth={0}>
-                    {/* Category name + type badge */}
                     <Stack direction="row" alignItems="center" spacing={0.75} mb={0.4}>
                       <Typography fontSize={12.5} fontWeight={700} color="#1e293b">
                         {cat.category_name}
@@ -445,7 +463,6 @@ export default function ManageWeightageModal({
                       <KRATypeBadge isStandard={cat.is_standard} />
                     </Stack>
 
-                    {/* KRA names preview */}
                     {cat.kra_names?.length > 0 && (
                       <Typography fontSize={10.5} color="#94a3b8">
                         {cat.kra_names.slice(0, 2).join(', ')}
@@ -453,7 +470,6 @@ export default function ManageWeightageModal({
                       </Typography>
                     )}
 
-                    {/* Mini progress bar per category */}
                     {cat.weightage !== '' && !isNaN(val) && val > 0 && (
                       <LinearProgress
                         variant="determinate"
@@ -475,7 +491,6 @@ export default function ManageWeightageModal({
                     )}
                   </Box>
 
-                  {/* Weightage input */}
                   <Stack direction="row" alignItems="center" spacing={0.75} flexShrink={0} mt={0.25}>
                     <TextField
                       size="small"
@@ -518,13 +533,19 @@ export default function ManageWeightageModal({
           </Stack>
         </Box>
 
-        {/* Global error */}
+        {/* ─── FIX Bug 3: globalError is now a WARNING (amber), not a hard error ── */}
         {globalError && (
-          <Alert severity="error" sx={{ borderRadius: 2, fontSize: 12, py: 0.5 }}>{globalError}</Alert>
+          <Alert
+            severity="warning"
+            icon={<WarningAmberIcon fontSize="small" />}
+            sx={{ borderRadius: 2, fontSize: 12, py: 0.5 }}
+          >
+            {globalError}
+          </Alert>
         )}
 
-        {/* Success hint */}
-        {isValid && !globalError && (
+        {/* Success hint — only show when exactly 100% and no other errors */}
+        {isValid && !globalError && Object.keys(fieldErrors).length === 0 && (
           <Alert severity="success" icon={<CheckCircleIcon fontSize="small" />} sx={{ borderRadius: 2, fontSize: 12, py: 0.5 }}>
             All set! Weightage totals 100%. Ready to assign.
           </Alert>
@@ -541,6 +562,7 @@ export default function ManageWeightageModal({
         </Button>
         <Button
           onClick={handleSubmit}
+          // ─── FIX Bug 3: Remove isValid from disabled condition — allow non-100% submit ──
           disabled={submitting || hasNoCategories}
           sx={{
             background: gradient,

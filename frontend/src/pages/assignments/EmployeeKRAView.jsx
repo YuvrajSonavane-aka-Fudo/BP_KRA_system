@@ -36,7 +36,7 @@ function KRATable({ kraLibrary, kraLevelIds = [], categories }) {
     const map = {};
     kraLibrary.forEach((kra) => {
       kra.levels.forEach((level) => {
-        if (kraLevelIds.includes(level.kra_level_id)) {
+        if (kraLevelIds.includes(level.kra_level_id?? level.id)) {
           const cid = kra.category_id;
           if (!map[cid]) {
             map[cid] = {
@@ -262,21 +262,19 @@ function WeightageSummary({ categories: allCategories, cachedCategories = [], kr
 // ── Clone Panel ────────────────────────────────────────────────────────────────
 
 function ClonePanel({ employees, sourceEmployee, onClone, cloning }) {
-  const [search, setSearch]       = useState('');
+  const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [mode, setMode] = useState('append'); // ← add this
 
-  // Only show other assigned employees as targets
   const eligible = useMemo(
-    () =>
-      employees.filter(
-        (e) =>
-          e.assigned_to_cycle &&
-          e.employee_id !== sourceEmployee.employee_id &&
-          e.employee_kra_cycle_id != null &&
-          (search.trim() === '' || e.full_name.toLowerCase().includes(search.toLowerCase()))
-      ),
-    [employees, sourceEmployee, search]
-  );
+  () =>
+    employees.filter(
+      (e) =>
+        e.employee_id !== sourceEmployee.employee_id &&
+        (search.trim() === '' || e.full_name.toLowerCase().includes(search.toLowerCase()))
+    ),
+  [employees, sourceEmployee, search]
+);
 
   const toggleId = (id) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -290,7 +288,8 @@ function ClonePanel({ employees, sourceEmployee, onClone, cloning }) {
       .filter((e) => selectedIds.includes(e.employee_id))
       .map((e) => e.employee_kra_cycle_id)
       .filter(Boolean);
-    onClone(targetKraCycleIds);
+      console.log('Cloning with mode:', mode, 'targets:', targetKraCycleIds);
+    onClone(targetKraCycleIds, mode); // ← pass mode
   };
 
   return (
@@ -303,12 +302,72 @@ function ClonePanel({ employees, sourceEmployee, onClone, cloning }) {
       </Stack>
       <Typography fontSize={12} color="#64748b" mb={1.5}>
         Select employees below to receive the same KRAs as{' '}
-        <strong>{sourceEmployee.full_name}</strong>. Their existing KRAs will be replaced.
+        <strong>{sourceEmployee.full_name}</strong>.
       </Typography>
 
-      <Alert severity="warning" sx={{ borderRadius: 2, fontSize: 11, mb: 1.5, py: 0.5 }}>
-        <strong>Note:</strong> This will replace any KRAs already assigned to the selected employees. Ratings and comments from previous assignments will not be carried over.
-      </Alert>
+      {/* ── Mode Selector ── */}
+      <Box sx={{ mb: 1.5 }}>
+        <Typography fontSize={11} fontWeight={700} color="#475569" textTransform="uppercase" letterSpacing="0.06em" mb={0.75}>
+          If employee already has KRAs
+        </Typography>
+        <Stack direction="row" gap={1}>
+          {[
+            {
+              value: 'append',
+              label: 'Append',
+              desc: 'Keep existing KRAs, add missing ones from source',
+              color: '#1d4ed8',
+              bg: '#eff6ff',
+              border: '#93c5fd',
+            },
+            {
+              value: 'overwrite',
+              label: 'Overwrite',
+              desc: 'Replace all existing KRAs with source KRAs',
+              color: '#dc2626',
+              bg: '#fef2f2',
+              border: '#fca5a5',
+            },
+          ].map((opt) => (
+            <Box
+              key={opt.value}
+              onClick={() => setMode(opt.value)}
+              sx={{
+                flex: 1, px: 1.5, py: 1, borderRadius: 2, cursor: 'pointer',
+                border: `2px solid ${mode === opt.value ? opt.border : '#e2e8f0'}`,
+                bgcolor: mode === opt.value ? opt.bg : '#fafafa',
+                transition: 'all 0.15s',
+                '&:hover': { border: `2px solid ${opt.border}`, bgcolor: opt.bg },
+              }}
+            >
+              <Stack direction="row" alignItems="center" gap={0.75} mb={0.25}>
+                <Box sx={{
+                  width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                  border: `2px solid ${mode === opt.value ? opt.color : '#cbd5e1'}`,
+                  bgcolor: mode === opt.value ? opt.color : 'transparent',
+                  transition: 'all 0.15s',
+                }} />
+                <Typography fontSize={12} fontWeight={700} color={mode === opt.value ? opt.color : '#374151'}>
+                  {opt.label}
+                </Typography>
+              </Stack>
+              <Typography fontSize={10.5} color="#64748b">{opt.desc}</Typography>
+            </Box>
+          ))}
+        </Stack>
+
+        {/* Contextual warning based on selected mode */}
+        {mode === 'overwrite' && (
+          <Alert severity="warning" sx={{ borderRadius: 2, fontSize: 11, mt: 1, py: 0.5 }}>
+            <strong>Destructive:</strong> All existing KRAs on selected employees will be deleted and replaced with {sourceEmployee.full_name}'s KRAs.
+          </Alert>
+        )}
+        {mode === 'append' && (
+          <Alert severity="info" sx={{ borderRadius: 2, fontSize: 11, mt: 1, py: 0.5 }}>
+            <strong>Safe:</strong> Only KRAs not already assigned will be added. Existing KRAs are untouched.
+          </Alert>
+        )}
+      </Box>
 
       <TextField
         size="small"
@@ -343,14 +402,12 @@ function ClonePanel({ employees, sourceEmployee, onClone, cloning }) {
       </Stack>
 
       {/* Employee list */}
-      <Box
-        sx={{
-          maxHeight: 220, overflow: 'auto',
-          border: '1px solid #e2e8f0', borderRadius: 2, mb: 1.5,
-          '&::-webkit-scrollbar': { width: 4 },
-          '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 2 },
-        }}
-      >
+      <Box sx={{
+        maxHeight: 220, overflow: 'auto',
+        border: '1px solid #e2e8f0', borderRadius: 2, mb: 1.5,
+        '&::-webkit-scrollbar': { width: 4 },
+        '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 2 },
+      }}>
         {eligible.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4, color: '#94a3b8' }}>
             <PersonIcon sx={{ fontSize: 28, mb: 0.5, opacity: 0.4 }} />
@@ -379,9 +436,6 @@ function ClonePanel({ employees, sourceEmployee, onClone, cloning }) {
                   onClick={(e) => e.stopPropagation()}
                   sx={{ p: 0, mr: 1.25, flexShrink: 0 }}
                 />
-                {/* <Avatar sx={{ width: 28, height: 28, fontSize: 10, fontWeight: 700, background: gradient, mr: 1, flexShrink: 0 }}>
-                  {getInitials(emp.full_name)}
-                </Avatar> */}
                 <Box minWidth={0}>
                   <Typography fontSize={12} fontWeight={600} color="#1e293b" noWrap>{emp.full_name}</Typography>
                   <Typography fontSize={10} color="#94a3b8" noWrap>
@@ -401,16 +455,18 @@ function ClonePanel({ employees, sourceEmployee, onClone, cloning }) {
         onClick={handleClone}
         sx={{
           fontSize: 12, fontWeight: 700,
-          background: gradient, color: '#ffffff',
-          borderRadius: 2, height: 38,
-          '&:hover': { background: gradient, opacity: 0.9, color: '#ffffff' },
+          background: mode === 'overwrite'
+            ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+            : gradient,
+          color: '#ffffff', borderRadius: 2, height: 38,
+          '&:hover': { opacity: 0.9 },
           '&:disabled': { opacity: 0.5, background: gradient, color: '#ffffff' },
         }}
       >
         {cloning
           ? 'Copying KRAs…'
           : selectedIds.length > 0
-            ? `Copy to ${selectedIds.length} Employee${selectedIds.length !== 1 ? 's' : ''}`
+            ? `${mode === 'overwrite' ? 'Overwrite' : 'Append'} KRAs for ${selectedIds.length} Employee${selectedIds.length !== 1 ? 's' : ''}`
             : 'Select employees to copy to'
         }
       </Button>
@@ -442,14 +498,14 @@ export default function EmployeeKRAView({
 
   if (!employee) return null;
 
-  const kraLevelIds      = cachedData?.kra_level_ids ?? [];
-  const cachedCategories = cachedData?.categories ?? [];
+const kraLevelIds      = employee.assigned_kras?.map(k => k.kra_level_id) ?? cachedData?.kra_level_ids ?? [];
+const cachedCategories = cachedData?.categories ?? [];
   const totalKRAs        = kraLevelIds.length;
 
-  const handleClone = async (targetIds) => {
+  const handleClone = async (targetIds, mode) => {
     setCloning(true);
     try {
-      await onCloneTo(targetIds);
+      await onCloneTo(targetIds, mode);
     } finally {
       setCloning(false);
     }
@@ -563,13 +619,13 @@ export default function EmployeeKRAView({
         )}
 
         {tab === 'clone' && (
-          <ClonePanel
-            employees={employees}
-            sourceEmployee={employee}
-            onClone={handleClone}
-            cloning={cloning}
-          />
-        )}
+  <ClonePanel
+    employees={employees.filter(e => e.assigned_to_cycle && e.employee_kra_cycle_id != null)}
+    sourceEmployee={employee}
+    onClone={handleClone}
+    cloning={cloning}
+  />
+)}
       </DialogContent>
 
       {/* Footer */}
