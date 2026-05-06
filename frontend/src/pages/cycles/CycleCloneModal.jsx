@@ -20,6 +20,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useNavigate } from 'react-router-dom';
 import ROUTES from '../../config/routes';
 import { getCycles, cloneCycle } from '../../api/cyclesApi';
@@ -51,13 +52,18 @@ function fmt(dateStr) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function CalendarPicker({ value, onChange, minDate, maxDate, label, error, defaultViewDate, blockMin = false }) {
+function toISO(year, month, day) {
+  return `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+/** Standard single-value calendar popup for cycle start/end */
+function CalendarPicker({ value, onChange, minDate, maxDate, label, error, blockMin = false }) {
   const [open, setOpen] = useState(false);
   const [showYearGrid, setShowYearGrid] = useState(false);
 
   function resolveView(dateStr) {
-    const src = dateStr || defaultViewDate;
-    if (src) { const d = new Date(toDateOnly(src) + 'T00:00:00'); return { year: d.getFullYear(), month: d.getMonth() }; }
+    const src = toDateOnly(dateStr);
+    if (src) { const d = new Date(src + 'T00:00:00'); return { year: d.getFullYear(), month: d.getMonth() }; }
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   }
@@ -93,7 +99,6 @@ function CalendarPicker({ value, onChange, minDate, maxDate, label, error, defau
     const dt = new Date(viewYear, viewMonth, d);
     if (minD) {
       const m = new Date(minD); m.setHours(0,0,0,0);
-      // blockMin=true blocks the minDate itself (for clone: must be strictly AFTER source end)
       if (blockMin ? dt <= m : dt < m) return true;
     }
     if (maxD) { const mx = new Date(maxD); mx.setHours(0,0,0,0); if (dt > mx) return true; }
@@ -107,9 +112,7 @@ function CalendarPicker({ value, onChange, minDate, maxDate, label, error, defau
     return !!d && t.getFullYear() === viewYear && t.getMonth() === viewMonth && t.getDate() === d;
   }
   function selectDay(d) {
-    const mm = String(viewMonth + 1).padStart(2, '0');
-    const dd = String(d).padStart(2, '0');
-    onChange(`${viewYear}-${mm}-${dd}`);
+    onChange(toISO(viewYear, viewMonth, d));
     setOpen(false);
   }
   function prevMonth() {
@@ -126,8 +129,7 @@ function CalendarPicker({ value, onChange, minDate, maxDate, label, error, defau
   return (
     <Box ref={ref} sx={{ position: 'relative', flex: 1, minWidth: 0 }}>
       <Box onClick={() => setOpen(o => !o)} sx={{
-        display: 'flex', alignItems: 'center', gap: 0.75,
-        px: 1.25, py: 0.75,
+        display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.75,
         border: `1.5px solid ${error ? '#ef4444' : open ? '#1E3A8A' : '#e2e8f0'}`,
         borderRadius: 1.5, cursor: 'pointer', bgcolor: '#fff', transition: 'border-color 0.15s',
         '&:hover': { borderColor: error ? '#ef4444' : '#1E3A8A' },
@@ -241,12 +243,267 @@ function CalendarPicker({ value, onChange, minDate, maxDate, label, error, defau
   );
 }
 
-export default function CycleCloneModal({ open= false, cycleId, onClose, onSuccess }) {
+/**
+ * InlineRangePicker — same as in CycleCreateModal.
+ * Inline calendar expands inside the stage row; no popup.
+ * Click start → click end → auto-closes.
+ */
+function InlineRangePicker({ startDate, endDate, onChange, minDate, maxDate, stageId, openId, setOpenId }) {
+  const isOpen = openId === stageId;
+
+  function resolveView() {
+    const src = startDate || minDate;
+    if (src) { const d = new Date(toDateOnly(src) + 'T00:00:00'); return { year: d.getFullYear(), month: d.getMonth() }; }
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  }
+
+  const [viewYear, setViewYear] = useState(() => resolveView().year);
+  const [viewMonth, setViewMonth] = useState(() => resolveView().month);
+  const [picking, setPicking] = useState('start');
+  const [hoverDay, setHoverDay] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const v = resolveView();
+      setViewYear(v.year);
+      setViewMonth(v.month);
+      setPicking(startDate ? 'end' : 'start');
+      setHoverDay(null);
+    }
+    // eslint-disable-next-line
+  }, [isOpen]);
+
+  const minD = minDate ? new Date(toDateOnly(minDate) + 'T00:00:00') : null;
+  const maxD = maxDate ? new Date(toDateOnly(maxDate) + 'T00:00:00') : null;
+  const startD = startDate ? new Date(toDateOnly(startDate) + 'T00:00:00') : null;
+  const endD = endDate ? new Date(toDateOnly(endDate) + 'T00:00:00') : null;
+
+  const totalDays = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const cells = [...Array(firstDay).fill(null), ...Array.from({ length: totalDays }, (_, i) => i + 1)];
+
+  function isDisabled(d) {
+    if (!d) return true;
+    const dt = new Date(viewYear, viewMonth, d);
+    if (minD) { const m = new Date(minD); m.setHours(0,0,0,0); if (dt < m) return true; }
+    if (maxD) { const mx = new Date(maxD); mx.setHours(0,0,0,0); if (dt > mx) return true; }
+    if (picking === 'end' && startD) {
+      const s = new Date(startD); s.setHours(0,0,0,0);
+      if (dt < s) return true;
+    }
+    return false;
+  }
+
+  function getDayState(d) {
+    if (!d) return {};
+    const dt = new Date(viewYear, viewMonth, d); dt.setHours(0,0,0,0);
+    const sTime = startD ? new Date(startD).setHours(0,0,0,0) : null;
+    const eTime = endD   ? new Date(endD).setHours(0,0,0,0)   : null;
+    const hTime = hoverDay ? new Date(viewYear, viewMonth, hoverDay).setHours(0,0,0,0) : null;
+    const dtTime = dt.getTime();
+
+    const isStart = sTime !== null && dtTime === sTime;
+    const isEnd   = eTime !== null && dtTime === eTime;
+    const rangeEndTime = picking === 'end' && hTime ? hTime : eTime;
+    const inRange = sTime !== null && rangeEndTime !== null && dtTime > sTime && dtTime < rangeEndTime;
+
+    return { isStart, isEnd, inRange };
+  }
+
+  function isToday(d) {
+    const t = new Date();
+    return !!d && t.getFullYear() === viewYear && t.getMonth() === viewMonth && t.getDate() === d;
+  }
+
+  function selectDay(d) {
+    const iso = toISO(viewYear, viewMonth, d);
+    if (picking === 'start') {
+      onChange({ start_date: iso, end_date: '' });
+      setPicking('end');
+    } else {
+      onChange({ start_date: startDate, end_date: iso });
+      setOpenId(null);
+    }
+    setHoverDay(null);
+  }
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1);
+  }
+
+  function openPicker(mode) {
+    setPicking(mode);
+    setOpenId(stageId);
+  }
+
+  const displayStart = startDate ? fmt(startDate) : null;
+  const displayEnd   = endDate   ? fmt(endDate)   : null;
+  const bothSet      = !!startDate && !!endDate;
+
+  return (
+    <Box>
+      {/* Trigger */}
+      <Stack direction="row" alignItems="center" spacing={0.75}>
+        <Box
+          onClick={() => isOpen && picking === 'start' ? setOpenId(null) : openPicker('start')}
+          sx={{
+            display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.5,
+            border: `1.5px solid ${isOpen && picking === 'start' ? '#1E3A8A' : displayStart ? '#93c5fd' : '#e2e8f0'}`,
+            borderRadius: 1.5, cursor: 'pointer', bgcolor: displayStart ? '#eff6ff' : '#fff',
+            minWidth: 110, transition: 'all 0.15s',
+            '&:hover': { borderColor: '#1E3A8A' },
+          }}
+        >
+          <CalendarMonthIcon sx={{ fontSize: 12, color: displayStart ? '#1E3A8A' : '#94a3b8' }} />
+          <Typography sx={{ fontSize: 11, color: displayStart ? '#1E3A8A' : '#94a3b8', fontWeight: displayStart ? 700 : 400 }}>
+            {displayStart || 'Start date'}
+          </Typography>
+        </Box>
+
+        <Typography sx={{ fontSize: 12, color: '#cbd5e1', fontWeight: 700 }}>→</Typography>
+
+        <Box
+          onClick={() => {
+            if (!startDate) return;
+            isOpen && picking === 'end' ? setOpenId(null) : openPicker('end');
+          }}
+          sx={{
+            display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.5,
+            border: `1.5px solid ${isOpen && picking === 'end' ? '#1E3A8A' : displayEnd ? '#93c5fd' : '#e2e8f0'}`,
+            borderRadius: 1.5, cursor: startDate ? 'pointer' : 'not-allowed',
+            bgcolor: displayEnd ? '#eff6ff' : '#fff',
+            minWidth: 110, transition: 'all 0.15s', opacity: startDate ? 1 : 0.5,
+            '&:hover': startDate ? { borderColor: '#1E3A8A' } : {},
+          }}
+        >
+          <CalendarMonthIcon sx={{ fontSize: 12, color: displayEnd ? '#1E3A8A' : '#94a3b8' }} />
+          <Typography sx={{ fontSize: 11, color: displayEnd ? '#1E3A8A' : '#94a3b8', fontWeight: displayEnd ? 700 : 400 }}>
+            {displayEnd || 'End date'}
+          </Typography>
+        </Box>
+
+        {(startDate || endDate) && (
+          <IconButton size="small" onClick={() => { onChange({ start_date: '', end_date: '' }); setOpenId(null); }}
+            sx={{ p: 0.25, color: '#94a3b8', '&:hover': { color: '#ef4444' } }}>
+            <CloseIcon sx={{ fontSize: 12 }} />
+          </IconButton>
+        )}
+      </Stack>
+
+      {/* Inline calendar */}
+      {isOpen && (
+        <Box sx={{
+          mt: 1, border: '1.5px solid #1E3A8A', borderRadius: 2,
+          overflow: 'hidden', bgcolor: '#fff',
+          boxShadow: '0 8px 24px -4px rgba(30,58,138,0.18)',
+          width: 264,
+        }}>
+          {/* Mode indicator */}
+          <Box sx={{ px: 1.5, py: 0.75, bgcolor: '#f0f9ff', borderBottom: '1px solid #e2e8f0' }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box sx={{ px: 1, py: 0.25, borderRadius: 1, bgcolor: picking === 'start' ? '#1E3A8A' : '#e2e8f0' }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: picking === 'start' ? '#fff' : '#64748b' }}>
+                  {displayStart || '← Pick start'}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: 10, color: '#94a3b8' }}>→</Typography>
+              <Box sx={{ px: 1, py: 0.25, borderRadius: 1, bgcolor: picking === 'end' ? '#1E3A8A' : '#e2e8f0', opacity: startDate ? 1 : 0.45 }}>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: picking === 'end' ? '#fff' : '#64748b' }}>
+                  {displayEnd || 'Pick end →'}
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+
+          {/* Month nav */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, py: 0.75, background: gradient }}>
+            <IconButton size="small" onClick={prevMonth} sx={{ color: '#fff', p: 0.25 }}>
+              <ChevronLeftIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+            <Typography sx={{ fontWeight: 700, fontSize: 12, color: '#fff' }}>{MONTHS[viewMonth]} {viewYear}</Typography>
+            <IconButton size="small" onClick={nextMonth} sx={{ color: '#fff', p: 0.25 }}>
+              <ChevronRightIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Stack>
+
+          {/* Grid */}
+          <Box sx={{ px: 1.25, pt: 0.75, pb: 0.5 }}>
+            <Stack direction="row" mb={0.4}>
+              {WEEK_DAYS.map(d => (
+                <Box key={d} sx={{ flex: 1, textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#94a3b8' }}>{d}</Typography>
+                </Box>
+              ))}
+            </Stack>
+            {Array.from({ length: Math.ceil(cells.length / 7) }, (_, ri) => (
+              <Stack key={ri} direction="row" sx={{ mb: 0.15 }}>
+                {cells.slice(ri * 7, ri * 7 + 7).map((d, ci) => {
+                  const disabled = isDisabled(d);
+                  const { isStart, isEnd, inRange } = getDayState(d);
+                  const today = isToday(d);
+                  const highlighted = isStart || isEnd;
+                  return (
+                    <Box key={ci} sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                      {d ? (
+                        <Box
+                          onClick={() => !disabled && selectDay(d)}
+                          onMouseEnter={() => !disabled && picking === 'end' && setHoverDay(d)}
+                          onMouseLeave={() => setHoverDay(null)}
+                          sx={{
+                            width: 26, height: 26,
+                            borderRadius: inRange ? 0 : '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            bgcolor: highlighted ? '#1E3A8A' : inRange ? '#dbeafe' : 'transparent',
+                            border: today && !highlighted ? '1.5px solid #1E3A8A' : '1.5px solid transparent',
+                            transition: 'all 0.1s',
+                            '&:hover': !disabled && !highlighted ? { bgcolor: inRange ? '#bfdbfe' : '#dbeafe' } : {},
+                          }}
+                        >
+                          <Typography sx={{
+                            fontSize: 11, lineHeight: 1,
+                            fontWeight: highlighted ? 700 : today ? 600 : 400,
+                            color: highlighted ? '#fff' : disabled ? '#cbd5e1' : inRange ? '#1E3A8A' : today ? '#1E3A8A' : '#374151',
+                          }}>
+                            {d}
+                          </Typography>
+                        </Box>
+                      ) : <Box sx={{ width: 26, height: 26 }} />}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            ))}
+          </Box>
+
+          <Stack direction="row" justifyContent="space-between" sx={{ px: 1.5, py: 0.75, borderTop: '1px solid #f1f5f9' }}>
+            <Button size="small" onClick={() => { onChange({ start_date: '', end_date: '' }); setOpenId(null); }}
+              sx={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, minWidth: 0, p: 0.5 }}>
+              Clear
+            </Button>
+            {bothSet && (
+              <Button size="small" onClick={() => setOpenId(null)}
+                sx={{ fontSize: 10, color: '#1E3A8A', fontWeight: 700, minWidth: 0, p: 0.5 }}>
+                Done
+              </Button>
+            )}
+          </Stack>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+export default function CycleCloneModal({ open = false, cycleId, onClose, onSuccess }) {
   const navigate = useNavigate();
 
   const [source, setSource] = useState(null);
   const [loadErr, setLoadErr] = useState('');
-  const [step, setStep] = useState(0); // 0=timeline, 1=stages, 2=result
+  const [step, setStep] = useState(0);
   const [animDir, setAnimDir] = useState(1);
 
   const [cycleName, setCycleName] = useState('');
@@ -257,6 +514,8 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
     STAGES.forEach(s => { init[s.id] = { start_date: '', end_date: '' }; });
     return init;
   });
+
+  const [openStageId, setOpenStageId] = useState(null);
 
   const [fieldErrors, setFieldErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -280,13 +539,12 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
     }
   }, [cycleId]);
 
-  // Reset + fetch on open
   useEffect(() => {
     if (open && cycleId) {
       setStep(0); setAnimDir(1); setResult(null); setNewCycleId(null);
       setStartDate(''); setEndDate('');
       setStageDates(() => { const i = {}; STAGES.forEach(s => { i[s.id] = { start_date: '', end_date: '' }; }); return i; });
-      setFieldErrors({}); setTouched({}); setCloneErr(''); setLoadErr('');
+      setFieldErrors({}); setTouched({}); setCloneErr(''); setLoadErr(''); setOpenStageId(null);
       fetchSource();
     }
   }, [open, cycleId, fetchSource]);
@@ -306,7 +564,7 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
       const d = stageDates[s.id] ?? {};
       if (touched[`s${s.id}s`] && !d.start_date) errors[`s${s.id}s`] = 'Required.';
       if (touched[`s${s.id}e`] && !d.end_date) errors[`s${s.id}e`] = 'Required.';
-      if (d.start_date && d.end_date && d.end_date < d.start_date) errors[`s${s.id}e`] = 'Before start.';
+      if (d.start_date && d.end_date && d.end_date < d.start_date) errors[`s${s.id}e`] = 'End before start.';
       if (startDate && d.start_date && d.start_date < startDate) errors[`s${s.id}s`] = `Before cycle start (${fmt(startDate)}).`;
       if (endDate && d.end_date && d.end_date > endDate) errors[`s${s.id}e`] = `After cycle end (${fmt(endDate)}).`;
     });
@@ -314,9 +572,10 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
   }, [cycleName, startDate, endDate, stageDates, touched, source, sourceEndDateOnly]);
 
   function touch(key) { setTouched(t => ({ ...t, [key]: true })); }
-  function updateStageDate(stageId, field, value) {
-    setStageDates(prev => ({ ...prev, [stageId]: { ...prev[stageId], [field]: value } }));
-    touch(field === 'start_date' ? `s${stageId}s` : `s${stageId}e`);
+
+  function updateStageDate(stageId, value) {
+    setStageDates(prev => ({ ...prev, [stageId]: value }));
+    setTouched(t => ({ ...t, [`s${stageId}s`]: true, [`s${stageId}e`]: true }));
   }
 
   const step0Valid = !!cycleName.trim() && !!startDate && !!endDate && endDate > startDate
@@ -326,15 +585,15 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
   function goNext() {
     setTouched(t => ({ ...t, cycleName: true, startDate: true, endDate: true }));
     if (!step0Valid) return;
-    setAnimDir(1); setStep(1);
+    setAnimDir(1); setStep(1); setOpenStageId(null);
   }
-  function goBack() { setAnimDir(-1); setStep(0); }
+  function goBack() { setAnimDir(-1); setStep(0); setOpenStageId(null); }
 
   async function handleClone() {
     const allTouched = { cycleName: true, startDate: true, endDate: true };
     STAGES.forEach(s => { allTouched[`s${s.id}s`] = true; allTouched[`s${s.id}e`] = true; });
     setTouched(allTouched);
-    if (!step0Valid || !step1Valid) { setCloneErr('Please fix errors above.'); return; }
+    if (!step0Valid || !step1Valid) { setCloneErr('Please fill in all required fields.'); return; }
     setCloning(true); setCloneErr('');
     try {
       const res = await cloneCycle(cycleId, {
@@ -363,10 +622,12 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
   const skipped = result?.assignments?.skipped ?? [];
   const needsReview = result?.assignments?.needs_review ?? [];
 
+  const configuredCount = STAGES.filter(s => stageDates[s.id]?.start_date && stageDates[s.id]?.end_date).length;
+
   const stepTitles = ['Clone Setup', 'Stage Dates', 'Done!'];
   const stepSubs = [
     `Copying: ${source?.name ?? '…'}`,
-    'Set the date range for each stage',
+    'Click a row to set its date range',
     'Cycle cloned successfully',
   ];
 
@@ -382,11 +643,11 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
           borderRadius: 3,
           overflow: 'hidden',
           boxShadow: '0 32px 80px -12px rgba(30,58,138,0.25)',
-          maxHeight: '90vh',
+          maxHeight: '92vh',
         }
       }}
     >
-      {/* ── Header ── */}
+      {/* Header */}
       <Box sx={{ background: gradient, px: 3, pt: 2.5, pb: 2, color: '#fff' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
           <Box>
@@ -414,10 +675,10 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
         {step === 2 && (
           <Stack direction="row" spacing={1.5} mt={1.5} flexWrap="wrap" gap={0.75}>
             {[
-              { label: 'Total', value: summary?.total ?? 0, color: '#bfdbfe' },
-              { label: 'Enrolled', value: summary?.enrolled ?? 0, color: '#bbf7d0' },
-              { label: 'Skipped', value: summary?.skipped ?? 0, color: '#fde68a' },
-              { label: 'Needs Review', value: summary?.needs_review ?? 0, color: '#fecaca' },
+              { label: 'Total', value: summary?.total ?? 0 },
+              { label: 'Enrolled', value: summary?.enrolled ?? 0 },
+              { label: 'Skipped', value: summary?.skipped ?? 0 },
+              { label: 'Needs Review', value: summary?.needs_review ?? 0 },
             ].map(item => (
               <Box key={item.label} sx={{ px: 1.25, py: 0.6, bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 1.5 }}>
                 <Typography sx={{ fontSize: 9, opacity: 0.75, fontWeight: 600 }}>{item.label}</Typography>
@@ -428,25 +689,21 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
         )}
       </Box>
 
-      {/* ── Body ── */}
+      {/* Body */}
       <Box sx={{ px: 3, py: 2.5, overflow: 'auto', flex: 1 }}>
-
         {loadErr && <Alert severity="error" sx={{ mb: 2, borderRadius: 1.5 }}>{loadErr}</Alert>}
 
-        {/* STEP 0 — Timeline */}
+        {/* STEP 0 */}
         {step === 0 && source && (
           <Box sx={{ animation: 'fadeSlide 0.25s ease' }}>
             <style>{`@keyframes fadeSlide { from { opacity:0; transform:translateX(${animDir * 24}px); } to { opacity:1; transform:translateX(0); } }`}</style>
 
-            {/* Source banner */}
             <Box sx={{ px: 1.5, py: 1.25, bgcolor: '#f0f9ff', borderRadius: 1.5, border: '1px solid #bae6fd', mb: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <ContentCopyIcon sx={{ fontSize: 14, color: '#0284c7', flexShrink: 0 }} />
                 <Box flex={1} minWidth={0}>
                   <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#0c4a6e' }} noWrap>{source.name}</Typography>
-                  <Typography sx={{ fontSize: 11, color: '#0369a1' }}>
-                    {fmt(source.start_date)} — {fmt(source.end_date)}
-                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: '#0369a1' }}>{fmt(source.start_date)} — {fmt(source.end_date)}</Typography>
                 </Box>
                 <Chip label={source.status} size="small" sx={{ fontSize: 9, fontWeight: 700, height: 18, bgcolor: '#dbeafe', color: '#1d4ed8' }} />
               </Stack>
@@ -464,8 +721,7 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
                   New Cycle Name <Box component="span" sx={{ color: '#ef4444' }}>*</Box>
                 </Typography>
                 <TextField
-                  fullWidth size="small"
-                  value={cycleName}
+                  fullWidth size="small" value={cycleName}
                   onChange={e => { setCycleName(e.target.value); touch('cycleName'); }}
                   onBlur={() => touch('cycleName')}
                   error={!!fieldErrors.cycleName}
@@ -481,12 +737,9 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
                     Start Date <Box component="span" sx={{ color: '#ef4444' }}>*</Box>
                   </Typography>
                   <CalendarPicker
-                    label="Pick start date"
-                    value={startDate}
-                    minDate={sourceEndDateOnly || undefined}
-                    maxDate={endDate || undefined}
-                    error={fieldErrors.startDate}
-                    blockMin={true}
+                    label="Pick start date" value={startDate}
+                    minDate={sourceEndDateOnly || undefined} maxDate={endDate || undefined}
+                    error={fieldErrors.startDate} blockMin={true}
                     onChange={v => { setStartDate(v); touch('startDate'); }}
                   />
                 </Box>
@@ -495,8 +748,7 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
                     End Date <Box component="span" sx={{ color: '#ef4444' }}>*</Box>
                   </Typography>
                   <CalendarPicker
-                    label="Pick end date"
-                    value={endDate}
+                    label="Pick end date" value={endDate}
                     minDate={startDate || sourceEndDateOnly || undefined}
                     error={fieldErrors.endDate}
                     onChange={v => { setEndDate(v); touch('endDate'); }}
@@ -525,18 +777,17 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
           </Box>
         )}
 
-        {/* STEP 1 — Stage Dates (compact table) */}
+        {/* STEP 1 — Inline range pickers */}
         {step === 1 && (
           <Box sx={{ animation: 'fadeSlide 0.25s ease' }}>
             <style>{`@keyframes fadeSlide { from { opacity:0; transform:translateX(${animDir * 24}px); } to { opacity:1; transform:translateX(0); } }`}</style>
 
             <Box sx={{ border: '1px solid #e2e8f0', borderRadius: 2, overflow: 'visible' }}>
-              {/* Header */}
               <Stack direction="row" alignItems="center" sx={{ px: 1.5, py: 1, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', flex: '0 0 160px' }}>Stage</Typography>
-                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1, pl: 0.5 }}>Start</Typography>
-                <Box sx={{ width: 20, textAlign: 'center' }}><Typography sx={{ fontSize: 10, color: '#cbd5e1' }}>→</Typography></Box>
-                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', flex: 1, pl: 0.5 }}>End</Typography>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', flex: '0 0 150px' }}>Stage</Typography>
+                <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Date Range — click to set start then end
+                </Typography>
               </Stack>
 
               {STAGES.map((stage, idx) => {
@@ -548,66 +799,54 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
                 const isLast = idx === STAGES.length - 1;
 
                 return (
-                  <Stack key={stage.id} direction="row" alignItems="flex-start" sx={{
-                    px: 1.5, py: 1,
-                    borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
-                    bgcolor: configured ? '#f0f9ff' : hasErr ? '#fff5f5' : '#fff',
-                    transition: 'background-color 0.2s',
-                  }}>
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: '0 0 160px', pt: 0.25 }}>
-                      <Box sx={{
-                        width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                        background: configured ? gradient : hasErr ? '#fee2e2' : '#f1f5f9',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s',
-                      }}>
-                        {configured
-                          ? <CheckCircleIcon sx={{ color: '#fff', fontSize: 12 }} />
-                          : <Typography sx={{ fontSize: 9, fontWeight: 800, color: hasErr ? '#ef4444' : '#94a3b8' }}>{idx + 1}</Typography>
-                        }
-                      </Box>
-                      <Box minWidth={0}>
-                        <Typography sx={{ fontSize: 11, fontWeight: configured ? 700 : 500, color: configured ? '#1E3A8A' : '#374151', lineHeight: 1.2 }} noWrap>
+                  <Box
+                    key={stage.id}
+                    sx={{
+                      borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
+                      bgcolor: openStageId === stage.id ? '#f8faff' : configured ? '#f0f9ff' : hasErr ? '#fff5f5' : '#fff',
+                      transition: 'background-color 0.2s',
+                    }}
+                  >
+                    <Stack direction="row" alignItems="flex-start" sx={{ px: 1.5, py: 1 }}>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: '0 0 150px', pt: 0.5 }}>
+                        <Box sx={{
+                          width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                          background: configured ? gradient : hasErr ? '#fee2e2' : '#f1f5f9',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {configured
+                            ? <CheckCircleIcon sx={{ color: '#fff', fontSize: 12 }} />
+                            : <Typography sx={{ fontSize: 9, fontWeight: 800, color: hasErr ? '#ef4444' : '#94a3b8' }}>{idx + 1}</Typography>
+                          }
+                        </Box>
+                        <Typography sx={{ fontSize: 11, fontWeight: configured ? 700 : 500, color: configured ? '#1E3A8A' : '#374151', lineHeight: 1.2 }}>
                           {stage.name}
                         </Typography>
-                        {configured && (
-                          <Typography sx={{ fontSize: 10, color: '#3b82f6', mt: 0.1 }} noWrap>
-                            {fmt(dates.start_date)} → {fmt(dates.end_date)}
+                      </Stack>
+
+                      <Box sx={{ flex: 1 }}>
+                        <InlineRangePicker
+                          stageId={stage.id}
+                          startDate={dates.start_date}
+                          endDate={dates.end_date}
+                          minDate={startDate || undefined}
+                          maxDate={endDate || undefined}
+                          openId={openStageId}
+                          setOpenId={setOpenStageId}
+                          onChange={val => updateStageDate(stage.id, val)}
+                        />
+                        {(startErr || endErr) && (
+                          <Typography sx={{ fontSize: 10, color: '#ef4444', mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                            <ErrorOutlineIcon sx={{ fontSize: 11 }} />{startErr || endErr}
                           </Typography>
                         )}
                       </Box>
                     </Stack>
-
-                    <Box sx={{ flex: 1, px: 0.5 }}>
-                      <CalendarPicker
-                        label="Start"
-                        value={dates.start_date}
-                        minDate={startDate || undefined}
-                        maxDate={dates.end_date || endDate || undefined}
-                        error={startErr}
-                        defaultViewDate={startDate || undefined}
-                        onChange={v => updateStageDate(stage.id, 'start_date', v)}
-                      />
-                    </Box>
-                    <Box sx={{ width: 20, display: 'flex', justifyContent: 'center', pt: 0.9 }}>
-                      <Typography sx={{ fontSize: 12, color: '#cbd5e1', fontWeight: 700 }}>→</Typography>
-                    </Box>
-                    <Box sx={{ flex: 1, px: 0.5 }}>
-                      <CalendarPicker
-                        label="End"
-                        value={dates.end_date}
-                        minDate={dates.start_date || startDate || undefined}
-                        maxDate={endDate || undefined}
-                        error={endErr}
-                        defaultViewDate={dates.start_date || startDate || undefined}
-                        onChange={v => updateStageDate(stage.id, 'end_date', v)}
-                      />
-                    </Box>
-                  </Stack>
+                  </Box>
                 );
               })}
             </Box>
 
-            {/* Progress dots */}
             <Stack direction="row" alignItems="center" spacing={1} mt={1.5}>
               {STAGES.map(s => {
                 const done = !!(stageDates[s.id]?.start_date && stageDates[s.id]?.end_date);
@@ -618,20 +857,23 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
                 );
               })}
               <Typography sx={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap', ml: 0.5 }}>
-                {STAGES.filter(s => stageDates[s.id]?.start_date && stageDates[s.id]?.end_date).length}/5
+                {configuredCount}/5
               </Typography>
             </Stack>
 
-            {cloneErr && <Alert severity="error" sx={{ mt: 1.5, fontSize: 12, borderRadius: 1.5 }} icon={<WarningAmberIcon fontSize="inherit" />}>{cloneErr}</Alert>}
+            {cloneErr && (
+              <Alert severity="error" sx={{ mt: 1.5, fontSize: 12, borderRadius: 1.5 }} icon={<WarningAmberIcon fontSize="inherit" />}>
+                {cloneErr}
+              </Alert>
+            )}
           </Box>
         )}
 
-        {/* STEP 2 — Results */}
+        {/* STEP 2 — Results (unchanged from original) */}
         {step === 2 && result && (
           <Box sx={{ animation: 'fadeSlide 0.25s ease' }}>
             <style>{`@keyframes fadeSlide { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }`}</style>
 
-            {/* Success card */}
             <Box sx={{ px: 2, py: 1.75, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0', mb: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
                 <CheckCircleIcon sx={{ color: '#16a34a', fontSize: 18 }} />
@@ -644,7 +886,6 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
               </Typography>
             </Box>
 
-            {/* Stage windows summary */}
             <Box sx={{ border: '1px solid #e2e8f0', borderRadius: 2, mb: 2, overflow: 'hidden' }}>
               <Box sx={{ px: 1.5, py: 1, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                 <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -669,7 +910,6 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
               })}
             </Box>
 
-            {/* Assignment results */}
             {needsReview.length > 0 && (
               <Accordion defaultExpanded elevation={0}
                 sx={{ border: '1px solid #fecaca', borderRadius: '8px !important', mb: 1.5, '&:before': { display: 'none' } }}>
@@ -801,18 +1041,12 @@ export default function CycleCloneModal({ open= false, cycleId, onClose, onSucce
         )}
       </Box>
 
-      {/* ── Footer ── */}
+      {/* Footer */}
       <Box sx={{ px: 3, py: 2, borderTop: '1px solid #f1f5f9', bgcolor: '#fafafa' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          {step === 0 && (
-            <Button onClick={() => !cloning && onClose()} sx={{ color: '#94a3b8', fontWeight: 600, fontSize: 13 }}>Cancel</Button>
-          )}
-          {step === 1 && (
-            <Button startIcon={<ArrowBackIcon />} onClick={goBack} disabled={cloning} sx={{ color: '#64748b', fontWeight: 600, fontSize: 13 }}>Back</Button>
-          )}
-          {step === 2 && (
-            <Button onClick={onClose} sx={{ color: '#64748b', fontWeight: 600, fontSize: 13 }}>Close</Button>
-          )}
+          {step === 0 && <Button onClick={() => !cloning && onClose()} sx={{ color: '#94a3b8', fontWeight: 600, fontSize: 13 }}>Cancel</Button>}
+          {step === 1 && <Button startIcon={<ArrowBackIcon />} onClick={goBack} disabled={cloning} sx={{ color: '#64748b', fontWeight: 600, fontSize: 13 }}>Back</Button>}
+          {step === 2 && <Button onClick={onClose} sx={{ color: '#64748b', fontWeight: 600, fontSize: 13 }}>Close</Button>}
 
           <Stack direction="row" spacing={1.5} alignItems="center">
             {step === 0 && (

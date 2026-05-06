@@ -49,12 +49,7 @@ const EDIT_STAGES = [1];
 const typeColor = (isStd) => (isStd ? ORG_COLOR : PROJ_COLOR);
 const typeLabel = (isStd) => (isStd ? 'Org' : 'Project');
 
-// ─── FIX: Helper to get the correct level ID regardless of API field name ─────
-// The API may return either `kra_level_id` or `id` on each level object.
-// Always use this helper instead of bare `level.kra_level_id` to avoid NaN/undefined keys.
 const getLevelId = (level) => level.kra_level_id ?? level.id;
-
-// ─── FIX: Build composite key consistently ────────────────────────────────────
 const makeKey = (kraId, level) => `${kraId}_${getLevelId(level)}`;
 
 function initials(name = '') {
@@ -117,11 +112,11 @@ function CycleBanner({ cycle, allCycles, onCycleChange, isReadOnly }) {
               {allCycles.active?.length > 0 && (
                 <MenuItem disabled sx={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Active</MenuItem>
               )}
-              {allCycles.active?.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, fontWeight: 600 }}>{c.name}</MenuItem>)}
+              {allCycles.active?.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8' }}>{c.name}</MenuItem>)}
               {allCycles.draft?.length > 0 && (
                 <MenuItem disabled sx={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mt: 0.5 }}>Draft / On Hold</MenuItem>
               )}
-              {allCycles.draft?.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, fontWeight: 600, color: '#92400e' }}>{c.name}</MenuItem>)}
+              {allCycles.draft?.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, fontWeight: 600 }}>{c.name}</MenuItem>)}
               {allCycles.closed?.length > 0 && (
                 <MenuItem disabled sx={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mt: 0.5 }}>Closed (Read Only)</MenuItem>
               )}
@@ -171,7 +166,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
     return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
   }, [kras, typeFilter, levelFilter, search, categories]);
 
-  // ─── FIX Bug 1 & 4: Use getLevelId() so composite keys are never undefined ───
   const allVisibleIds = useMemo(
     () => grouped.flatMap(g => g.kras.flatMap(k => (k.levels ?? []).map(l => makeKey(k.id, l)))),
     [grouped]
@@ -188,7 +182,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
         <Stack direction="row" alignItems="center" gap={1}>
           <Typography fontWeight={800} fontSize={13} color="#0f172a">KRA Library</Typography>
@@ -211,7 +204,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
         </Stack>
       </Stack>
 
-      {/* Search */}
       <TextField size="small" placeholder="Search KRAs…" value={search}
         onChange={e => setSearch(e.target.value)}
         InputProps={{
@@ -224,7 +216,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
         }}
         sx={{ mb: 1, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36, bgcolor: '#f8fafc' } }} />
 
-      {/* Type + Level filters */}
       <Stack direction="row" gap={1} mb={1.5} alignItems="center">
         <Stack direction="row" sx={{ border: '1px solid #e2e8f0', borderRadius: 1.5, overflow: 'hidden', flexShrink: 0, height: 30 }}>
           {[{ v: 'all', l: 'All' }, { v: 'org', l: `Org (${orgCount})` }, { v: 'project', l: `Proj (${projectCount})` }].map(t => (
@@ -249,7 +240,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
         </FormControl>
       </Stack>
 
-      {/* Select All bar */}
       <Box sx={{
         display: 'flex', alignItems: 'center', px: 1, py: 0.5, mb: 0.5, borderRadius: 1.5,
         bgcolor: someSelected ? '#f0f9ff' : '#fafafa',
@@ -273,13 +263,11 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
         )}
       </Box>
 
-      {/* Grouped list */}
       <Box sx={{
         flex: 1, overflow: 'auto', pr: 0.5,
         '&::-webkit-scrollbar': { width: 3 },
         '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 4 }
       }}>
-
         {grouped.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 6 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
@@ -289,7 +277,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
             <Typography fontSize={11} color="#cbd5e1" mt={0.25}>Try adjusting your filters</Typography>
           </Box>
         ) : grouped.map(group => {
-          // ─── FIX Bug 1 & 4: Use makeKey() helper for consistent composite keys ───
           const catLevelIds = group.kras.flatMap(k => (k.levels ?? []).map(l => makeKey(k.id, l)));
           const catAll = catLevelIds.length > 0 && catLevelIds.every(id => selectedKraLevelIds.includes(id));
           const catSome = catLevelIds.some(id => selectedKraLevelIds.includes(id));
@@ -299,8 +286,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
 
           return (
             <Box key={group.cid} sx={{ mb: 0.75 }}>
-
-              {/* ── Category header ── */}
               <Box sx={{
                 display: 'flex', alignItems: 'center', px: 1, py: 0.85, borderRadius: 1.5,
                 bgcolor: tc.bg, border: `1px solid ${tc.border}`, mb: 0.4
@@ -335,7 +320,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
                 </Box>
               </Box>
 
-              {/* ── KRA rows ── */}
               <Collapse in={isOpen} unmountOnExit>
                 <Box sx={{ pl: 1.5 }}>
                   {group.kras
@@ -343,7 +327,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map(kra =>
                       (kra.levels ?? []).map(level => {
-                        // ─── FIX Bug 1 & 4: Use makeKey() — never bare level.kra_level_id ──
                         const kraLevelId = makeKey(kra.id, level);
                         const isSelected = selectedKraLevelIds.includes(kraLevelId);
                         const ktc = typeColor(kra.is_standard);
@@ -368,14 +351,12 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
                               },
                               transition: 'all 0.1s',
                             }}>
-
                             <Checkbox size="small"
                               checked={isSelected}
                               disabled={isReadOnly}
                               onChange={() => { }}
                               onClick={e => { e.stopPropagation(); toggle(); }}
                               sx={{ p: 0, mr: 1.25, flexShrink: 0 }} />
-
                             <Box flex={1} minWidth={0} onClick={toggle}>
                               <Stack direction="row" alignItems="center" gap={0.5} flexWrap="wrap">
                                 <Typography fontSize={12} fontWeight={isSelected ? 700 : 500} color="#1e293b" noWrap>
@@ -393,7 +374,6 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
                                 {level.level_name}{level.description ? ` · ${level.description}` : ''}
                               </Typography>
                             </Box>
-
                             <Chip label={typeLabel(kra.is_standard)} size="small"
                               sx={{
                                 height: 15, fontSize: 8, ml: 0.75, flexShrink: 0, fontWeight: 700,
@@ -496,8 +476,8 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
 
       <Stack direction="row" gap={1} mb={1.5}>
         {[
-          { val: deptFilter, set: setDept, items: depts, placeholder: 'Department' },
-          { val: levelFilter, set: setLevel, items: levels, placeholder: 'Level' },
+          { val: deptFilter, set: setDept, items: depts, placeholder: 'All Departments' },
+          { val: levelFilter, set: setLevel, items: levels, placeholder: 'All Levels' },
         ].map((f, i) => (
           <FormControl key={i} size="small" sx={{ flex: 1 }}>
             <Select value={f.val} onChange={e => f.set(e.target.value)} displayEmpty
@@ -770,7 +750,9 @@ export default function BulkAssignmentPage() {
   const [selectedKraLevelIds, setSelectedKraLevelIds] = useState([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
   const [assigning, setAssigning] = useState(false);
-  const [weightageModal, setWeightageModal] = useState({ open: false, mode: 'assign', employee: null, prefill: null, enrolMode: 'skip' });
+  const [weightageModal, setWeightageModal] = useState({
+    open: false, mode: 'assign', employee: null, prefill: null, enrolMode: 'skip',
+  });
   const [viewEmployee, setViewEmployee] = useState(null);
   const [cloneDefault, setCloneDefault] = useState(false);
 
@@ -779,7 +761,6 @@ export default function BulkAssignmentPage() {
   const isReadOnly = !WRITE_STAGES.includes(activeCycle?.status);
   const canEdit = !isReadOnly && EDIT_STAGES.includes(activeCycle?.current_stage?.id);
 
-  // ─── FIX Bug 1: employeeDuplicateMap uses getLevelId() so cache lookup matches ──
   const employeeDuplicateMap = useMemo(() => {
     const map = {};
     selectedEmployeeIds.forEach(empId => {
@@ -800,45 +781,36 @@ export default function BulkAssignmentPage() {
   }, [selectedEmployeeIds, employees, assignedKRAMap, kraLibrary]);
 
   const rebuildAssignedMap = useCallback((empList) => {
-  const map = {};
-  empList.forEach(e => {
-    if (!e.employee_kra_cycle_id) return;
+    const map = {};
+    empList.forEach(e => {
+      if (!e.employee_kra_cycle_id) return;
 
-    const cached = getAssignmentFromCache(e.employee_kra_cycle_id);
-    const apiKraLevelIds = (e.assigned_kras ?? []).map(k => k.kra_level_id).filter(Boolean);
+      const cached = getAssignmentFromCache(e.employee_kra_cycle_id);
+      const apiKraLevelIds = (e.assigned_kras ?? []).map(k => k.kra_level_id).filter(Boolean);
 
-    if (cached?.kra_level_ids?.length) {
-      // Merge: union of cache + fresh API data (API is source of truth for IDs)
-      const merged = [...new Set([...cached.kra_level_ids, ...apiKraLevelIds])];
-
-      // Always update cache with merged IDs so future opens show full list
-      saveAssignmentToCache({
-        employee_kra_cycle_id: e.employee_kra_cycle_id,
-        cycle_id: activeCycle?.id,
-        categories: cached.categories ?? [], // preserve existing weightage
-        kra_level_ids: merged,
-      });
-
-      map[e.employee_kra_cycle_id] = merged;
-
-    } else if (apiKraLevelIds.length) {
-      // No cache yet — seed from API, categories will be empty until user opens modal
-      saveAssignmentToCache({
-        employee_kra_cycle_id: e.employee_kra_cycle_id,
-        cycle_id: activeCycle?.id,
-        categories: [],
-        kra_level_ids: apiKraLevelIds,
-      });
-
-      map[e.employee_kra_cycle_id] = apiKraLevelIds;
-
-    } else if (cached?.kra_level_ids?.length) {
-      // API returned nothing but cache exists — trust cache
-      map[e.employee_kra_cycle_id] = cached.kra_level_ids;
-    }
-  });
-  setAssignedKRAMap(map);
-}, [activeCycle?.id]);
+      if (cached?.kra_level_ids?.length) {
+        const merged = [...new Set([...cached.kra_level_ids, ...apiKraLevelIds])];
+        saveAssignmentToCache({
+          employee_kra_cycle_id: e.employee_kra_cycle_id,
+          cycle_id: activeCycle?.id,
+          categories: cached.categories ?? [],
+          kra_level_ids: merged,
+        });
+        map[e.employee_kra_cycle_id] = merged;
+      } else if (apiKraLevelIds.length) {
+        saveAssignmentToCache({
+          employee_kra_cycle_id: e.employee_kra_cycle_id,
+          cycle_id: activeCycle?.id,
+          categories: [],
+          kra_level_ids: apiKraLevelIds,
+        });
+        map[e.employee_kra_cycle_id] = apiKraLevelIds;
+      } else if (cached?.kra_level_ids?.length) {
+        map[e.employee_kra_cycle_id] = cached.kra_level_ids;
+      }
+    });
+    setAssignedKRAMap(map);
+  }, [activeCycle?.id]);
 
   useEffect(() => {
     if (hasMounted.current) return;
@@ -907,140 +879,149 @@ export default function BulkAssignmentPage() {
   }, []);
 
   const handleAssignClick = () => {
-  if (selectedKraLevelIds.length === 0) { showToast('Select at least one KRA before assigning.', 'warning'); return; }
-  if (selectedEmployeeIds.length === 0) { showToast('Select at least one employee.', 'warning'); return; }
+    if (selectedKraLevelIds.length === 0) { showToast('Select at least one KRA before assigning.', 'warning'); return; }
+    if (selectedEmployeeIds.length === 0) { showToast('Select at least one employee.', 'warning'); return; }
 
-  // Decode composite keys by looking up actual objects in kraLibrary
-  // This is safe for any kraId/levelId value including multi-digit IDs
-  const kraLevelIds = [];
-const kraLevelToKraId = {};
-const kraSelections = []; // new format for backend
+    const kraLevelIds = [];
+    const kraLevelToKraId = {};
+    const kraSelections = [];
 
-selectedKraLevelIds.forEach(compositeKey => {
-  for (const kra of kraLibrary) {
-    for (const level of (kra.levels ?? [])) {
-      if (makeKey(kra.id, level) === compositeKey) {
-        const actualLevelId = getLevelId(level);
-        if (!isNaN(actualLevelId) && actualLevelId > 0) {
-          kraLevelIds.push(actualLevelId);
-          kraLevelToKraId[actualLevelId] = kra.id;
-          // new format: kra_id + seniority level_id
-          kraSelections.push({
-            kra_id: kra.id,
-            kra_level_id: level.level_id ?? actualLevelId,
-          });
-        }
-        break;
-      }
-    }
-  }
-});
-
-  // Match selected KRAs using makeKey()
-  const selectedKras = kraLibrary.filter(k =>
-    (k.levels ?? []).some(l => selectedKraLevelIds.includes(makeKey(k.id, l)))
-  );
-  const uniqueCatIds = [...new Set(selectedKras.map(k => k.category_id))];
-  const prefillCats = uniqueCatIds.map(cid => ({
-    category_id: cid,
-    category_name: categories.find(c => c.id === cid)?.name ?? `Category ${cid}`,
-    weightage: '',
-  }));
-
-  // Default enrolMode to 'append' when any selected employee already has KRAs
-  const anyAlreadyEnrolled = employees.some(
-    e => selectedEmployeeIds.includes(e.employee_id) && e.assigned_to_cycle,
-  );
-
-  setWeightageModal({
-    open: true, mode: 'assign', employee: null,
-    prefill: {
-    categories: prefillCats,
-    kra_level_ids: kraLevelIds,
-    kra_level_to_kra_id: kraLevelToKraId,
-    kra_selections: kraSelections,
-  },
-    enrolMode: anyAlreadyEnrolled ? 'append' : 'skip',
-  });
-};
-
-  const handleConfirmAssign = async ({ categories: cats, kra_level_ids, kra_selections, kra_level_to_kra_id, is_date_based, enrol_mode }) => {
-  setAssigning(true);
-  setWeightageModal(m => ({ ...m, open: false }));
-  try {
-    const selEmps = employees.filter(e => selectedEmployeeIds.includes(e.employee_id));
-    const payload = {
-      assignments: selEmps.map(e => ({ employee_id: e.employee_id, employee_level_id: e.level_id ?? null })),
-      shared: {
-        categories: cats,
-        kra_level_ids,
-        kra_selections: kra_selections ?? [],  // comes from destructured param
-        kra_level_to_kra_id: kra_level_to_kra_id ?? {},
-        is_date_based: is_date_based ?? false,
-      },
-      enrol_mode: enrol_mode ?? 'skip',
-    };
-    const res = await bulkAssignKRAs(activeCycle.id, payload);
-    const { enrolled = [], skipped = [], failed = [] } = res.data;
-    
-    // ✅ FIX: Merge cache instead of overwriting on append
-    enrolled.forEach(e => {
-      const emp = employees.find(emp => emp.employee_id === e.employee_id);
-      const existingCache = emp?.employee_kra_cycle_id
-        ? getAssignmentFromCache(emp.employee_kra_cycle_id)
-        : null;
-
-      let mergedKraLevelIds = kra_level_ids;
-      let mergedCategories = cats;
-
-      if (enrol_mode === 'append' && existingCache) {
-        mergedKraLevelIds = [...new Set([...(existingCache.kra_level_ids ?? []), ...kra_level_ids])];
-        const catMap = {};
-        // Start with NEW categories first
-        cats.forEach(c => { catMap[c.category_id] = c; });
-        // Then layer in OLD categories that are NOT in the new assignment (preserve existing)
-        (existingCache.categories ?? []).forEach(c => {
-          if (!catMap[c.category_id]) {
-            catMap[c.category_id] = c; // keep old category if not replaced
+    selectedKraLevelIds.forEach(compositeKey => {
+      for (const kra of kraLibrary) {
+        for (const level of (kra.levels ?? [])) {
+          if (makeKey(kra.id, level) === compositeKey) {
+            const actualLevelId = getLevelId(level);
+            if (!isNaN(actualLevelId) && actualLevelId > 0) {
+              kraLevelIds.push(actualLevelId);
+              kraLevelToKraId[actualLevelId] = kra.id;
+              kraSelections.push({
+                kra_id: kra.id,
+                kra_level_id: level.level_id ?? actualLevelId,
+              });
+            }
+            break;
           }
-        });
-        mergedCategories = Object.values(catMap);
+        }
       }
-
-      saveAssignmentToCache({
-        employee_kra_cycle_id: e.employee_kra_cycle_id,
-        cycle_id: activeCycle.id,
-        categories: mergedCategories,
-        kra_level_ids: mergedKraLevelIds,
-      });
     });
 
-    await handleRefresh(activeCycle.id);
-    setSelectedKraLevelIds([]); setSelectedEmployeeIds([]);
-    
-    if (failed.length === 0) {
-      const newCount = enrolled.filter(e => e.enrol_mode === 'new').length;
-      const updatedCount = enrolled.filter(e => e.enrol_mode !== 'new').length;
-      const parts = [];
-      if (newCount) parts.push(`${newCount} assigned`);
-      if (updatedCount) parts.push(`${updatedCount} ${enrol_mode === 'overwrite' ? 'overwritten' : 'appended'}`);
-      if (skipped.length) parts.push(`${skipped.length} skipped`);
-      showToast(parts.join(', ') + '.', 'success');
-    } else {
-      showToast(enrolled.length > 0 ? `${enrolled.length} assigned, ${failed.length} failed.` : 'Assignment failed.', enrolled.length > 0 ? 'warning' : 'error');
+    const selectedKras = kraLibrary.filter(k =>
+      (k.levels ?? []).some(l => selectedKraLevelIds.includes(makeKey(k.id, l)))
+    );
+    const uniqueCatIds = [...new Set(selectedKras.map(k => k.category_id))];
+    const prefillCats = uniqueCatIds.map(cid => ({
+      category_id: cid,
+      category_name: categories.find(c => c.id === cid)?.name ?? `Category ${cid}`,
+      weightage: '',
+    }));
+
+    const anyAlreadyEnrolled = employees.some(
+      e => selectedEmployeeIds.includes(e.employee_id) && e.assigned_to_cycle,
+    );
+
+    // Collect existing category weightages from enrolled employees' cache
+    // so the modal can compute remaining capacity per category in append mode
+    const existingCategoriesMap = {};
+    employees
+      .filter(e => selectedEmployeeIds.includes(e.employee_id) && e.assigned_to_cycle && e.employee_kra_cycle_id)
+      .forEach(e => {
+        const cached = getAssignmentFromCache(e.employee_kra_cycle_id);
+        (cached?.categories ?? e.assigned_categories ?? []).forEach(c => {
+          if (!existingCategoriesMap[c.category_id]) {
+            existingCategoriesMap[c.category_id] = { ...c };
+          }
+        });
+      });
+
+    setWeightageModal({
+      open: true, mode: 'assign', employee: null,
+      prefill: {
+        categories: prefillCats,
+        kra_level_ids: kraLevelIds,
+        kra_level_to_kra_id: kraLevelToKraId,
+        kra_selections: kraSelections,
+        existing_categories: Object.values(existingCategoriesMap),
+      },
+      enrolMode: anyAlreadyEnrolled ? 'append' : 'skip',
+    });
+  };
+
+  const handleConfirmAssign = async ({ categories: cats, kra_level_ids, kra_selections, kra_level_to_kra_id, is_date_based, enrol_mode }) => {
+    setAssigning(true);
+    setWeightageModal(m => ({ ...m, open: false }));
+    try {
+      const selEmps = employees.filter(e => selectedEmployeeIds.includes(e.employee_id));
+      const payload = {
+        assignments: selEmps.map(e => ({ employee_id: e.employee_id, employee_level_id: e.level_id ?? null })),
+        shared: {
+          categories: cats,
+          kra_level_ids,
+          kra_selections: kra_selections ?? [],
+          kra_level_to_kra_id: kra_level_to_kra_id ?? {},
+          is_date_based: is_date_based ?? false,
+        },
+        enrol_mode: enrol_mode ?? 'skip',
+      };
+      const res = await bulkAssignKRAs(activeCycle.id, payload);
+      const { enrolled = [], skipped = [], failed = [] } = res.data;
+
+      enrolled.forEach(e => {
+        const emp = employees.find(emp => emp.employee_id === e.employee_id);
+        const existingCache = emp?.employee_kra_cycle_id
+          ? getAssignmentFromCache(emp.employee_kra_cycle_id)
+          : null;
+
+        let mergedKraLevelIds = kra_level_ids;
+        let mergedCategories = cats;
+
+        if (enrol_mode === 'append' && existingCache) {
+          mergedKraLevelIds = [...new Set([...(existingCache.kra_level_ids ?? []), ...kra_level_ids])];
+          const catMap = {};
+          cats.forEach(c => { catMap[c.category_id] = c; });
+          (existingCache.categories ?? []).forEach(c => {
+            if (!catMap[c.category_id]) {
+              catMap[c.category_id] = c;
+            }
+          });
+          mergedCategories = Object.values(catMap);
+        }
+
+        saveAssignmentToCache({
+          employee_kra_cycle_id: e.employee_kra_cycle_id,
+          cycle_id: activeCycle.id,
+          categories: mergedCategories,
+          kra_level_ids: mergedKraLevelIds,
+        });
+      });
+
+      await handleRefresh(activeCycle.id);
+      setSelectedKraLevelIds([]); setSelectedEmployeeIds([]);
+
+      if (failed.length === 0) {
+        const newCount = enrolled.filter(e => e.enrol_mode === 'new').length;
+        const updatedCount = enrolled.filter(e => e.enrol_mode !== 'new').length;
+        const parts = [];
+        if (newCount) parts.push(`${newCount} assigned`);
+        if (updatedCount) parts.push(`${updatedCount} ${enrol_mode === 'overwrite' ? 'overwritten' : 'appended'}`);
+        if (skipped.length) parts.push(`${skipped.length} skipped`);
+        showToast(parts.join(', ') + '.', 'success');
+      } else {
+        showToast(enrolled.length > 0 ? `${enrolled.length} assigned, ${failed.length} failed.` : 'Assignment failed.', enrolled.length > 0 ? 'warning' : 'error');
+      }
+    } catch (e) {
+      showToast(e?.response?.data?.message || 'Assignment failed.', 'error');
+    } finally {
+      setAssigning(false);
     }
-  } catch (e) {
-    showToast(e?.response?.data?.message || 'Assignment failed.', 'error');
-  } finally {
-    setAssigning(false);
-  }
-};
+  };
 
   const handleEditEmployee = (emp) => {
     const cached = getAssignmentFromCache(emp.employee_kra_cycle_id);
     setWeightageModal({
       open: true, mode: 'edit', employee: emp,
-      prefill: cached ? { categories: cached.categories, kra_level_ids: cached.kra_level_ids } : { categories: [], kra_level_ids: [] }
+      prefill: cached
+        ? { categories: cached.categories, kra_level_ids: cached.kra_level_ids }
+        : { categories: [], kra_level_ids: [] },
     });
   };
 
@@ -1086,52 +1067,56 @@ selectedKraLevelIds.forEach(compositeKey => {
   const handleViewEmployee = (emp) => { setCloneDefault(false); setViewEmployee(emp); };
 
   const handleCloneTo = async (targetIds, mode) => {
-  try {
-    await cloneAssignmentToMany(targetIds, viewEmployee.employee_kra_cycle_id, mode);
+    try {
+      await cloneAssignmentToMany(targetIds, viewEmployee.employee_kra_cycle_id, mode);
 
-    // After clone, update cache for each target:
-    // - KRA level IDs come from source (cloned)
-    // - Categories/weightage stay as target's own (backend doesn't clone weightage)
-    const sourceCache = getAssignmentFromCache(viewEmployee.employee_kra_cycle_id);
-    const sourceKraLevelIds = sourceCache?.kra_level_ids ?? [];
+      const sourceCache = getAssignmentFromCache(viewEmployee.employee_kra_cycle_id);
+      const sourceKraLevelIds = sourceCache?.kra_level_ids ?? [];
+      const sourceCategories = sourceCache?.categories ?? [];
 
-    employees
-      .filter(e => {
-        const ekId = e.employee_kra_cycle_id;
-        return targetIds.includes(ekId) && ekId != null;
-      })
-      .forEach(targetEmp => {
-        const ekId = targetEmp.employee_kra_cycle_id;
+      targetIds.forEach(ekId => {
         const targetCache = getAssignmentFromCache(ekId);
 
         let mergedKraLevelIds;
+        let mergedCategories;
+
         if (mode === 'overwrite') {
           mergedKraLevelIds = [...sourceKraLevelIds];
+          mergedCategories = [...sourceCategories];
         } else {
-          // append: union of target existing + source
           mergedKraLevelIds = [...new Set([
             ...(targetCache?.kra_level_ids ?? []),
             ...sourceKraLevelIds,
           ])];
+          const catMap = {};
+          (targetCache?.categories ?? []).forEach(c => { catMap[c.category_id] = c; });
+          sourceCategories.forEach(c => {
+            if (!catMap[c.category_id]) {
+              catMap[c.category_id] = c;
+            }
+          });
+          mergedCategories = Object.values(catMap);
         }
 
         saveAssignmentToCache({
           employee_kra_cycle_id: ekId,
           cycle_id: activeCycle.id,
-          // Keep target's own categories — weightage is NOT cloned
-          categories: targetCache?.categories ?? [],
+          categories: mergedCategories,
           kra_level_ids: mergedKraLevelIds,
         });
       });
 
-    await handleRefresh(activeCycle.id);
-    showToast(`KRAs ${mode === 'overwrite' ? 'overwritten' : 'appended'} for ${targetIds.length} employee${targetIds.length !== 1 ? 's' : ''}.`, 'success');
-    setViewEmployee(null);
-    setCloneDefault(false);
-  } catch (e) {
-    showToast(e?.response?.data?.error || 'Copy failed.', 'error');
-  }
-};
+      await handleRefresh(activeCycle.id);
+      showToast(
+        `KRAs ${mode === 'overwrite' ? 'overwritten' : 'appended'} for ${targetIds.length} employee${targetIds.length !== 1 ? 's' : ''}.`,
+        'success'
+      );
+      setViewEmployee(null);
+      setCloneDefault(false);
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Copy failed.', 'error');
+    }
+  };
 
   const selectedAssigned = employees.filter(e => selectedEmployeeIds.includes(e.employee_id) && e.assigned_to_cycle);
 
@@ -1240,40 +1225,48 @@ selectedKraLevelIds.forEach(compositeKey => {
         )}
       </Box>
 
-      <ManageWeightageModal open={weightageModal.open} mode={weightageModal.mode}
-        employee={weightageModal.employee} prefill={weightageModal.prefill}
+      {/* ─── ManageWeightageModal — now receives assignedKRAMap + getAssignmentFromCache ─── */}
+      <ManageWeightageModal
+        open={weightageModal.open}
+        mode={weightageModal.mode}
+        employee={weightageModal.employee}
+        prefill={weightageModal.prefill}
         enrolMode={weightageModal.enrolMode}
         onEnrolModeChange={val => setWeightageModal(m => ({ ...m, enrolMode: val }))}
-        kraLibrary={kraLibrary} categories={categories}
-        selectedEmployeeIds={selectedEmployeeIds} employees={employees}
+        kraLibrary={kraLibrary}
+        categories={categories}
+        selectedEmployeeIds={selectedEmployeeIds}
+        employees={employees}
         activeCycleId={activeCycle?.id}
         onConfirm={weightageModal.mode === 'edit' ? handleConfirmEdit : handleConfirmAssign}
-        onClose={() => setWeightageModal(m => ({ ...m, open: false }))} />
+        onClose={() => setWeightageModal(m => ({ ...m, open: false }))}
+        assignedKRAMap={assignedKRAMap}
+        getAssignmentFromCache={getAssignmentFromCache}
+      />
 
       {viewEmployee && (() => {
-  // Always use fresh employee data from state, not stale viewEmployee snapshot
-  const freshEmployee = employees.find(e => e.employee_id === viewEmployee.employee_id) ?? viewEmployee;
-  return (
-    <EmployeeKRAView
-      open={!!viewEmployee}
-      employee={freshEmployee}
-      kraLibrary={kraLibrary}
-      categories={categories}
-      cachedData={{
-        kra_level_ids: assignedKRAMap[freshEmployee.employee_kra_cycle_id] ?? [],
-        categories: getAssignmentFromCache(freshEmployee.employee_kra_cycle_id)?.categories ?? [],
-      }}
-      employees={employees.filter(e => 
-        e.assigned_to_cycle && 
-        e.employee_kra_cycle_id != null
-      )}
-      activeCycleId={activeCycle?.id}
-      defaultTab={cloneDefault ? 'clone' : 'kras'}
-      onClose={() => { setViewEmployee(null); setCloneDefault(false); }}
-      onCloneTo={handleCloneTo}
-    />
-  );
-})()}
+        const freshEmployee = employees.find(e => e.employee_id === viewEmployee.employee_id) ?? viewEmployee;
+        return (
+          <EmployeeKRAView
+            open={!!viewEmployee}
+            employee={freshEmployee}
+            kraLibrary={kraLibrary}
+            categories={categories}
+            cachedData={{
+              kra_level_ids: assignedKRAMap[freshEmployee.employee_kra_cycle_id] ?? [],
+              categories: getAssignmentFromCache(freshEmployee.employee_kra_cycle_id)?.categories ?? [],
+            }}
+            employees={employees.filter(e =>
+              e.assigned_to_cycle &&
+              e.employee_kra_cycle_id != null
+            )}
+            activeCycleId={activeCycle?.id}
+            defaultTab={cloneDefault ? 'clone' : 'kras'}
+            onClose={() => { setViewEmployee(null); setCloneDefault(false); }}
+            onCloneTo={handleCloneTo}
+          />
+        );
+      })()}
 
       <ToastStack toasts={toasts} />
     </Box>

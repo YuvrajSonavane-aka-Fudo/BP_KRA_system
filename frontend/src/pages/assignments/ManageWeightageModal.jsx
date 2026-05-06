@@ -11,6 +11,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import LockIcon from '@mui/icons-material/Lock';
 
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
@@ -18,7 +19,6 @@ function getInitials(name = '') {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
-// is_standard: true=Org (green), false=Project (blue)
 function KRATypeBadge({ isStandard }) {
   return (
     <Chip
@@ -45,6 +45,10 @@ export default function ManageWeightageModal({
   selectedEmployeeIds, employees,
   activeCycleId,
   onConfirm, onClose,
+  // NEW: pass existing cached assignments so we can show prior weightage in append mode
+  // Shape: { [employee_kra_cycle_id]: { categories: [{category_id, weightage}], kra_level_ids: [] } }
+  assignedKRAMap,
+  getAssignmentFromCache,
 }) {
   const [categoryWeightages, setCategoryWeightages] = useState([]);
   const [isDateBased, setIsDateBased] = useState(false);
@@ -67,6 +71,74 @@ export default function ManageWeightageModal({
     [selectedKras]
   );
 
+  // ── Compute existing weightage for append mode ─────────────────────────────
+  // When enrolMode === 'append', we need to know what each category already has
+  // so we can show it as locked and constrain the remaining input.
+  //
+  // Strategy: for each selected employee that is already enrolled,
+  // find the MINIMUM remaining capacity across all of them for each new category.
+  // This ensures the value entered won't exceed ANY employee's remaining budget.
+  const { existingByCategory, remainingByCategory, lockedCategories } = useMemo(() => {
+    if (isEdit || enrolMode !== 'append') {
+      return { existingByCategory: {}, remainingByCategory: {}, lockedCategories: new Set() };
+    }
+
+    const targetEmps = employees.filter(
+      (e) => selectedEmployeeIds.includes(e.employee_id) && e.assigned_to_cycle && e.employee_kra_cycle_id
+    );
+
+    if (targetEmps.length === 0) {
+      return { existingByCategory: {}, remainingByCategory: {}, lockedCategories: new Set() };
+    }
+
+    // For each employee, build their current category→weightage map from cache
+    const empCatMaps = targetEmps.map((emp) => {
+      const cached = getAssignmentFromCache ? getAssignmentFromCache(emp.employee_kra_cycle_id) : null;
+      const catMap = {};
+      (cached?.categories ?? emp.assigned_categories ?? []).forEach((c) => {
+        catMap[c.category_id] = parseFloat(c.weightage) || 0;
+      });
+      return { empId: emp.employee_id, catMap };
+    });
+
+    // For each new category being assigned, compute:
+    //   - representative existing weightage (from first enrolled emp that has it, or 0)
+    //   - minimum remaining across all enrolled employees
+    const existingByCategory = {};
+    const remainingByCategory = {};
+    const lockedCategories = new Set();
+
+    uniqueCategoryIds.forEach((cid) => {
+      // Representative existing value (show in UI)
+      let representativeExisting = null;
+      let minRemaining = 100;
+
+      empCatMaps.forEach(({ catMap }) => {
+        const currentForCat = catMap[cid] ?? 0;
+        const totalUsed = Object.values(catMap).reduce((s, v) => s + v, 0);
+        const freed = currentForCat; // when updating existing cat, we free its current slot
+        const remaining = 100 - totalUsed + freed;
+
+        if (representativeExisting === null && currentForCat > 0) {
+          representativeExisting = currentForCat;
+        }
+        if (remaining < minRemaining) {
+          minRemaining = remaining;
+        }
+      });
+
+      existingByCategory[cid] = representativeExisting ?? 0;
+      remainingByCategory[cid] = Math.max(0, Math.round(minRemaining));
+
+      // If ALL enrolled employees already have this category at 100% (no room)
+      if (minRemaining <= 0) {
+        lockedCategories.add(cid);
+      }
+    });
+
+    return { existingByCategory, remainingByCategory, lockedCategories };
+  }, [isEdit, enrolMode, employees, selectedEmployeeIds, uniqueCategoryIds, getAssignmentFromCache]);
+
   // ── Init weightage state on open ───────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
@@ -75,30 +147,39 @@ export default function ManageWeightageModal({
 
     if (uniqueCategoryIds.length > 0) {
       const init = uniqueCategoryIds.map((cid) => {
-      const existing = prefillCats.find((c) => c.category_id === cid);
-      const cat = categories.find((c) => c.id === cid);
-      const sampleKRA = selectedKras.find((k) => k.category_id === cid);
+        const existing = prefillCats.find((c) => c.category_id === cid);
+        const cat = categories.find((c) => c.id === cid);
+        const sampleKRA = selectedKras.find((k) => k.category_id === cid);
 
-      // Build names WITH level suffix so "test L1" and "test Senior" show separately
-      const kraNames = [];
-      kraLibrary.forEach(kra => {
-        if (kra.category_id !== cid) return;
-        (kra.levels ?? []).forEach(level => {
-          const compositeKey = `${kra.id}_${level.kra_level_id ?? level.id}`;
-          if (selectedKraLevelIds.includes(compositeKey)) {
-            kraNames.push(`${kra.name} (${level.level_name})`);
-          }
+        // Build KRA names with level suffix
+        const kraNames = [];
+        kraLibrary.forEach(kra => {
+          if (kra.category_id !== cid) return;
+          (kra.levels ?? []).forEach(level => {
+            const compositeKey = `${kra.id}_${level.kra_level_id ?? level.id}`;
+            if (selectedKraLevelIds.includes(compositeKey)) {
+              kraNames.push(`${kra.name} (${level.level_name})`);
+            }
+          });
         });
-      });
 
-      return {
-        category_id: cid,
-        category_name: cat?.name ?? sampleKRA?.category_name ?? `Category ${cid}`,
-        is_standard: sampleKRA?.is_standard ?? true,
-        weightage: existing?.weightage ? String(existing.weightage) : '',
-        kra_names: kraNames,
-      };
-    });
+        // For append mode: pre-fill with existing weightage for that category
+        let prefillWeightage = existing?.weightage ? String(existing.weightage) : '';
+        if (!prefillWeightage && enrolMode === 'append' && existingByCategory[cid] > 0) {
+          prefillWeightage = String(existingByCategory[cid]);
+        }
+
+        return {
+          category_id: cid,
+          category_name: cat?.name ?? sampleKRA?.category_name ?? `Category ${cid}`,
+          is_standard: sampleKRA?.is_standard ?? true,
+          weightage: prefillWeightage,
+          kra_names: kraNames,
+          // Track the existing weightage for display
+          existing_weightage: existingByCategory[cid] ?? 0,
+          max_weightage: remainingByCategory[cid] ?? 100,
+        };
+      });
       setCategoryWeightages(init);
     } else if (prefillCats.length > 0) {
       setCategoryWeightages(
@@ -111,6 +192,8 @@ export default function ManageWeightageModal({
             is_standard: sampleKRA?.is_standard ?? true,
             weightage: String(c.weightage ?? ''),
             kra_names: [],
+            existing_weightage: 0,
+            max_weightage: 100,
           };
         })
       );
@@ -121,7 +204,7 @@ export default function ManageWeightageModal({
     setIsDateBased(false);
     setFieldErrors({});
     setGlobalError('');
-  }, [open, prefill]);
+  }, [open, prefill, enrolMode, existingByCategory, remainingByCategory]);
 
   // ── Weightage maths ────────────────────────────────────────────────────────
   const totalWeightage = categoryWeightages.reduce((sum, c) => {
@@ -142,32 +225,32 @@ export default function ManageWeightageModal({
     );
   };
 
-  // ── Distribute evenly ──────────────────────────────────────────────────────
+  // ── Distribute evenly (respects max_weightage per category) ───────────────
   const distributeEvenly = () => {
     const count = categoryWeightages.length;
     if (count === 0) return;
     const base = Math.floor(100 / count);
     const remainder = 100 - base * (count - 1);
     setCategoryWeightages((prev) =>
-      prev.map((c, i) => ({
-        ...c,
-        weightage: String(i === prev.length - 1 ? remainder : base),
-      }))
+      prev.map((c, i) => {
+        const suggested = i === prev.length - 1 ? remainder : base;
+        const capped = Math.min(suggested, c.max_weightage ?? 100);
+        return { ...c, weightage: String(capped) };
+      })
     );
     setFieldErrors({});
     setGlobalError('');
   };
 
   // ── Validate ───────────────────────────────────────────────────────────────
-  // ─── FIX Bug 3: Validate only checks per-field errors (empty / negative / >100)
-  // The 100% total is now a WARNING shown in the UI, not a hard block.
-  // Submit is always allowed as long as individual fields are valid numbers.
   const validate = () => {
     const errors = {};
     let valid = true;
 
     categoryWeightages.forEach((c) => {
       const v = parseFloat(c.weightage);
+      const maxAllowed = c.max_weightage ?? 100;
+
       if (c.weightage === '' || isNaN(v)) {
         errors[c.category_id] = 'Please enter a weightage value';
         valid = false;
@@ -177,19 +260,20 @@ export default function ManageWeightageModal({
       } else if (v > 100) {
         errors[c.category_id] = 'Weightage cannot exceed 100%';
         valid = false;
+      } else if (enrolMode === 'append' && v > maxAllowed) {
+        errors[c.category_id] = `Only ${maxAllowed}% remaining for this category`;
+        valid = false;
       }
     });
 
     setFieldErrors(errors);
 
-    // ─── FIX Bug 3: Show warning for non-100% total but DO NOT block submit ──
     if (valid && !isValid) {
       setGlobalError(
         totalWeightage > 100
           ? `Total is ${totalWeightage.toFixed(1)}% — consider reducing by ${(totalWeightage - 100).toFixed(1)}% to reach exactly 100%.`
           : `Total is ${totalWeightage.toFixed(1)}% — ${remainingWeight}% unallocated. You can still save.`
       );
-      // NOTE: We intentionally do NOT return false here — submit proceeds
     }
 
     return valid;
@@ -227,7 +311,6 @@ export default function ManageWeightageModal({
   const alreadyEnrolledCount = isEdit ? 0 : targetEmployees.filter((e) => e.assigned_to_cycle).length;
   const showEnrolModePicker = !isEdit && alreadyEnrolledCount > 0;
 
-  // ── Progress bar color ─────────────────────────────────────────────────────
   const progressColor = isValid ? '#16a34a' : totalWeightage > 100 ? '#dc2626' : '#f59e0b';
 
   return (
@@ -389,10 +472,14 @@ export default function ManageWeightageModal({
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
           <Box>
             <Typography fontSize={13} fontWeight={700} color="#1e293b">Category Weightage</Typography>
-            {/* ─── FIX Bug 3: Changed "must add up to exactly 100%" to advisory text ── */}
-            <Typography fontSize={11} color="#64748b">Ideally all categories should add up to 100%</Typography>
+            <Typography fontSize={11} color="#64748b">
+              {enrolMode === 'append'
+                ? 'Showing remaining % available per category. Existing weightage is locked.'
+                : 'Ideally all categories should add up to 100%'
+              }
+            </Typography>
           </Box>
-          {categoryWeightages.length > 1 && (
+          {categoryWeightages.length > 1 && enrolMode !== 'append' && (
             <Button
               size="small" onClick={distributeEvenly}
               sx={{ fontSize: 11, fontWeight: 600, color: '#1E3A8A', border: '1px solid #bfdbfe', borderRadius: 2, height: 28, px: 1.5 }}
@@ -444,14 +531,19 @@ export default function ManageWeightageModal({
             const val = parseFloat(cat.weightage);
             const hasError = fieldErrors[cat.category_id];
             const pct = isNaN(val) ? 0 : Math.min(val, 100);
+            const maxAllowed = cat.max_weightage ?? 100;
+            const existingW = cat.existing_weightage ?? 0;
+            const isAppendMode = enrolMode === 'append';
+            const isLocked = lockedCategories.has(cat.category_id);
+            const hasExisting = isAppendMode && existingW > 0;
 
             return (
               <Box
                 key={cat.category_id}
                 sx={{
                   p: 1.5, borderRadius: 2,
-                  border: `1px solid ${hasError ? '#fecaca' : '#e2e8f0'}`,
-                  bgcolor: hasError ? '#fff5f5' : '#fafafa',
+                  border: `1px solid ${hasError ? '#fecaca' : isLocked ? '#fde68a' : '#e2e8f0'}`,
+                  bgcolor: hasError ? '#fff5f5' : isLocked ? '#fffbeb' : '#fafafa',
                 }}
               >
                 <Stack direction="row" alignItems="flex-start" spacing={1.5}>
@@ -461,23 +553,75 @@ export default function ManageWeightageModal({
                         {cat.category_name}
                       </Typography>
                       <KRATypeBadge isStandard={cat.is_standard} />
+                      {isLocked && (
+                        <Tooltip title="No remaining capacity for this category">
+                          <Chip
+                            icon={<LockIcon sx={{ fontSize: '10px !important' }} />}
+                            label="Full"
+                            size="small"
+                            sx={{ height: 16, fontSize: 8, fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e' }}
+                          />
+                        </Tooltip>
+                      )}
                     </Stack>
 
                     {cat.kra_names?.length > 0 && (
-                      <Typography fontSize={10.5} color="#94a3b8">
+                      <Typography fontSize={10.5} color="#94a3b8" mb={0.5}>
                         {cat.kra_names.slice(0, 2).join(', ')}
                         {cat.kra_names.length > 2 ? ` +${cat.kra_names.length - 2} more KRA${cat.kra_names.length - 2 > 1 ? 's' : ''}` : ''}
                       </Typography>
                     )}
 
-                    {cat.weightage !== '' && !isNaN(val) && val > 0 && (
+                    {/* Show existing + available in append mode */}
+                    {isAppendMode && (
+                      <Box sx={{ mb: 0.75 }}>
+                        {hasExisting && (
+                          <Stack direction="row" alignItems="center" gap={1} mb={0.5}>
+                            <Box sx={{ flex: 1 }}>
+                              {/* Existing weightage bar (locked portion) */}
+                              <Stack direction="row" justifyContent="space-between" mb={0.25}>
+                                <Typography fontSize={9.5} color="#64748b">Already assigned</Typography>
+                                <Typography fontSize={9.5} fontWeight={700} color="#475569">{existingW}%</Typography>
+                              </Stack>
+                              <LinearProgress
+                                variant="determinate"
+                                value={Math.min(existingW, 100)}
+                                sx={{
+                                  height: 5, borderRadius: 2, bgcolor: '#e2e8f0',
+                                  '& .MuiLinearProgress-bar': {
+                                    bgcolor: cat.is_standard ? '#86efac' : '#93c5fd',
+                                    borderRadius: 2,
+                                  },
+                                }}
+                              />
+                            </Box>
+                          </Stack>
+                        )}
+                        <Stack direction="row" alignItems="center" gap={1}>
+                          <Chip
+                            label={isLocked ? 'No capacity left' : `${maxAllowed}% remaining`}
+                            size="small"
+                            sx={{
+                              height: 16, fontSize: 9, fontWeight: 700,
+                              bgcolor: isLocked ? '#fef3c7' : '#f0fdf4',
+                              color: isLocked ? '#92400e' : '#16a34a',
+                            }}
+                          />
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {/* New value progress bar */}
+                    {!isLocked && cat.weightage !== '' && !isNaN(val) && val > 0 && (
                       <LinearProgress
                         variant="determinate"
-                        value={pct}
+                        value={Math.min((val / (maxAllowed || 100)) * 100, 100)}
                         sx={{
                           mt: 0.75, height: 3, borderRadius: 2, bgcolor: '#e2e8f0',
                           '& .MuiLinearProgress-bar': {
-                            bgcolor: cat.is_standard ? '#16a34a' : '#1d4ed8',
+                            bgcolor: val > maxAllowed
+                              ? '#ef4444'
+                              : cat.is_standard ? '#16a34a' : '#1d4ed8',
                             borderRadius: 2,
                           },
                         }}
@@ -495,22 +639,35 @@ export default function ManageWeightageModal({
                     <TextField
                       size="small"
                       type="number"
-                      value={cat.weightage}
+                      value={isLocked ? '0' : cat.weightage}
                       onChange={(e) => handleWeightageChange(cat.category_id, e.target.value)}
                       error={!!hasError}
                       placeholder="0"
-                      inputProps={{ min: 1, max: 100, step: 5 }}
+                      disabled={isLocked}
+                      inputProps={{
+                        min: 1,
+                        max: isAppendMode ? maxAllowed : 100,
+                        step: 5,
+                      }}
                       sx={{
                         width: 80,
                         '& .MuiOutlinedInput-root': {
                           borderRadius: 1.5, fontSize: 14, fontWeight: 700,
                           borderColor: hasError ? '#fca5a5' : undefined,
+                          bgcolor: isLocked ? '#f1f5f9' : undefined,
                         },
                         '& input': { textAlign: 'center', py: 0.75 },
                         '& input::-webkit-inner-spin-button': { opacity: 0 },
                       }}
                     />
                     <Typography fontSize={14} fontWeight={700} color="#64748b">%</Typography>
+                    {isAppendMode && !isLocked && maxAllowed < 100 && (
+                      <Tooltip title={`Max ${maxAllowed}% available`}>
+                        <Typography fontSize={9} color="#94a3b8" sx={{ whiteSpace: 'nowrap' }}>
+                          / {maxAllowed}%
+                        </Typography>
+                      </Tooltip>
+                    )}
                   </Stack>
                 </Stack>
               </Box>
@@ -533,7 +690,6 @@ export default function ManageWeightageModal({
           </Stack>
         </Box>
 
-        {/* ─── FIX Bug 3: globalError is now a WARNING (amber), not a hard error ── */}
         {globalError && (
           <Alert
             severity="warning"
@@ -544,7 +700,6 @@ export default function ManageWeightageModal({
           </Alert>
         )}
 
-        {/* Success hint — only show when exactly 100% and no other errors */}
         {isValid && !globalError && Object.keys(fieldErrors).length === 0 && (
           <Alert severity="success" icon={<CheckCircleIcon fontSize="small" />} sx={{ borderRadius: 2, fontSize: 12, py: 0.5 }}>
             All set! Weightage totals 100%. Ready to assign.
@@ -562,7 +717,6 @@ export default function ManageWeightageModal({
         </Button>
         <Button
           onClick={handleSubmit}
-          // ─── FIX Bug 3: Remove isValid from disabled condition — allow non-100% submit ──
           disabled={submitting || hasNoCategories}
           sx={{
             background: gradient,
