@@ -58,9 +58,10 @@ export const getCategories = (params = {}) =>
  * Response: { cycles: [{ id, name, description, start_date, end_date, status, current_stage: { id, name } }] }
  *
  * Dropdown shows:
- *   ACTIVE  → write access (default selected)
- *   CLOSED  → read-only / view only
- *   DRAFT / ON_HOLD → excluded from dropdown (not ready for assignment)
+ *   ACTIVE    → write access (default selected)
+ *   DRAFT /
+ *   ON_HOLD   → write access; shown under separate "Draft / On Hold" group
+ *   CLOSED    → read-only / view only
  */
 export const getKRACycles = () =>
   axiosInstance.get('kra/cycles');
@@ -262,8 +263,9 @@ export const bulkRemoveEmployees = (employeeKraCycleIds) =>
  * Response: { employee_kra_cycle_id, cloned_from, kras_copied, message }
  */
 export const cloneAssignment = (targetEmployeeKraCycleId, sourceEmployeeKraCycleId) =>
-  axiosInstance.post(`kra/assignments/${targetEmployeeKraCycleId}/clone-from`, {
+  axiosInstance.post(`kra/assignments/clone-from`, {
     source_employee_kra_cycle_id: sourceEmployeeKraCycleId,
+    target_employee_kra_cycle_ids: [targetEmployeeKraCycleId],
   });
 
 /**
@@ -276,14 +278,12 @@ export const cloneAssignment = (targetEmployeeKraCycleId, sourceEmployeeKraCycle
  *
  * Wrap in try/catch — Promise.all rejects if ANY request fails.
  */
-export const cloneAssignmentToMany = (targetEmployeeKraCycleIds, sourceEmployeeKraCycleId) =>
-  Promise.all(
-    targetEmployeeKraCycleIds.map((targetId) =>
-      axiosInstance.post(`kra/assignments/${targetId}/clone-from`, {
-        source_employee_kra_cycle_id: sourceEmployeeKraCycleId,
-      })
-    )
-  );
+export const cloneAssignmentToMany = (targetEmployeeKraCycleIds, sourceEmployeeKraCycleId, mode = 'append') =>
+  axiosInstance.post(`kra/assignments/clone-from`, {
+    source_employee_kra_cycle_id: sourceEmployeeKraCycleId,
+    target_employee_kra_cycle_ids: targetEmployeeKraCycleIds,
+    mode,
+  });
 
 
 // ── 8. PAGE BOOTSTRAP ────────────────────────────────────────────────────────
@@ -315,9 +315,10 @@ export const loadKRAAssignmentPageData = async () => {
 
   return {
     categories:  categoriesRes.data.categories ?? [],
-    activeCycle: allCyclesList.find((c) => c.status === 'ACTIVE') ?? null,
+    activeCycle: allCyclesList.find((c) => c.status === 'ACTIVE') ?? allCyclesList.find((c) => c.status === 'DRAFT') ?? null,
     allCycles: {
       active: allCyclesList.filter((c) => c.status === 'ACTIVE'),
+      draft:  allCyclesList.filter((c) => c.status === 'DRAFT' || c.status === 'ON_HOLD'),
       closed: allCyclesList.filter((c) => c.status === 'CLOSED'),
     },
     kraLibrary: kraRes.data.kras ?? [],
