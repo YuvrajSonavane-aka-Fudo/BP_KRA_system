@@ -325,7 +325,7 @@ class KRABulkAssignmentEnrolView(APIView):
                     ekc.save(update_fields=update_fields)
 
                     skipped_cats = []
-                    kras_added = 0 
+                    kras_added = 0  
                     if enrol_mode == "overwrite":
                         ekc.categories.all().delete()
                         EmployeeKRACycleCategory.objects.bulk_create(
@@ -390,6 +390,35 @@ class KRABulkAssignmentEnrolView(APIView):
                                 remaining -= cat_weight
                         if new_cat_rows:
                             EmployeeKRACycleCategory.objects.bulk_create(new_cat_rows)
+
+                        # KRA levels: add only those not already present
+                        existing_kra_level_ids = set(
+                            ekc.kra_level_rows.values_list("kra_level_id", flat=True)
+                        )
+                        to_add = [
+                            kl_id for kl_id in kra_level_ids
+                            if kl_id not in existing_kra_level_ids
+                        ]
+                        if not to_add:
+                            skipped.append(
+                                {
+                                    "employee_id": eid,
+                                    "employee_kra_cycle_id": ekc.id,
+                                    "reason": "append: all submitted KRA levels already exist on this employee — nothing added.",
+                                }
+                            )
+                            continue
+                        new_kra_rows = EmployeeKRALevel.objects.bulk_create(
+                            [
+                                EmployeeKRALevel(
+                                    employee_id=eid,
+                                    kra_level_id=kl_id,
+                                    employee_kra_cycle=ekc,
+                                )
+                                for kl_id in to_add
+                            ]
+                        )
+                        kras_added = len(new_kra_rows)
 
                     enrolled.append(
                         {
