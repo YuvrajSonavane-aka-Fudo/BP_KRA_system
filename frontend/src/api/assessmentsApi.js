@@ -4,38 +4,42 @@ import axiosInstance from './axiosInstance';
 
 /**
  * GET /kra/cycles/:cycleId/self-assessment
- * Employee: returns own KRAs with editable self-rating, self-comments, progress_notes.
+ * Returns the logged-in employee's KRA rows with descriptions and any existing ratings.
  */
 export const getSelfAssessment = (cycleId) =>
   axiosInstance.get(`/kra/cycles/${cycleId}/self-assessment`);
 
 /**
- * PATCH /kra/cycles/:cycleId/self-assessment  (Save — keep editable)
- * Body: { kra_level_id, self_rating?, self_comments?, progress_notes? }
+ * PATCH /kra/assessments/:employeeKraLevelId/self
+ * Save self rating, comment, progress notes, help_and_assistance_required.
+ * Body: { self_rating_id?, self_comment?, progress_notes?, help_and_assistance_required? }
  */
-export const saveSelfAssessment = (cycleId, payload) =>
-  axiosInstance.patch(`/kra/cycles/${cycleId}/self-assessment`, payload);
-
-/**
- * POST /kra/cycles/:cycleId/self-assessment/submit  (Submit — locks fields)
- */
-export const submitSelfAssessment = (cycleId) =>
-  axiosInstance.post(`/kra/cycles/${cycleId}/self-assessment/submit`);
+export const saveSelfAssessmentRow = (employeeKraLevelId, payload) =>
+  axiosInstance.patch(`/kra/assessments/${employeeKraLevelId}/self`, payload);
 
 // ── Lead / HR Assessment ──────────────────────────────────────────────────────
 
 /**
- * GET /kra/cycles/:cycleId/assessments?employee_id=:empId
- * Reviewer (Lead/VL/HR): returns employee KRAs including self-assessment data.
+ * GET /kra/cycles/:cycleId/progress?employee_id=:empId
+ * Lead/HR: returns all enrolled employees (or one if employee_id given) with KRA rows,
+ * self-assessment data, and any existing lead ratings.
  */
-export const getEmployeeAssessment = (cycleId, employeeId) =>
-  axiosInstance.get(`/kra/cycles/${cycleId}/assessments`, {
-    params: { employee_id: employeeId },
+export const getAssessmentProgress = (cycleId, employeeId = null) =>
+  axiosInstance.get(`/kra/cycles/${cycleId}/progress`, {
+    params: employeeId ? { employee_id: employeeId } : {},
   });
 
 /**
- * PATCH /kra/cycles/:cycleId/assessments
- * Body: { employee_id, kra_level_id, lead_rating?, lead_comments? }
+ * PATCH /kra/assessments/:employeeKraLevelId/lead-review
+ * Lead/HR: submit lead_rating_id, lead_comment, lead_progress_notes.
+ * Only allowed in Stage 3 (Assessment) or Stage 4 (HR Validation).
  */
-export const submitLeadAssessment = (cycleId, payload) =>
-  axiosInstance.patch(`/kra/cycles/${cycleId}/assessments`, payload);
+export const submitLeadReview = (employeeKraLevelId, payload) =>
+  axiosInstance.patch(`/kra/assessments/${employeeKraLevelId}/lead-review`, payload);
+
+/**
+ * PATCH /kra/assessments/:employeeKraLevelId/description
+ * Lead: write description_by_lead for a KRA row. Stage 1 & 2 only.
+ */
+export const saveLeadDescription = (employeeKraLevelId, payload) =>
+  axiosInstance.patch(`/kra/assessments/${employeeKraLevelId}/description`, payload);
