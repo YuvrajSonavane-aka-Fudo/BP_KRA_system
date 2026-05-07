@@ -498,8 +498,11 @@ export default function EmployeeKRAView({
 
   if (!employee) return null;
 
-const kraLevelIds      = employee.assigned_kras?.map(k => k.kra_level_id) ?? cachedData?.kra_level_ids ?? [];
-const cachedCategories = cachedData?.categories ?? [];
+const kraLevelIds = employee.assigned_kras?.map(k => k.kra_level_id) ?? cachedData?.kra_level_ids ?? [];
+const cachedCategories = 
+  (employee.assigned_categories?.length > 0)
+    ? employee.assigned_categories
+    : (cachedData?.categories ?? []);
   const totalKRAs        = kraLevelIds.length;
 
   const handleClone = async (targetIds, mode) => {
