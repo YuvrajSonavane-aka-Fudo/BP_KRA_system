@@ -469,28 +469,6 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      {/* ── Stat cards ── */}
-      <Stack direction="row" spacing={1.5} flexShrink={0}>
-        {[
-          { label: 'Total',     value: allCycles?.length ?? 0, icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,         color: '#1e40af', bg: '#dbeafe' },
-          { label: 'Active',    value: activeCycles.length,    icon: <TrendingUpIcon sx={{ fontSize: 16 }} />,         color: '#15803d', bg: '#dcfce7' },
-          { label: 'Draft',     value: draftCycles.length,     icon: <PendingActionsIcon sx={{ fontSize: 16 }} />,     color: '#d97706', bg: '#fef3c7' },
-          { label: 'On Hold',   value: onHoldCycles.length,    icon: <PauseCircleOutlineIcon sx={{ fontSize: 16 }} />, color: '#9a3412', bg: '#fde8d8' },
-          { label: 'Closed',    value: closedCycles.length,    icon: <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />, color: '#334155', bg: '#f1f5f9' },
-          { label: 'Cancelled', value: cancelledCycles.length, icon: <BlockIcon sx={{ fontSize: 16 }} />,              color: '#991b1b', bg: '#fee2e2' },
-        ].map((item, i) => (
-          <Paper key={i} elevation={0} sx={{ flex: 1, p: 1.5, borderRadius: 2, border: '1px solid #e2e8f0', '&:hover': { boxShadow: '0 4px 12px -2px rgba(0,0,0,0.08)' } }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: item.bg, color: item.color, flexShrink: 0 }}>{item.icon}</Box>
-              <Box>
-                <Typography fontSize={10} fontWeight={600} color="#64748b" noWrap>{item.label}</Typography>
-                <Typography fontSize={20} fontWeight={800} lineHeight={1} color="#0f172a">{item.value}</Typography>
-              </Box>
-            </Stack>
-          </Paper>
-        ))}
-      </Stack>
-
       {/* ── Active cycle banner ── */}
       {activeCycle && (() => {
         const sid       = activeCycle.current_stage?.id ?? 1;
