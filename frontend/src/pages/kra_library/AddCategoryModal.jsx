@@ -91,7 +91,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category }) {
             <Stack direction="row" spacing={1.5}>
               {[
                 { value: true,  label: 'Standard', icon: <StarIcon sx={{ fontSize: 14 }} />, desc: 'Core org-wide KRA category' },
-                { value: false, label: 'Custom',   icon: <TuneIcon sx={{ fontSize: 14 }} />, desc: 'Project or team specific' },
+                { value: false, label: 'Project',   icon: <TuneIcon sx={{ fontSize: 14 }} />, desc: 'Project or team specific' },
               ].map(opt => (
                 <Box key={String(opt.value)} onClick={() => setStandard(opt.value)}
                   sx={{
