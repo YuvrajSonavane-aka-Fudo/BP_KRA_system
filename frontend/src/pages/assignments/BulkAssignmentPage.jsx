@@ -137,19 +137,23 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
   const [expanded, setExpanded] = useState({});
 
   const allLevels = useMemo(() => {
-    const set = new Map();
-    kras.forEach(k => (k.levels ?? []).forEach(l => {
-      const lid = getLevelId(l);
-      if (!set.has(lid)) set.set(lid, l.level_name);
-    }));
-    return [...set.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [kras]);
+  const seen = new Set();
+  const list = [];
+  kras.forEach(k => (k.levels ?? []).forEach(l => {
+    const name = l.level_name;
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      list.push({ name });
+    }
+  }));
+  return list.sort((a, b) => a.name.localeCompare(b.name));
+}, [kras]);
 
   const grouped = useMemo(() => {
     let list = kras;
     if (typeFilter === 'org') list = list.filter(k => k.is_standard === true);
     if (typeFilter === 'project') list = list.filter(k => k.is_standard === false);
-    if (levelFilter) list = list.filter(k => (k.levels ?? []).some(l => String(getLevelId(l)) === levelFilter));
+    if (levelFilter) list = list.filter(k => (k.levels ?? []).some(l => l.level_name === levelFilter));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(k => k.name.toLowerCase().includes(q) || k.description?.toLowerCase().includes(q));
@@ -235,7 +239,7 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
           <Select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} displayEmpty
             sx={{ fontSize: 11, height: 30, borderRadius: 1.5, bgcolor: '#f8fafc' }}>
             <MenuItem value="" sx={{ fontSize: 11 }}>All Levels</MenuItem>
-            {allLevels.map(l => <MenuItem key={l.id} value={String(l.id)} sx={{ fontSize: 11 }}>{l.name}</MenuItem>)}
+            {allLevels.map(l => <MenuItem key={l.name} value={l.name} sx={{ fontSize: 11 }}>{l.name}</MenuItem>)}
           </Select>
         </FormControl>
       </Stack>
