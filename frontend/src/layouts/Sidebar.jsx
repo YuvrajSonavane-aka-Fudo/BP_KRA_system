@@ -4,37 +4,46 @@ import {
   Box, List, ListItemButton, ListItemIcon, ListItemText,
   Typography, Divider, Stack, Avatar, Tooltip, IconButton,
 } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
-import GroupsIcon from '@mui/icons-material/Groups';
-import RateReviewIcon from '@mui/icons-material/RateReview';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import LayersIcon from '@mui/icons-material/Layers';
-import LogoutIcon from '@mui/icons-material/Logout';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import useAuth from '../auth/useAuth';
-import ROUTES from '../config/routes';
+import DashboardIcon      from '@mui/icons-material/Dashboard';
+import LibraryBooksIcon   from '@mui/icons-material/LibraryBooks';
+import GroupsIcon         from '@mui/icons-material/Groups';
+import RateReviewIcon     from '@mui/icons-material/RateReview';
+import AssessmentIcon     from '@mui/icons-material/Assessment';
+import SelfImprovementIcon from '@mui/icons-material/SelfImprovement';
+import LogoutIcon         from '@mui/icons-material/Logout';
+import ChevronLeftIcon    from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon   from '@mui/icons-material/ChevronRight';
+import useAuth            from '../auth/useAuth';
+import ROUTES             from '../config/routes';
+import useRoleAccess      from '../hooks/useRoleAccess';
 
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
-const SIDEBAR_EXPANDED = 240;
+const SIDEBAR_EXPANDED  = 240;
 const SIDEBAR_COLLAPSED = 60;
 
-const NAV_ITEMS = [
-  { label: 'Dashboard',      icon: <DashboardIcon fontSize="small" />,    path: ROUTES.DASHBOARD },
-  { label: 'KRAs Library',   icon: <LibraryBooksIcon fontSize="small" />, path: ROUTES.KRA_LIBRARY },
-  { label: 'KRA Assignment', icon: <GroupsIcon fontSize="small" />,       path: ROUTES.ASSIGNMENTS },
-  { label: 'Reviews',        icon: <RateReviewIcon fontSize="small" />,   path: ROUTES.TEAM_PERFORMANCE },
-  { label: 'Reports',        icon: <AssessmentIcon fontSize="small" />,   path: ROUTES.REPORTS },
-];
-
 export default function Sidebar({ onToggle }) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const { user, logout } = useAuth();
+  const { canLeadAssess } = useRoleAccess();
   const [collapsed, setCollapsed] = useState(false);
 
   const initials = user?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+
+  // Build nav items — show "Reviews" only for leads/HR/admin, always show "Self Assessment"
+  const NAV_ITEMS = [
+    { label: 'Dashboard',        icon: <DashboardIcon fontSize="small" />,       path: ROUTES.DASHBOARD },
+    { label: 'KRAs Library',     icon: <LibraryBooksIcon fontSize="small" />,    path: ROUTES.KRA_LIBRARY },
+    { label: 'KRA Assignment',   icon: <GroupsIcon fontSize="small" />,          path: ROUTES.ASSIGNMENTS },
+    // Self Assessment — visible to all authenticated users
+    { label: 'Self Assessment',  icon: <SelfImprovementIcon fontSize="small" />, path: ROUTES.ASSESSMENTS_SELF },
+    // Reviews — visible only to leads / HR / admin
+    ...(canLeadAssess
+      ? [{ label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, path: ROUTES.TEAM_PERFORMANCE }]
+      : []
+    ),
+    { label: 'Reports',          icon: <AssessmentIcon fontSize="small" />,      path: ROUTES.REPORTS },
+  ];
 
   function handleToggle() {
     const next = !collapsed;
@@ -138,12 +147,6 @@ export default function Sidebar({ onToggle }) {
             minHeight: 40,
           };
 
-          // ─── FIX: key must be on the outermost element returned from map() ───
-          // When collapsed, Tooltip is outermost → key on Tooltip ✓
-          // When expanded,  Box is outermost    → key on Box ✓
-          // Previously: key was on ListItemButton inside btn, which was then
-          // returned bare (no wrapper) in the expanded branch — React fell back
-          // to positional index, causing wrong onClick to fire on click.
           if (collapsed) {
             return (
               <Tooltip key={item.label} title={item.label} placement="right">
