@@ -391,7 +391,7 @@ class KRACycleListCreateView(APIView):
         status_filter = request.query_params.get("status")
 
         if _is_hr(caller):
-            qs = KRACycle.objects.filter(is_deleted=False).select_related("stage")
+            qs = KRACycle.objects.filter(is_deleted=False).select_related("stage").prefetch_related("cycle_stages__stage")
         else:
             qs = (
                 KRACycle.objects.filter(
@@ -400,6 +400,7 @@ class KRACycleListCreateView(APIView):
                     employee_cycles__employee=caller,
                 )
                 .select_related("stage")
+                .prefetch_related("cycle_stages__stage")
                 .distinct()
             )
 
@@ -417,6 +418,14 @@ class KRACycleListCreateView(APIView):
                 "current_stage": (
                     {"id": c.stage.id, "name": c.stage.name} if c.stage else None
                 ),
+                "cycle_stages": [
+                    {
+                        "stage_id":   cs.stage.id,
+                        "start_date": cs.start_date,
+                        "end_date":   cs.end_date,
+                    }
+                    for cs in c.cycle_stages.filter(is_deleted=False).order_by("id")
+                ],
             }
             for c in qs
         ]
@@ -526,9 +535,36 @@ class KRACycleUpdateView(APIView):
     permission_classes = [IsAuthenticated]
 
     VALID_TRANSITIONS = {
-        "DRAFT":  ["ACTIVE"],
-        "ACTIVE": ["CLOSED"],
+        "DRAFT":     ["ACTIVE"],
+        "ACTIVE":    ["ON_HOLD", "CLOSED", "CANCELLED"],
+        "ON_HOLD":   ["ACTIVE", "CANCELLED"],
+        "INACTIVE":  ["ACTIVE", "CANCELLED"],
+        "CLOSED":    [],
+        "CANCELLED": [],
     }
+
+    def get(self, request, cycle_id):
+        cycle = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
+        return Response({
+            "id":          cycle.id,
+            "name":        cycle.name,
+            "description": cycle.description,
+            "start_date":  cycle.start_date,
+            "end_date":    cycle.end_date,
+            "status":      cycle.status,
+            "current_stage": (
+                {"id": cycle.stage.id, "name": cycle.stage.name} if cycle.stage else None
+            ),
+            "cycle_stages": [
+                {
+                    "stage_id":   cs.stage.id,
+                    "start_date": cs.start_date,
+                    "end_date":   cs.end_date,
+                }
+                for cs in cycle.cycle_stages.filter(is_deleted=False)
+                    .select_related("stage").order_by("id")
+            ],
+        }, status=status.HTTP_200_OK)
 
     def patch(self, request, cycle_id):
         caller = _get_caller(request)
@@ -541,7 +577,6 @@ class KRACycleUpdateView(APIView):
 
         cycle = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
 
-        # Capture old values BEFORE making any changes
         old_status     = cycle.status
         old_is_deleted = cycle.is_deleted
 
@@ -570,14 +605,38 @@ class KRACycleUpdateView(APIView):
         if is_deleted is not None:
             cycle.is_deleted = is_deleted
 
+        # ── Save name / description if provided ──
+        if "name" in request.data:
+            cycle.name = request.data["name"]
+        if "description" in request.data:
+            cycle.description = request.data.get("description") or ""
+
+        # ── Save stage dates if provided ──
+        stages_data = request.data.get("stages")
+        if stages_data:
+            for s in stages_data:
+                stage_id   = s.get("stage_id")
+                start_date = s.get("start_date")
+                end_date   = s.get("end_date")
+                if stage_id and start_date and end_date:
+                    KRACycleStage.objects.update_or_create(
+                        kra_cycle=cycle,
+                        stage_id=stage_id,
+                        defaults={
+                            "start_date": _parse_date(start_date),
+                            "end_date":   _parse_date(end_date),
+                            "is_deleted": False,
+                        }
+                    )
+
         cycle.save()
 
         _audit(request, "CYCLE_UPDATED", "KRACycle", cycle.id,
-            old_data = {
+            old_data={
                 "status":     old_status,
                 "is_deleted": old_is_deleted,
             },
-            new_data = {
+            new_data={
                 "status":     cycle.status,
                 "is_deleted": cycle.is_deleted,
                 "updated_by": caller.email,
