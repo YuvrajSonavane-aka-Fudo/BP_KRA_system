@@ -886,7 +886,11 @@ export default function KRALibraryPage() {
       showToast('KRA removed');
       refresh();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to delete KRA', 'error');
+      const raw = err?.response?.data?.error ?? '';
+      const friendly = raw.toLowerCase().includes('assigned') || raw.toLowerCase().includes('active cycle')
+        ? 'This KRA is currently in use by employees and can\'t be deleted.'
+        : 'Failed to delete KRA. Please try again.';
+      showToast(friendly, 'error');
     } finally { setDeleting(false); }
   }
 
@@ -931,7 +935,11 @@ export default function KRALibraryPage() {
       showToast(`Deleted ${total} item${total !== 1 ? 's' : ''} successfully`);
       refresh();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Some items could not be deleted', 'error');
+      const raw = err?.response?.data?.error ?? '';
+      const friendly = raw.toLowerCase().includes('assigned') || raw.toLowerCase().includes('active cycle')
+        ? 'Some KRAs are currently in use by employees and couldn\'t be deleted.'
+        : 'Some items couldn\'t be deleted. Please try again.';
+      showToast(friendly, 'error');
     } finally {
       setBulkDeleting(false);
     }
