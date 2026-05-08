@@ -559,7 +559,7 @@ export default function TeamPerformancePage() {
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                      {['Employee', 'Role', 'KRAs', 'Self-Assessment', 'Lead Review', 'Action'].map(h => (
+                      {['Employee', 'KRAs', 'Self-Assessment', 'Lead Review', 'Action'].map(h => (
                         <TableCell key={h} sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', py: 1.5, borderBottom: '1.5px solid #e2e8f0' }}>
                           {h}
                         </TableCell>
@@ -586,9 +586,6 @@ export default function TeamPerformancePage() {
                                 <Typography sx={{ fontSize: 11, color: '#94a3b8' }}>Stage {emp.current_stage_id}</Typography>
                               </Box>
                             </Stack>
-                          </TableCell>
-                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
-                            <Typography sx={{ fontSize: 13, color: '#475569' }}>{emp.title || emp.status || '—'}</Typography>
                           </TableCell>
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
                             <Chip label={kraCount} size="small"
