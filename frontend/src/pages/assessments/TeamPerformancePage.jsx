@@ -1,42 +1,34 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Stack, Chip, TextField, MenuItem, Select,
   CircularProgress, Alert, Divider, Avatar, LinearProgress,
-  Table, TableBody, TableCell, TableHead, TableRow, Tooltip,
-  IconButton, Collapse,
+  Table, TableBody, TableCell, TableHead, TableRow, Tooltip, IconButton,
 } from '@mui/material';
-import CheckCircleIcon    from '@mui/icons-material/CheckCircle';
-import PendingIcon        from '@mui/icons-material/Pending';
-import LockIcon           from '@mui/icons-material/Lock';
-import ArrowBackIcon      from '@mui/icons-material/ArrowBack';
-import RateReviewIcon     from '@mui/icons-material/RateReview';
-import VisibilityIcon     from '@mui/icons-material/Visibility';
-import SaveIcon           from '@mui/icons-material/Save';
-import WarningAmberIcon   from '@mui/icons-material/WarningAmber';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PendingIcon from '@mui/icons-material/Pending';
+import LockIcon from '@mui/icons-material/Lock';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import SaveIcon from '@mui/icons-material/Save';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { getCycles } from '../../api/cyclesApi';
 import { getReferenceData } from '../../api/referenceDataApi';
 import { getAssessmentProgress, submitLeadReview } from '../../api/assessmentsApi';
+import { getStageStates, canLeadReview, getStageLockReason } from '../../utils/stageUtils';
 
-const NAVY   = '#0f1b4c';
-const BLUE   = '#1E3A8A';
+const NAVY = '#0f1b4c';
+const BLUE = '#1E3A8A';
 const ACCENT = '#3b82f6';
 
-// ── Canonical 5-stage cycle definition (matches DashboardPage / backend) ───────
-const CYCLE_STAGES = [
-  { id: 1, name: 'KRA Assignment' },
-  { id: 2, name: 'Self Assessment' },
-  { id: 3, name: 'Lead Assessment' },
-  { id: 4, name: 'HR Validation' },
-  { id: 5, name: 'Completed' },
-];
-
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function initials(name = '') {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 }
 
 function selfStatus(kras) {
-  if (!kras.length) return 'locked';
+  if (!kras?.length) return 'locked';
   const rated = kras.filter(k => k.self_rating_id).length;
   if (rated === kras.length) return 'completed';
   if (rated > 0) return 'in_progress';
@@ -44,7 +36,7 @@ function selfStatus(kras) {
 }
 
 function leadStatus(kras) {
-  if (!kras.length) return 'locked';
+  if (!kras?.length) return 'locked';
   const rated = kras.filter(k => k.lead_rating_id).length;
   if (rated === kras.length) return 'completed';
   if (rated > 0) return 'in_progress';
@@ -53,61 +45,60 @@ function leadStatus(kras) {
 
 function StatusBadge({ statusKey }) {
   const map = {
-    completed:   { label: 'COMPLETED',   bg: '#dcfce7', color: '#16a34a', icon: <CheckCircleIcon sx={{ fontSize: 12 }} /> },
-    in_progress: { label: 'IN PROGRESS', bg: '#fef9c3', color: '#ca8a04', icon: <PendingIcon     sx={{ fontSize: 12 }} /> },
-    pending:     { label: 'PENDING',     bg: '#fef2f2', color: '#dc2626', icon: <PendingIcon     sx={{ fontSize: 12 }} /> },
-    locked:      { label: 'LOCKED',      bg: '#f1f5f9', color: '#94a3b8', icon: <LockIcon        sx={{ fontSize: 12 }} /> },
+    completed: { label: 'COMPLETED', bg: '#dcfce7', color: '#16a34a', icon: <CheckCircleIcon sx={{ fontSize: 12 }} /> },
+    in_progress: { label: 'IN PROGRESS', bg: '#fef9c3', color: '#ca8a04', icon: <PendingIcon sx={{ fontSize: 12 }} /> },
+    pending: { label: 'PENDING', bg: '#fef2f2', color: '#dc2626', icon: <PendingIcon sx={{ fontSize: 12 }} /> },
+    locked: { label: 'LOCKED', bg: '#f1f5f9', color: '#94a3b8', icon: <LockIcon sx={{ fontSize: 12 }} /> },
   };
   const s = map[statusKey] || map.locked;
   return (
-    <Chip
-      icon={s.icon}
-      label={s.label}
-      size="small"
+    <Chip icon={s.icon} label={s.label} size="small"
       sx={{
         bgcolor: s.bg, color: s.color, fontWeight: 700, fontSize: 10,
         border: `1px solid ${s.color}30`, height: 22,
-        '& .MuiChip-icon': { color: s.color, ml: 0.5 },
-      }}
-    />
+        '& .MuiChip-icon': { color: s.color, ml: 0.5 }
+      }} />
   );
 }
 
-// ── Stage stepper (synced with active cycle) ──────────────────────────────────
-function CycleStageStepper({ currentStageId }) {
+// ── Stage stepper — rollback-safe ─────────────────────────────────────────────
+function CycleStageStepper({ currentStageId, completedStageIds }) {
   if (!currentStageId) return null;
+  const states = getStageStates(currentStageId, completedStageIds);
+
   return (
     <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, px: 3, py: 2, mb: 3 }}>
       <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1.5 }}>
         Current Cycle Stage
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-        {CYCLE_STAGES.map((stage, i) => {
-          const isDone    = stage.id < currentStageId;
-          const isCurrent = stage.id === currentStageId;
-          const isLast    = i === CYCLE_STAGES.length - 1;
+        {states.map((stage, i) => {
+          const isLast = i === states.length - 1;
           return (
             <React.Fragment key={stage.id}>
               <Stack alignItems="center" spacing={0.5} sx={{ minWidth: 80 }}>
                 <Box sx={{
                   width: 34, height: 34, borderRadius: '50%',
-                  bgcolor: isCurrent ? BLUE : isDone ? '#22c55e' : '#e2e8f0',
-                  border: isCurrent ? `3px solid ${ACCENT}` : isDone ? '3px solid #22c55e' : '3px solid #e2e8f0',
+                  bgcolor: stage.isCurrent ? BLUE : stage.isDone ? '#22c55e' : '#e2e8f0',
+                  border: stage.isCurrent
+                    ? `3px solid ${ACCENT}`
+                    : stage.isDone ? '3px solid #22c55e' : '3px solid #e2e8f0',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: isCurrent ? `0 0 0 3px rgba(59,130,246,0.2)` : 'none',
+                  boxShadow: stage.isCurrent ? `0 0 0 3px rgba(59,130,246,0.2)` : 'none',
                   transition: 'all 0.2s',
                 }}>
-                  {isDone
+                  {stage.isDone
                     ? <CheckCircleIcon sx={{ fontSize: 18, color: '#fff' }} />
-                    : <Typography sx={{ fontSize: 11, fontWeight: 800, color: isCurrent ? '#fff' : '#94a3b8' }}>
-                        {stage.id}
-                      </Typography>
+                    : <Typography sx={{ fontSize: 11, fontWeight: 800, color: stage.isCurrent ? '#fff' : '#94a3b8' }}>
+                      {stage.id}
+                    </Typography>
                   }
                 </Box>
                 <Typography sx={{
-                  fontSize: 10, fontWeight: isCurrent ? 700 : 500, textAlign: 'center', lineHeight: 1.3,
-                  color: isCurrent ? BLUE : isDone ? '#22c55e' : '#94a3b8',
-                  textTransform: 'uppercase', letterSpacing: '0.04em', maxWidth: 76,
+                  fontSize: 10, fontWeight: stage.isCurrent ? 700 : 500,
+                  textAlign: 'center', lineHeight: 1.3, maxWidth: 76,
+                  color: stage.isCurrent ? BLUE : stage.isDone ? '#22c55e' : '#94a3b8',
+                  textTransform: 'uppercase', letterSpacing: '0.04em',
                 }}>
                   {stage.name}
                 </Typography>
@@ -115,7 +106,7 @@ function CycleStageStepper({ currentStageId }) {
               {!isLast && (
                 <Box sx={{
                   flex: 1, height: 2, mt: '16px',
-                  bgcolor: isDone ? '#22c55e' : '#e2e8f0',
+                  bgcolor: stage.isDone ? '#22c55e' : '#e2e8f0',
                   transition: 'background-color 0.3s',
                 }} />
               )}
@@ -127,14 +118,16 @@ function CycleStageStepper({ currentStageId }) {
   );
 }
 
-// ── Single KRA review card ────────────────────────────────────────────────────
-function KRAReviewRow({ row, ratings, cycleStageId, onSave, saving, savedId }) {
-  const [leadRatingId,      setLeadRatingId]      = useState(row.lead_rating_id      ?? '');
-  const [leadComment,       setLeadComment]       = useState(row.lead_comment        ?? '');
+// ── KRA review card ───────────────────────────────────────────────────────────
+function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, savedId }) {
+  const [leadRatingId, setLeadRatingId] = useState(row.lead_rating_id ?? '');
+  const [leadComment, setLeadComment] = useState(row.lead_comment ?? '');
   const [leadProgressNotes, setLeadProgressNotes] = useState(row.lead_progress_notes ?? '');
-  const [dirty,  setDirty]  = useState(false);
-  const canReview = cycleStageId === 3 || cycleStageId === 4;
-  const isSaving  = saving && savedId === row.employee_kra_level_id;
+  const [dirty, setDirty] = useState(false);
+  const isSaving = saving && savedId === row.employee_kra_level_id;
+
+  // Reset dirty if editable changes (stage rolled back mid-session)
+  React.useEffect(() => { setDirty(false); }, [editable]);
 
   function change(setter) {
     return v => { setter(v); setDirty(true); };
@@ -142,21 +135,18 @@ function KRAReviewRow({ row, ratings, cycleStageId, onSave, saving, savedId }) {
 
   function handleSave() {
     onSave(row.employee_kra_level_id, {
-      lead_rating_id:      leadRatingId      || null,
-      lead_comment:        leadComment       || null,
+      lead_rating_id: leadRatingId || null,
+      lead_comment: leadComment || null,
       lead_progress_notes: leadProgressNotes || null,
     });
     setDirty(false);
   }
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        border: row.lead_rating_id ? '1.5px solid #bbf7d0' : '1.5px solid #e2e8f0',
-        borderRadius: 2.5, overflow: 'hidden', mb: 2,
-      }}
-    >
+    <Paper elevation={0} sx={{
+      border: row.lead_rating_id ? '1.5px solid #bbf7d0' : '1.5px solid #e2e8f0',
+      borderRadius: 2.5, overflow: 'hidden', mb: 2,
+    }}>
       {/* KRA name bar */}
       <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#fafbff', borderBottom: '1px solid #f1f5f9' }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -165,9 +155,7 @@ function KRAReviewRow({ row, ratings, cycleStageId, onSave, saving, savedId }) {
               ? <CheckCircleIcon sx={{ fontSize: 17, color: '#22c55e' }} />
               : <PendingIcon sx={{ fontSize: 17, color: '#f59e0b' }} />
             }
-            <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
-              {row.kra_name}
-            </Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{row.kra_name}</Typography>
           </Stack>
           <Stack direction="row" spacing={1} alignItems="center">
             {row.category_name && (
@@ -186,7 +174,7 @@ function KRAReviewRow({ row, ratings, cycleStageId, onSave, saving, savedId }) {
       </Box>
 
       <Stack direction={{ xs: 'column', md: 'row' }} divider={<Divider orientation="vertical" flexItem />}>
-        {/* Employee Self-Assessment (read-only) */}
+        {/* Employee self-assessment (read-only) */}
         <Box sx={{ flex: 1, p: 2.5 }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1 }}>
             Employee Self-Assessment
@@ -218,28 +206,27 @@ function KRAReviewRow({ row, ratings, cycleStageId, onSave, saving, savedId }) {
           )}
         </Box>
 
-        {/* Lead Evaluation */}
-        <Box sx={{ flex: 1, p: 2.5, bgcolor: canReview ? '#fff' : '#fafbff' }}>
+        {/* Lead evaluation */}
+        <Box sx={{ flex: 1, p: 2.5, bgcolor: editable ? '#fff' : '#fafbff' }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1.5 }}>
             Lead Evaluation
           </Typography>
 
-          {!canReview ? (
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <LockIcon sx={{ fontSize: 15, color: '#cbd5e1' }} />
-              <Typography sx={{ fontSize: 13, color: '#cbd5e1', fontStyle: 'italic' }}>
-                Review opens in Lead Assessment stage
+          {!editable ? (
+            // Clear, contextual message — not just a lock icon
+            <Stack direction="row" alignItems="flex-start" spacing={1}>
+              <LockIcon sx={{ fontSize: 15, color: '#cbd5e1', mt: 0.2 }} />
+              <Typography sx={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
+                {lockReason || 'Not available at this stage.'}
               </Typography>
             </Stack>
           ) : (
             <Stack spacing={1.5}>
-              <Select
-                value={leadRatingId}
-                onChange={e => change(setLeadRatingId)(e.target.value)}
+              <Select value={leadRatingId} onChange={e => change(setLeadRatingId)(e.target.value)}
                 displayEmpty size="small" fullWidth
                 sx={{
                   fontSize: 13, borderRadius: 2,
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: leadRatingId ? '#22c55e' : '#e2e8f0' },
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: leadRatingId ? '#22c55e' : '#e2e8f0' }
                 }}
               >
                 <MenuItem value="" disabled sx={{ fontSize: 13, color: '#94a3b8' }}>Select Rating</MenuItem>
@@ -250,47 +237,39 @@ function KRAReviewRow({ row, ratings, cycleStageId, onSave, saving, savedId }) {
                 ))}
               </Select>
 
-              <TextField
-                multiline minRows={3}
+              <TextField multiline minRows={3} fullWidth size="small"
                 placeholder="Enter mandatory evaluation comments..."
-                value={leadComment}
-                onChange={e => change(setLeadComment)(e.target.value)}
-                fullWidth size="small"
+                value={leadComment} onChange={e => change(setLeadComment)(e.target.value)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     fontSize: 13, borderRadius: 2,
                     '&:hover fieldset': { borderColor: ACCENT },
                     '&.Mui-focused fieldset': { borderColor: ACCENT },
-                  },
+                  }
                 }}
               />
 
-              <TextField
-                multiline minRows={2}
+              <TextField multiline minRows={2} fullWidth size="small"
                 placeholder="Optional: notes on progress, coaching points..."
-                value={leadProgressNotes}
-                onChange={e => change(setLeadProgressNotes)(e.target.value)}
-                fullWidth size="small"
+                value={leadProgressNotes} onChange={e => change(setLeadProgressNotes)(e.target.value)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     fontSize: 13, borderRadius: 2,
                     '&:hover fieldset': { borderColor: ACCENT },
                     '&.Mui-focused fieldset': { borderColor: ACCENT },
-                  },
+                  }
                 }}
               />
 
               <Stack direction="row" justifyContent="flex-end">
-                <Box
-                  onClick={dirty ? handleSave : undefined}
-                  sx={{
-                    display: 'inline-flex', alignItems: 'center', gap: 0.8,
-                    px: 2, py: 0.8, borderRadius: 2, cursor: dirty ? 'pointer' : 'default',
-                    bgcolor: dirty ? BLUE : '#f1f5f9', color: dirty ? '#fff' : '#94a3b8',
-                    fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                    '&:hover': dirty ? { bgcolor: ACCENT } : {},
-                  }}
-                >
+                <Box onClick={dirty ? handleSave : undefined} sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: 0.8,
+                  px: 2, py: 0.8, borderRadius: 2,
+                  cursor: dirty ? 'pointer' : 'default',
+                  bgcolor: dirty ? BLUE : '#f1f5f9', color: dirty ? '#fff' : '#94a3b8',
+                  fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                  '&:hover': dirty ? { bgcolor: ACCENT } : {},
+                }}>
                   {isSaving ? <CircularProgress size={12} sx={{ color: '#fff' }} /> : <SaveIcon sx={{ fontSize: 14 }} />}
                   {isSaving ? 'Saving…' : 'Save Review'}
                 </Box>
@@ -303,11 +282,11 @@ function KRAReviewRow({ row, ratings, cycleStageId, onSave, saving, savedId }) {
   );
 }
 
-// ── Employee detail view ──────────────────────────────────────────────────────
-function EmployeeReviewPanel({ emp, ratings, cycleStageId, currentCycleStageId, onBack }) {
-  const [saving,    setSaving]    = useState(false);
-  const [savedId,   setSavedId]   = useState(null);
-  const [toast,     setToast]     = useState('');
+// ── Employee review panel ─────────────────────────────────────────────────────
+function EmployeeReviewPanel({ emp, ratings, currentCycleStageId, completedStageIds, onBack }) {
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState(null);
+  const [toast, setToast] = useState({ msg: '', severity: 'success' });
   const [localKras, setLocalKras] = useState(emp.kras ?? []);
 
   async function handleSave(employeeKraLevelId, payload) {
@@ -318,27 +297,28 @@ function EmployeeReviewPanel({ emp, ratings, cycleStageId, currentCycleStageId, 
       setLocalKras(prev =>
         prev.map(k => k.employee_kra_level_id === employeeKraLevelId ? { ...k, ...payload } : k)
       );
-      setToast('Review saved');
-      setTimeout(() => setToast(''), 2500);
+      setToast({ msg: 'Review saved', severity: 'success' });
     } catch (err) {
-      setToast(err?.response?.data?.error || 'Save failed');
-      setTimeout(() => setToast(''), 3000);
+      setToast({ msg: err?.response?.data?.error || 'Save failed', severity: 'error' });
     } finally {
       setSaving(false);
       setSavedId(null);
+      setTimeout(() => setToast({ msg: '', severity: 'success' }), 3000);
     }
   }
 
   const reviewed = localKras.filter(k => k.lead_rating_id).length;
-  const pct      = localKras.length ? Math.round((reviewed / localKras.length) * 100) : 0;
+  const pct = localKras.length ? Math.round((reviewed / localKras.length) * 100) : 0;
+
+  // Gate from stageUtils — single source of truth
+  const editable = canLeadReview(currentCycleStageId);
+  const lockReason = getStageLockReason(currentCycleStageId, 'lead');
 
   return (
-    // ── Full-height panel with internal scroll ────────────────────────────────
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
 
-      {/* Fixed header strip */}
+      {/* Fixed header */}
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 2, flexShrink: 0, bgcolor: '#f5f6fa' }}>
-        {/* Back + employee identity */}
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
           <IconButton onClick={onBack} size="small" sx={{ bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#e2e8f0' } }}>
             <ArrowBackIcon fontSize="small" />
@@ -349,37 +329,39 @@ function EmployeeReviewPanel({ emp, ratings, cycleStageId, currentCycleStageId, 
           <Box sx={{ flex: 1 }}>
             <Typography sx={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>{emp.full_name}</Typography>
             <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>
-              {emp.title || emp.status || '—'} · Stage {emp.current_stage_id}: {emp.current_stage_name}
+              {emp.title || emp.status || '—'}
             </Typography>
           </Box>
-
-          {/* Progress pill */}
           <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, px: 2, py: 1, minWidth: 140 }}>
             <Typography sx={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, mb: 0.3 }}>KRAs Reviewed</Typography>
             <Stack direction="row" alignItems="baseline" spacing={0.5}>
               <Typography sx={{ fontSize: 20, fontWeight: 800, color: BLUE }}>{reviewed}</Typography>
               <Typography sx={{ fontSize: 13, color: '#94a3b8' }}>/ {localKras.length}</Typography>
             </Stack>
-            <LinearProgress
-              variant="determinate" value={pct}
-              sx={{ mt: 0.5, height: 4, borderRadius: 2, bgcolor: '#e2e8f0',
-                '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#22c55e' : ACCENT } }}
-            />
+            <LinearProgress variant="determinate" value={pct}
+              sx={{
+                mt: 0.5, height: 4, borderRadius: 2, bgcolor: '#e2e8f0',
+                '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#22c55e' : ACCENT }
+              }} />
           </Paper>
         </Stack>
 
-        {/* Cycle stage stepper */}
-        <CycleStageStepper currentStageId={currentCycleStageId} />
-
+        <CycleStageStepper currentStageId={currentCycleStageId} completedStageIds={completedStageIds} />
         <Divider />
       </Box>
 
       {/* Scrollable KRA list */}
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
-        {toast && (
-          <Alert severity={toast.toLowerCase().includes('fail') ? 'error' : 'success'} sx={{ mb: 2, borderRadius: 2 }}>
-            {toast}
+
+        {/* Stage-lock banner */}
+        {!editable && lockReason && (
+          <Alert severity="warning" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
+            {lockReason} KRA data is shown in read-only mode.
           </Alert>
+        )}
+
+        {toast.msg && (
+          <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>
         )}
 
         {localKras.length === 0 ? (
@@ -392,7 +374,8 @@ function EmployeeReviewPanel({ emp, ratings, cycleStageId, currentCycleStageId, 
               key={row.employee_kra_level_id}
               row={row}
               ratings={ratings}
-              cycleStageId={cycleStageId}
+              editable={editable}
+              lockReason={lockReason}
               onSave={handleSave}
               saving={saving}
               savedId={savedId}
@@ -406,14 +389,14 @@ function EmployeeReviewPanel({ emp, ratings, cycleStageId, currentCycleStageId, 
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function TeamPerformancePage() {
-  const [cycles,   setCycles]   = useState([]);
-  const [cycleId,  setCycleId]  = useState('');
-  const [data,     setData]     = useState(null);
-  const [ratings,  setRatings]  = useState([]);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [cycles, setCycles] = useState([]);
+  const [cycleId, setCycleId] = useState('');
+  const [data, setData] = useState(null);
+  const [ratings, setRatings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [selected, setSelected] = useState(null);
-  const [search,   setSearch]   = useState('');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     getCycles({ status: 'ACTIVE' }).then(res => {
@@ -421,9 +404,7 @@ export default function TeamPerformancePage() {
       setCycles(list);
       if (list.length) setCycleId(list[0].id);
     });
-    getReferenceData().then(res => {
-      setRatings(res.data?.ratings ?? []);
-    });
+    getReferenceData().then(res => setRatings(res.data?.ratings ?? []));
   }, []);
 
   useEffect(() => {
@@ -435,37 +416,45 @@ export default function TeamPerformancePage() {
       .finally(() => setLoading(false));
   }, [cycleId]);
 
-  const cycle     = cycles.find(c => c.id === cycleId);
+  function refetchProgress() {
+    if (!cycleId) return;
+    setLoading(true); setError('');
+    getAssessmentProgress(cycleId)
+      .then(res => setData(res.data))
+      .catch(err => setError(err?.response?.data?.error || 'Failed to load progress'))
+      .finally(() => setLoading(false));
+  }
+
+  const cycle = cycles.find(c => c.id === cycleId);
   const employees = data?.employees ?? [];
 
-  // Use cycle's current_stage_id from the API response or fallback to cycle object
-  const currentCycleStageId = data?.current_stage_id ?? cycle?.current_stage_id ?? null;
-  // For lead review permission logic, use employee's stage
-  const empStageId = employees[0]?.current_stage_id ?? currentCycleStageId ?? null;
+  // Stage resolution — prefer API response, fall back to cycle object
+  const currentCycleStageId = data?.current_stage_id ?? data?.current_stage?.id ?? cycle?.current_stage_id ?? employees[0]?.current_stage_id ?? null;
+  const completedStageIds = data?.completed_stage_ids ?? [];
 
-  // Summary stats
-  const pending   = employees.filter(e => leadStatus(e.kras) === 'pending').length;
+  const pending = employees.filter(e => leadStatus(e.kras) === 'pending').length;
   const completed = employees.filter(e => leadStatus(e.kras) === 'completed').length;
-  const pct       = employees.length ? Math.round((completed / employees.length) * 100) : 0;
+  const pct = employees.length ? Math.round((completed / employees.length) * 100) : 0;
 
   const filtered = employees.filter(e =>
     !search || e.full_name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Employee detail view (full-height internal scroll) ────────────────────
   if (selected) {
     return (
       <EmployeeReviewPanel
         emp={selected}
         ratings={ratings}
-        cycleStageId={empStageId}
         currentCycleStageId={currentCycleStageId}
-        onBack={() => setSelected(null)}
+        completedStageIds={completedStageIds}
+        onBack={() => {
+          setSelected(null);
+          refetchProgress(); // this re-triggers the useEffect since loading state resets
+        }}
       />
     );
   }
 
-  // ── Team list view ────────────────────────────────────────────────────────
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
 
@@ -482,15 +471,9 @@ export default function TeamPerformancePage() {
               Team Performance Review
             </Typography>
           </Box>
-
-          {/* Only show cycle selector if there are multiple active cycles (rare edge case) */}
           {cycles.length > 1 && (
-            <Select
-              value={cycleId}
-              onChange={e => setCycleId(e.target.value)}
-              size="small"
-              sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}
-            >
+            <Select value={cycleId} onChange={e => setCycleId(e.target.value)}
+              size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
               {cycles.map(c => (
                 <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>
               ))}
@@ -498,9 +481,7 @@ export default function TeamPerformancePage() {
           )}
         </Stack>
 
-        {/* Cycle stage stepper */}
-        <CycleStageStepper currentStageId={currentCycleStageId} />
-
+        <CycleStageStepper currentStageId={currentCycleStageId} completedStageIds={completedStageIds} />
         <Divider />
       </Box>
 
@@ -514,7 +495,6 @@ export default function TeamPerformancePage() {
           </Box>
         ) : (
           <>
-            {/* Stats row */}
             {employees.length > 0 && (
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
                 <Paper elevation={0} sx={{ flex: 1, border: '1.5px solid #e2e8f0', borderRadius: 3, p: 2.5 }}>
@@ -534,11 +514,11 @@ export default function TeamPerformancePage() {
                     % Reviews Completed
                   </Typography>
                   <Typography sx={{ fontSize: 30, fontWeight: 800, color: BLUE }}>{pct}%</Typography>
-                  <LinearProgress
-                    variant="determinate" value={pct}
-                    sx={{ mt: 1, height: 6, borderRadius: 3, bgcolor: '#e2e8f0',
-                      '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#22c55e' : ACCENT } }}
-                  />
+                  <LinearProgress variant="determinate" value={pct}
+                    sx={{
+                      mt: 1, height: 6, borderRadius: 3, bgcolor: '#e2e8f0',
+                      '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#22c55e' : ACCENT }
+                    }} />
                 </Paper>
 
                 {pending > 0 && (
@@ -559,21 +539,15 @@ export default function TeamPerformancePage() {
               </Stack>
             )}
 
-            {/* Search */}
             <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
               <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
                 Team Members {employees.length > 0 && `(${employees.length})`}
               </Typography>
-              <TextField
-                placeholder="Search team..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                size="small"
-                sx={{ width: 220, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 13, bgcolor: '#fff' } }}
-              />
+              <TextField placeholder="Search team..." value={search}
+                onChange={e => setSearch(e.target.value)} size="small"
+                sx={{ width: 220, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 13, bgcolor: '#fff' } }} />
             </Stack>
 
-            {/* Team table */}
             <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
               {filtered.length === 0 ? (
                 <Box sx={{ p: 5, textAlign: 'center' }}>
@@ -594,12 +568,11 @@ export default function TeamPerformancePage() {
                   </TableHead>
                   <TableBody>
                     {filtered.map((emp, idx) => {
-                      const ss        = selfStatus(emp.kras);
-                      const ls        = leadStatus(emp.kras);
-                      const kraCount  = emp.kras?.length ?? 0;
+                      const ss = selfStatus(emp.kras);
+                      const ls = leadStatus(emp.kras);
+                      const kraCount = emp.kras?.length ?? 0;
                       return (
-                        <TableRow
-                          key={emp.employee_id}
+                        <TableRow key={emp.employee_id}
                           sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafbff', '&:hover': { bgcolor: '#eff6ff' }, cursor: 'pointer' }}
                           onClick={() => setSelected(emp)}
                         >
@@ -615,16 +588,11 @@ export default function TeamPerformancePage() {
                             </Stack>
                           </TableCell>
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
-                            <Typography sx={{ fontSize: 13, color: '#475569' }}>
-                              {emp.title || emp.status || '—'}
-                            </Typography>
+                            <Typography sx={{ fontSize: 13, color: '#475569' }}>{emp.title || emp.status || '—'}</Typography>
                           </TableCell>
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
-                            <Chip
-                              label={kraCount}
-                              size="small"
-                              sx={{ bgcolor: '#f1f5f9', color: BLUE, fontWeight: 700, fontSize: 12, minWidth: 32 }}
-                            />
+                            <Chip label={kraCount} size="small"
+                              sx={{ bgcolor: '#f1f5f9', color: BLUE, fontWeight: 700, fontSize: 12, minWidth: 32 }} />
                           </TableCell>
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
                             <StatusBadge statusKey={ss} />
@@ -638,20 +606,14 @@ export default function TeamPerformancePage() {
                                 <LockIcon sx={{ fontSize: 16, color: '#cbd5e1' }} />
                               </Tooltip>
                             ) : ls === 'completed' ? (
-                              <Box
-                                onClick={e => { e.stopPropagation(); setSelected(emp); }}
-                                sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.6, borderRadius: 1.5, bgcolor: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer', '&:hover': { bgcolor: '#e2e8f0' } }}
-                              >
-                                <VisibilityIcon sx={{ fontSize: 14 }} />
-                                View
+                              <Box onClick={e => { e.stopPropagation(); setSelected(emp); }}
+                                sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.6, borderRadius: 1.5, bgcolor: '#f1f5f9', color: '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer', '&:hover': { bgcolor: '#e2e8f0' } }}>
+                                <VisibilityIcon sx={{ fontSize: 14 }} /> View
                               </Box>
                             ) : (
-                              <Box
-                                onClick={e => { e.stopPropagation(); setSelected(emp); }}
-                                sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.6, borderRadius: 1.5, bgcolor: BLUE, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', '&:hover': { bgcolor: ACCENT } }}
-                              >
-                                <RateReviewIcon sx={{ fontSize: 14 }} />
-                                Review
+                              <Box onClick={e => { e.stopPropagation(); setSelected(emp); }}
+                                sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.6, borderRadius: 1.5, bgcolor: BLUE, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', '&:hover': { bgcolor: ACCENT } }}>
+                                <RateReviewIcon sx={{ fontSize: 14 }} /> Review
                               </Box>
                             )}
                           </TableCell>
