@@ -38,10 +38,10 @@ export default function Sidebar({ onToggle }) {
     // Self Assessment — visible to all authenticated users
     { label: 'Self Assessment',  icon: <SelfImprovementIcon fontSize="small" />, path: ROUTES.ASSESSMENTS_SELF },
     // Reviews — visible only to leads / HR / admin
-    ...(canLeadAssess
-      ? [{ label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, path: ROUTES.TEAM_PERFORMANCE }]
-      : []
-    ),
+    // ...(canLeadAssess
+    //   ? [{ label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, path: ROUTES.TEAM_PERFORMANCE }]
+    //   : []
+    // ),
     { label: 'Reports',          icon: <AssessmentIcon fontSize="small" />,      path: ROUTES.REPORTS },
   ];
 
