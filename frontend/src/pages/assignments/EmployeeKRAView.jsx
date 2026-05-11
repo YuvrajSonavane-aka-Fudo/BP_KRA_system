@@ -275,6 +275,7 @@ export default function EmployeeKRAView({
   const [warnClose, setWarnClose]           = useState(false);
   const [warnBulkDelete, setWarnBulkDelete] = useState(false);
   const [warnDeleteKRA, setWarnDeleteKRA]   = useState(null);
+  const [deleting, setDeleting]             = useState(false); 
 
   /* ── init on open ── */
   useEffect(() => {
@@ -406,14 +407,24 @@ export default function EmployeeKRAView({
   };
 
   const handleBulkDelete = async () => {
-    await onDeleteKRAs?.([...checkedKRAs]);
-    setCheckedKRAs(new Set());
-    setWarnBulkDelete(false);
+    setDeleting(true);
+    try {
+      await onDeleteKRAs?.([...checkedKRAs]);
+      setCheckedKRAs(new Set());
+      setWarnBulkDelete(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleDeleteKRA = async () => {
-    await onDeleteKRAs?.([warnDeleteKRA]);
-    setWarnDeleteKRA(null);
+    setDeleting(true);
+    try {
+      await onDeleteKRAs?.([warnDeleteKRA]);
+      setWarnDeleteKRA(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const isCatOpen = cid => expandedCats[cid] !== false;
@@ -865,6 +876,7 @@ export default function EmployeeKRAView({
         confirmColor="#dc2626"
         onConfirm={handleBulkDelete}
         onCancel={() => setWarnBulkDelete(false)}
+        loading={deleting} 
       />
 
       <WarnDialog
@@ -875,6 +887,7 @@ export default function EmployeeKRAView({
         confirmColor="#dc2626"
         onConfirm={handleDeleteKRA}
         onCancel={() => setWarnDeleteKRA(null)}
+        loading={deleting} 
       />
     </>
   );
