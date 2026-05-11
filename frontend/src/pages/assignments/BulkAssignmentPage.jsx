@@ -133,7 +133,15 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
     if (typeFilter === 'org') list = list.filter(k => k.is_standard === true);
     if (typeFilter === 'project') list = list.filter(k => k.is_standard === false);
     if (levelFilter) list = list.filter(k => (k.levels ?? []).some(l => l.level_name === levelFilter));
-    if (search.trim()) { const q = search.toLowerCase(); list = list.filter(k => k.name.toLowerCase().includes(q) || k.description?.toLowerCase().includes(q)); }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(k =>
+        k.name.toLowerCase().includes(q) ||
+        k.description?.toLowerCase().includes(q) ||
+        k.category_name?.toLowerCase().includes(q) ||   // ← ADD
+        (k.levels ?? []).some(l => l.level_name?.toLowerCase().includes(q))  // ← ADD
+      );
+    }
     const map = {};
     list.forEach(kra => {
       const cid = kra.category_id ?? '__uncategorized__';
@@ -257,22 +265,39 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
 }
 
 // ─── Employee Panel ───────────────────────────────────────────────────────────
-function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isReadOnly, canEdit, onView, onEdit, onDelete, onClone }) {
+function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isReadOnly, onView }) {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState(0);
   const [deptFilter, setDept] = useState('');
   const [levelFilter, setLevel] = useState('');
+  const [sortDir, setSortDir] = useState('asc'); // ← ADD
+
   const depts = useMemo(() => [...new Set(employees.map(e => e.department).filter(Boolean))].sort(), [employees]);
   const levels = useMemo(() => [...new Set(employees.map(e => e.level).filter(Boolean))].sort(), [employees]);
+
   const filtered = useMemo(() => {
     let list = employees;
     if (tab === 1) list = list.filter(e => e.assigned_to_cycle);
     if (tab === 2) list = list.filter(e => !e.assigned_to_cycle);
     if (deptFilter) list = list.filter(e => e.department === deptFilter);
     if (levelFilter) list = list.filter(e => e.level === levelFilter);
-    if (search.trim()) { const q = search.toLowerCase(); list = list.filter(e => e.full_name.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q)); }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(e =>
+        e.full_name.toLowerCase().includes(q) ||
+        e.email?.toLowerCase().includes(q) ||
+        e.department?.toLowerCase().includes(q) ||
+        e.level?.toLowerCase().includes(q) ||
+        String(e.employee_id).includes(q)  // ← global search includes ID
+      );
+    }
+    // Sort by employee_id
+    list = [...list].sort((a, b) =>
+      sortDir === 'asc' ? a.employee_id - b.employee_id : b.employee_id - a.employee_id
+    );
     return list;
-  }, [employees, tab, deptFilter, levelFilter, search]);
+  }, [employees, tab, deptFilter, levelFilter, search, sortDir]);
+
   const assigned = employees.filter(e => e.assigned_to_cycle).length;
   const unassigned = employees.filter(e => !e.assigned_to_cycle).length;
   const allSel = filtered.length > 0 && filtered.every(e => selectedEmployeeIds.includes(e.employee_id));
@@ -281,82 +306,123 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header row */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
         <Stack direction="row" alignItems="center" gap={1}>
           <Typography fontWeight={800} fontSize={13} color="#0f172a">Target Employees</Typography>
-          {selectedEmployeeIds.length > 0 && <Chip label={`${selectedEmployeeIds.length} selected`} size="small" deleteIcon={<ClearIcon sx={{ fontSize: '13px !important' }} />} onDelete={() => onToggleEmployee(selectedEmployeeIds, 'deselect_all')} sx={{ height: 18, fontSize: 9.5, fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e' }} />}
+          {selectedEmployeeIds.length > 0 && (
+            <Chip label={`${selectedEmployeeIds.length} selected`} size="small"
+              deleteIcon={<ClearIcon sx={{ fontSize: '13px !important' }} />}
+              onDelete={() => onToggleEmployee(selectedEmployeeIds, 'deselect_all')}
+              sx={{ height: 18, fontSize: 9.5, fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e' }} />
+          )}
         </Stack>
         <Stack direction="row" gap={0.5}>
           {[{ l: 'All', c: employees.length, v: 0 }, { l: 'Assigned', c: assigned, v: 1 }, { l: 'Unassigned', c: unassigned, v: 2 }].map(t => (
-            <Chip key={t.v} label={`${t.l} ${t.c}`} size="small" onClick={() => setTab(t.v)} sx={{ height: 22, fontSize: 10, fontWeight: 700, cursor: 'pointer', borderRadius: 1.5, bgcolor: tab === t.v ? '#1E3A8A' : '#f1f5f9', color: tab === t.v ? '#fff' : '#64748b', '&:hover': { bgcolor: tab === t.v ? '#1e40af' : '#e2e8f0' } }} />
+            <Chip key={t.v} label={`${t.l} ${t.c}`} size="small" onClick={() => setTab(t.v)}
+              sx={{ height: 22, fontSize: 10, fontWeight: 700, cursor: 'pointer', borderRadius: 1.5, bgcolor: tab === t.v ? '#1E3A8A' : '#f1f5f9', color: tab === t.v ? '#fff' : '#64748b' }} />
           ))}
         </Stack>
       </Stack>
 
-      <Stack direction="row" gap={1} mb={1}>
-        <TextField size="small" placeholder="Search by name or email…" value={search} onChange={e => setSearch(e.target.value)}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: '#94a3b8' }} /></InputAdornment>, endAdornment: search ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearch('')}><ClearIcon sx={{ fontSize: 13 }} /></IconButton></InputAdornment> : null }}
-          sx={{ flex: 1, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36, bgcolor: '#f8fafc' } }} />
-        <Tooltip title="Filters">
-          <Badge badgeContent={hasFilters ? (!!deptFilter + !!levelFilter) : 0} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 8, height: 14, minWidth: 14 } }}>
-            <IconButton size="small" sx={{ border: `1px solid ${hasFilters ? '#93c5fd' : '#e2e8f0'}`, borderRadius: 1.5, bgcolor: hasFilters ? '#eff6ff' : 'transparent', width: 36, height: 36, color: hasFilters ? '#1d4ed8' : '#64748b' }}><FilterListIcon sx={{ fontSize: 16 }} /></IconButton>
-          </Badge>
-        </Tooltip>
-      </Stack>
+      {/* Search */}
+      <TextField size="small" placeholder="Search anything…" value={search} onChange={e => setSearch(e.target.value)}
+        InputProps={{
+          startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: '#94a3b8' }} /></InputAdornment>,
+          endAdornment: search ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearch('')}><ClearIcon sx={{ fontSize: 13 }} /></IconButton></InputAdornment> : null,
+        }}
+        sx={{ mb: 1, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36, bgcolor: '#f8fafc' } }} />
 
+      {/* Filters row */}
       <Stack direction="row" gap={1} mb={1.5}>
-        {[{ val: deptFilter, set: setDept, items: depts, placeholder: 'All Departments' }, { val: levelFilter, set: setLevel, items: levels, placeholder: 'All Levels' }].map((f, i) => (
-          <FormControl key={i} size="small" sx={{ flex: 1 }}>
-            <Select value={f.val} onChange={e => f.set(e.target.value)} displayEmpty sx={{ fontSize: 10.5, height: 30, borderRadius: 1.5, bgcolor: f.val ? '#eff6ff' : '#f8fafc', color: f.val ? '#1d4ed8' : undefined, '& .MuiOutlinedInput-notchedOutline': { borderColor: f.val ? '#93c5fd' : '#e2e8f0' } }}>
-              <MenuItem value="" sx={{ fontSize: 10.5 }}>{f.placeholder}</MenuItem>
-              {f.items.map(v => <MenuItem key={v} value={v} sx={{ fontSize: 10.5 }}>{v}</MenuItem>)}
-            </Select>
-          </FormControl>
-        ))}
-        {hasFilters && <Button size="small" onClick={() => { setDept(''); setLevel(''); }} sx={{ fontSize: 10, color: '#64748b', minWidth: 0, px: 1, height: 30, flexShrink: 0 }}>Clear</Button>}
+        <FormControl size="small" sx={{ flex: 1 }}>
+          <Select value={deptFilter} onChange={e => setDept(e.target.value)} displayEmpty
+            sx={{ fontSize: 10.5, height: 30, borderRadius: 1.5, bgcolor: deptFilter ? '#eff6ff' : '#f8fafc' }}>
+            <MenuItem value="" sx={{ fontSize: 10.5 }}>All Departments</MenuItem>
+            {depts.map(v => <MenuItem key={v} value={v} sx={{ fontSize: 10.5 }}>{v}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ flex: 1 }}>
+          <Select value={levelFilter} onChange={e => setLevel(e.target.value)} displayEmpty
+            sx={{ fontSize: 10.5, height: 30, borderRadius: 1.5, bgcolor: levelFilter ? '#eff6ff' : '#f8fafc' }}>
+            <MenuItem value="" sx={{ fontSize: 10.5 }}>All Levels</MenuItem>
+            {levels.map(v => <MenuItem key={v} value={v} sx={{ fontSize: 10.5 }}>{v}</MenuItem>)}
+          </Select>
+        </FormControl>
+        {/* Sort toggle */}
+        <Tooltip title={`Sort ID: ${sortDir === 'asc' ? 'Ascending' : 'Descending'}`}>
+          <IconButton size="small" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            sx={{ border: '1px solid #e2e8f0', borderRadius: 1.5, width: 30, height: 30, color: '#64748b', flexShrink: 0,
+              '&:hover': { color: '#1E3A8A', borderColor: '#bfdbfe', bgcolor: '#eff6ff' } }}>
+            {sortDir === 'asc' ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ExpandLessIcon sx={{ fontSize: 16 }} />}
+          </IconButton>
+        </Tooltip>
+        {hasFilters && (
+          <Button size="small" onClick={() => { setDept(''); setLevel(''); }}
+            sx={{ fontSize: 10, color: '#64748b', minWidth: 0, px: 1, height: 30, flexShrink: 0 }}>Clear</Button>
+        )}
       </Stack>
 
+      {/* Table header */}
       <Box sx={{ display: 'flex', alignItems: 'center', px: 1, pb: 0.75, mb: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-        <Checkbox size="small" disabled={isReadOnly} indeterminate={someSel && !allSel} checked={allSel && filtered.length > 0} onChange={() => !isReadOnly && onToggleEmployee(filtered.map(e => e.employee_id), allSel ? 'deselect_all' : 'select_all')} sx={{ p: 0.5 }} />
-        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.06em" ml={1} flex={1}>Employee</Typography>
-        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.06em" sx={{ width: 130, mr: 1 }}>Role / Level</Typography>
-        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.06em" sx={{ width: 60, textAlign: 'center' }}>Actions</Typography>
+        <Checkbox size="small" disabled={isReadOnly}
+          indeterminate={someSel && !allSel} checked={allSel && filtered.length > 0}
+          onChange={() => !isReadOnly && onToggleEmployee(filtered.map(e => e.employee_id), allSel ? 'deselect_all' : 'select_all')}
+          sx={{ p: 0.5 }} />
+        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.06em" sx={{ width: 40, ml: 0.5 }}>ID</Typography>
+        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.06em" flex={1} ml={1}>Employee</Typography>
+        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.06em" sx={{ width: 130 }}>Role / Level</Typography>
       </Box>
 
+      {/* Table rows */}
       <Box sx={{ flex: 1, overflow: 'auto', '&::-webkit-scrollbar': { width: 3 }, '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 4 } }}>
         {filtered.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 6 }}>
-            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}><PersonIcon sx={{ fontSize: 24, color: '#cbd5e1' }} /></Box>
+            <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
+              <PersonIcon sx={{ fontSize: 24, color: '#cbd5e1' }} />
+            </Box>
             <Typography fontSize={13} fontWeight={600} color="#94a3b8">No employees found</Typography>
           </Box>
         ) : filtered.map(emp => {
           const isSel = selectedEmployeeIds.includes(emp.employee_id);
           const isAssigned = emp.assigned_to_cycle;
           return (
-            <Box key={emp.employee_id} sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.85, borderRadius: 1.5, mb: 0.35, bgcolor: isSel ? '#eff6ff' : 'transparent', border: `1px solid ${isSel ? '#93c5fd' : 'transparent'}`, '&:hover': { bgcolor: isSel ? '#eff6ff' : '#f8fafc' }, transition: 'all 0.1s' }}>
-              <Checkbox size="small" checked={isSel} disabled={isReadOnly} onChange={() => !isReadOnly && onToggleEmployee([emp.employee_id], isSel ? 'deselect' : 'select')} sx={{ p: 0.5, flexShrink: 0 }} />
-              <Stack direction="row" alignItems="center" gap={1.25} flex={1} minWidth={0} ml={0.5} onClick={() => isAssigned && onView(emp)} sx={{ cursor: isAssigned ? 'pointer' : 'default' }}>
+            <Box key={emp.employee_id} sx={{
+              display: 'flex', alignItems: 'center', px: 1, py: 0.85, borderRadius: 1.5, mb: 0.35,
+              bgcolor: isSel ? '#eff6ff' : 'transparent',
+              border: `1px solid ${isSel ? '#93c5fd' : 'transparent'}`,
+              '&:hover': { bgcolor: isSel ? '#eff6ff' : '#f8fafc' }, transition: 'all 0.1s',
+            }}>
+              <Checkbox size="small" checked={isSel} disabled={isReadOnly}
+                onChange={() => !isReadOnly && onToggleEmployee([emp.employee_id], isSel ? 'deselect' : 'select')}
+                sx={{ p: 0.5, flexShrink: 0 }} />
+              {/* ID */}
+              <Typography fontSize={10.5} fontWeight={600} color="#94a3b8" sx={{ width: 40, ml: 0.5, flexShrink: 0 }}>
+                {emp.employee_id}
+              </Typography>
+              {/* Employee info */}
+              <Stack direction="row" alignItems="center" gap={1.25} flex={1} minWidth={0} ml={1}
+                onClick={() => isAssigned && onView(emp)} sx={{ cursor: isAssigned ? 'pointer' : 'default' }}>
                 <Box minWidth={0}>
                   <Stack direction="row" alignItems="center" gap={0.5}>
-                    <Typography fontSize={12.5} fontWeight={600} color={isAssigned ? '#1d4ed8' : '#1e293b'} noWrap sx={{ '&:hover': { textDecoration: isAssigned ? 'underline' : 'none' } }}>{emp.full_name}</Typography>
-                    {isAssigned && <Tooltip title="KRAs assigned — click to view"><CheckCircleIcon sx={{ fontSize: 12, color: '#16a34a', flexShrink: 0 }} /></Tooltip>}
+                    <Typography fontSize={12.5} fontWeight={600} color={isAssigned ? '#1d4ed8' : '#1e293b'} noWrap
+                      sx={{ '&:hover': { textDecoration: isAssigned ? 'underline' : 'none' } }}>
+                      {emp.full_name}
+                    </Typography>
+                    {isAssigned && (
+                      <Tooltip title="KRAs assigned — click to view">
+                        <CheckCircleIcon sx={{ fontSize: 12, color: '#16a34a', flexShrink: 0 }} />
+                      </Tooltip>
+                    )}
                   </Stack>
                   <Typography fontSize={10} color="#94a3b8" noWrap>{emp.email}</Typography>
                 </Box>
               </Stack>
-              <Box sx={{ width: 130, mr: 1, flexShrink: 0 }}>
+              {/* Role/Level */}
+              <Box sx={{ width: 130, flexShrink: 0 }}>
                 <Typography fontSize={11} color="#374151" noWrap fontWeight={500}>{emp.title || '—'}</Typography>
                 <Typography fontSize={10} color="#94a3b8" noWrap>{[emp.department, emp.level].filter(Boolean).join(' · ')}</Typography>
               </Box>
-              <Stack direction="row" gap={0} sx={{ width: 60, justifyContent: 'center', flexShrink: 0 }}>
-                {isAssigned && (
-                  <>
-                    {canEdit && <Tooltip title="Edit assignment"><IconButton size="small" onClick={() => onEdit(emp)} sx={{ color: '#cbd5e1', '&:hover': { color: '#1E3A8A', bgcolor: '#eff6ff' }, borderRadius: 1 }}><EditIcon sx={{ fontSize: 13 }} /></IconButton></Tooltip>}
-                    <Tooltip title="Copy KRAs to others"><IconButton size="small" onClick={() => onClone(emp)} sx={{ color: '#cbd5e1', '&:hover': { color: '#7c3aed', bgcolor: '#f5f3ff' }, borderRadius: 1 }}><ContentCopyIcon sx={{ fontSize: 13 }} /></IconButton></Tooltip>
-                    {canEdit && <Tooltip title="Remove from cycle"><IconButton size="small" onClick={() => onDelete(emp)} sx={{ color: '#cbd5e1', '&:hover': { color: '#ef4444', bgcolor: '#fef2f2' }, borderRadius: 1 }}><DeleteOutlineIcon sx={{ fontSize: 13 }} /></IconButton></Tooltip>}
-                  </>
-                )}
-              </Stack>
             </Box>
           );
         })}
@@ -1089,7 +1155,7 @@ export default function BulkAssignmentPage() {
             onSaveWeightages={(weightagesMap) => handleSaveWeightages(freshEmployee, weightagesMap)}  // ✅ add this
           />
         );
-      })()}
+      })()} 
 
       <ToastStack toasts={toasts} />
     </Box>
