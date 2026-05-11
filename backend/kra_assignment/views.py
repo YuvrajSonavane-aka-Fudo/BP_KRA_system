@@ -553,11 +553,11 @@ class KRAAssignmentUpdateDeleteView(APIView):
         if not _caller_can_act_on(caller, ekc.employee_id):
             return Response("Forbidden", status=status.HTTP_403_FORBIDDEN)
 
-        if ekc.stage_id != 1:
-            return Response(
-                "Assignments cannot be modified after Stage 1",
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # if ekc.stage_id != 1:
+        #     return Response(
+        #         "Assignments cannot be modified after Stage 1",
+        #         status=status.HTTP_400_BAD_REQUEST,
+        #     )
 
         try:
             total_weight = sum(int(c.get("weightage", 0)) for c in categories)
@@ -632,10 +632,10 @@ class KRAAssignmentUpdateDeleteView(APIView):
         if not _caller_can_act_on(caller, ekc.employee_id):
             return Response("Forbidden", status=status.HTTP_403_FORBIDDEN)
 
-        if ekc.stage_id != 1:
-            return Response(
-                "Cannot remove after Stage 1", status=status.HTTP_400_BAD_REQUEST
-            )
+        # if ekc.stage_id != 1:
+        #     return Response(
+        #         "Cannot remove after Stage 1", status=status.HTTP_400_BAD_REQUEST
+        #     )
 
         old_data = {
             "employee_id": ekc.employee_id,
@@ -880,3 +880,4 @@ class KRAAssignmentCloneView(APIView):
             },
             status=http_status,
         )
+    
