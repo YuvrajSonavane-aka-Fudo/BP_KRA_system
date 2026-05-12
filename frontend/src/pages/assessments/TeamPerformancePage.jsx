@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box, Typography, Paper, Stack, Chip, TextField, MenuItem, Select,
   CircularProgress, Alert, Divider, Avatar, LinearProgress,
   Table, TableBody, TableCell, TableHead, TableRow, Tooltip, IconButton,
+  InputAdornment,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingIcon from '@mui/icons-material/Pending';
@@ -13,6 +14,8 @@ import RateReviewIcon from '@mui/icons-material/RateReview';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SaveIcon from '@mui/icons-material/Save';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import SearchIcon from '@mui/icons-material/Search';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { getCycles } from '../../api/cyclesApi';
 import { getReferenceData } from '../../api/referenceDataApi';
 import { getAssessmentProgress, submitLeadReview } from '../../api/assessmentsApi';
@@ -22,11 +25,22 @@ const NAVY = '#0f1b4c';
 const BLUE = '#1E3A8A';
 const ACCENT = '#3b82f6';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function initials(name = '') {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 }
-
+function handleKraUpdated(employeeId, employeeKraLevelId, payload) {
+  setData(prev => ({
+    ...prev,
+    employees: prev.employees.map(e =>
+      e.employee_id !== employeeId ? e : {
+        ...e,
+        kras: e.kras.map(k =>
+          k.employee_kra_level_id === employeeKraLevelId ? { ...k, ...payload } : k
+        ),
+      }
+    ),
+  }));
+}
 function selfStatus(kras) {
   if (!kras?.length) return 'locked';
   const rated = kras.filter(k => k.self_rating_id).length;
@@ -61,11 +75,10 @@ function StatusBadge({ statusKey }) {
   );
 }
 
-// ── Stage stepper — rollback-safe ─────────────────────────────────────────────
+// ── Stage stepper ─────────────────────────────────────────────────────────────
 function CycleStageStepper({ currentStageId, completedStageIds }) {
   if (!currentStageId) return null;
   const states = getStageStates(currentStageId, completedStageIds);
-
   return (
     <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, px: 3, py: 2, mb: 3 }}>
       <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1.5 }}>
@@ -80,18 +93,14 @@ function CycleStageStepper({ currentStageId, completedStageIds }) {
                 <Box sx={{
                   width: 34, height: 34, borderRadius: '50%',
                   bgcolor: stage.isCurrent ? BLUE : stage.isDone ? '#22c55e' : '#e2e8f0',
-                  border: stage.isCurrent
-                    ? `3px solid ${ACCENT}`
-                    : stage.isDone ? '3px solid #22c55e' : '3px solid #e2e8f0',
+                  border: stage.isCurrent ? `3px solid ${ACCENT}` : stage.isDone ? '3px solid #22c55e' : '3px solid #e2e8f0',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: stage.isCurrent ? `0 0 0 3px rgba(59,130,246,0.2)` : 'none',
                   transition: 'all 0.2s',
                 }}>
                   {stage.isDone
                     ? <CheckCircleIcon sx={{ fontSize: 18, color: '#fff' }} />
-                    : <Typography sx={{ fontSize: 11, fontWeight: 800, color: stage.isCurrent ? '#fff' : '#94a3b8' }}>
-                      {stage.id}
-                    </Typography>
+                    : <Typography sx={{ fontSize: 11, fontWeight: 800, color: stage.isCurrent ? '#fff' : '#94a3b8' }}>{stage.id}</Typography>
                   }
                 </Box>
                 <Typography sx={{
@@ -99,16 +108,10 @@ function CycleStageStepper({ currentStageId, completedStageIds }) {
                   textAlign: 'center', lineHeight: 1.3, maxWidth: 76,
                   color: stage.isCurrent ? BLUE : stage.isDone ? '#22c55e' : '#94a3b8',
                   textTransform: 'uppercase', letterSpacing: '0.04em',
-                }}>
-                  {stage.name}
-                </Typography>
+                }}>{stage.name}</Typography>
               </Stack>
               {!isLast && (
-                <Box sx={{
-                  flex: 1, height: 2, mt: '16px',
-                  bgcolor: stage.isDone ? '#22c55e' : '#e2e8f0',
-                  transition: 'background-color 0.3s',
-                }} />
+                <Box sx={{ flex: 1, height: 2, mt: '16px', bgcolor: stage.isDone ? '#22c55e' : '#e2e8f0', transition: 'background-color 0.3s' }} />
               )}
             </React.Fragment>
           );
@@ -118,20 +121,17 @@ function CycleStageStepper({ currentStageId, completedStageIds }) {
   );
 }
 
-// ── KRA review card ───────────────────────────────────────────────────────────
-function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, savedId }) {
+// ── KRA review row ────────────────────────────────────────────────────────────
+function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, savedId, kraRef }) {
   const [leadRatingId, setLeadRatingId] = useState(row.lead_rating_id ?? '');
   const [leadComment, setLeadComment] = useState(row.lead_comment ?? '');
   const [leadProgressNotes, setLeadProgressNotes] = useState(row.lead_progress_notes ?? '');
   const [dirty, setDirty] = useState(false);
   const isSaving = saving && savedId === row.employee_kra_level_id;
 
-  // Reset dirty if editable changes (stage rolled back mid-session)
   React.useEffect(() => { setDirty(false); }, [editable]);
 
-  function change(setter) {
-    return v => { setter(v); setDirty(true); };
-  }
+  function change(setter) { return v => { setter(v); setDirty(true); }; }
 
   function handleSave() {
     onSave(row.employee_kra_level_id, {
@@ -143,9 +143,9 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
   }
 
   return (
-    <Paper elevation={0} sx={{
+    <Paper ref={kraRef} elevation={0} sx={{
       border: row.lead_rating_id ? '1.5px solid #bbf7d0' : '1.5px solid #e2e8f0',
-      borderRadius: 2.5, overflow: 'hidden', mb: 2,
+      borderRadius: 2.5, overflow: 'hidden', mb: 2, scrollMarginTop: '16px',
     }}>
       {/* KRA name bar */}
       <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#fafbff', borderBottom: '1px solid #f1f5f9' }}>
@@ -200,9 +200,7 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
               )}
             </Stack>
           ) : (
-            <Typography sx={{ fontSize: 13, color: '#cbd5e1', fontStyle: 'italic' }}>
-              Not yet submitted
-            </Typography>
+            <Typography sx={{ fontSize: 13, color: '#cbd5e1', fontStyle: 'italic' }}>Not yet submitted</Typography>
           )}
         </Box>
 
@@ -211,9 +209,7 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 1.5 }}>
             Lead Evaluation
           </Typography>
-
           {!editable ? (
-            // Clear, contextual message — not just a lock icon
             <Stack direction="row" alignItems="flex-start" spacing={1}>
               <LockIcon sx={{ fontSize: 15, color: '#cbd5e1', mt: 0.2 }} />
               <Typography sx={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
@@ -227,16 +223,12 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
                 sx={{
                   fontSize: 13, borderRadius: 2,
                   '& .MuiOutlinedInput-notchedOutline': { borderColor: leadRatingId ? '#22c55e' : '#e2e8f0' }
-                }}
-              >
+                }}>
                 <MenuItem value="" disabled sx={{ fontSize: 13, color: '#94a3b8' }}>Select Rating</MenuItem>
                 {ratings.map(r => (
-                  <MenuItem key={r.id} value={r.id} sx={{ fontSize: 13 }}>
-                    {r.rating} – {r.description}
-                  </MenuItem>
+                  <MenuItem key={r.id} value={r.id} sx={{ fontSize: 13 }}>{r.rating} – {r.description}</MenuItem>
                 ))}
               </Select>
-
               <TextField multiline minRows={3} fullWidth size="small"
                 placeholder="Enter mandatory evaluation comments..."
                 value={leadComment} onChange={e => change(setLeadComment)(e.target.value)}
@@ -248,7 +240,6 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
                   }
                 }}
               />
-
               <TextField multiline minRows={2} fullWidth size="small"
                 placeholder="Optional: notes on progress, coaching points..."
                 value={leadProgressNotes} onChange={e => change(setLeadProgressNotes)(e.target.value)}
@@ -260,7 +251,6 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
                   }
                 }}
               />
-
               <Stack direction="row" justifyContent="flex-end">
                 <Box onClick={dirty ? handleSave : undefined} sx={{
                   display: 'inline-flex', alignItems: 'center', gap: 0.8,
@@ -283,36 +273,54 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
 }
 
 // ── Employee review panel ─────────────────────────────────────────────────────
-function EmployeeReviewPanel({ emp, ratings, currentCycleStageId, completedStageIds, onBack }) {
+function EmployeeReviewPanel({ emp, allEmployees, ratings, currentCycleStageId, completedStageIds, onBack, onSwitchEmployee, onKraUpdated }) {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState(null);
   const [toast, setToast] = useState({ msg: '', severity: 'success' });
   const [localKras, setLocalKras] = useState(emp.kras ?? []);
+  const [kraSearch, setKraSearch] = useState('');
+
+  // Ref map for jump-to
+  const kraRefs = useRef({});
+
+  // When employee switches, reset local state
+  useEffect(() => {
+    setLocalKras(emp.kras ?? []);
+    setKraSearch('');
+  }, [emp.employee_id]);
 
   async function handleSave(employeeKraLevelId, payload) {
-    setSaving(true);
-    setSavedId(employeeKraLevelId);
+    setSaving(true); setSavedId(employeeKraLevelId);
     try {
       await submitLeadReview(employeeKraLevelId, payload);
-      setLocalKras(prev =>
-        prev.map(k => k.employee_kra_level_id === employeeKraLevelId ? { ...k, ...payload } : k)
-      );
+      setLocalKras(prev => prev.map(k => k.employee_kra_level_id === employeeKraLevelId ? { ...k, ...payload } : k));
+      onKraUpdated(emp.employee_id, employeeKraLevelId, payload);
       setToast({ msg: 'Review saved', severity: 'success' });
     } catch (err) {
       setToast({ msg: err?.response?.data?.error || 'Save failed', severity: 'error' });
     } finally {
-      setSaving(false);
-      setSavedId(null);
+      setSaving(false); setSavedId(null);
       setTimeout(() => setToast({ msg: '', severity: 'success' }), 3000);
     }
+  }
+
+  function handleJumpTo(employeeKraLevelId) {
+    setKraSearch('');
+    setTimeout(() => {
+      const el = kraRefs.current[employeeKraLevelId];
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   }
 
   const reviewed = localKras.filter(k => k.lead_rating_id).length;
   const pct = localKras.length ? Math.round((reviewed / localKras.length) * 100) : 0;
 
-  // Gate from stageUtils — single source of truth
   const editable = canLeadReview(currentCycleStageId);
   const lockReason = getStageLockReason(currentCycleStageId, 'lead');
+
+  const filteredKras = kraSearch
+    ? localKras.filter(k => k.kra_name?.toLowerCase().includes(kraSearch.toLowerCase()))
+    : localKras;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
@@ -320,19 +328,54 @@ function EmployeeReviewPanel({ emp, ratings, currentCycleStageId, completedStage
       {/* Fixed header */}
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 2, flexShrink: 0, bgcolor: '#f5f6fa' }}>
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+          {/* Back button */}
           <IconButton onClick={onBack} size="small" sx={{ bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#e2e8f0' } }}>
             <ArrowBackIcon fontSize="small" />
           </IconButton>
+
           <Avatar sx={{ width: 42, height: 42, bgcolor: BLUE, fontSize: 15, fontWeight: 800 }}>
             {initials(emp.full_name)}
           </Avatar>
-          <Box sx={{ flex: 1 }}>
+
+          {/* Employee name + dropdown switcher */}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>{emp.full_name}</Typography>
-            <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>
-              {emp.title || emp.status || '—'}
-            </Typography>
+            <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>{emp.title || '—'}</Typography>
           </Box>
-          <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, px: 2, py: 1, minWidth: 140 }}>
+
+          {/* Employee switcher dropdown — jump directly to another employee */}
+          <Select
+            value={emp.employee_id}
+            onChange={e => {
+              const next = allEmployees.find(a => a.employee_id === e.target.value);
+              if (next) onSwitchEmployee(next);
+            }}
+            size="small"
+            IconComponent={KeyboardArrowDownIcon}
+            sx={{
+              minWidth: 200, maxWidth: 260, fontSize: 13, borderRadius: 2, bgcolor: '#fff',
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e2e8f0' },
+            }}
+          >
+            {allEmployees.map(e => (
+              <MenuItem key={e.employee_id} value={e.employee_id} sx={{ fontSize: 13 }}>
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Avatar sx={{ width: 22, height: 22, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>
+                    {initials(e.full_name)}
+                  </Avatar>
+                  <Box>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{e.full_name}</Typography>
+                    <Typography sx={{ fontSize: 10, color: '#94a3b8' }}>
+                      {leadStatus(e.kras) === 'completed' ? '✓ Reviewed' : `${e.kras?.filter(k => k.lead_rating_id).length ?? 0}/${e.kras?.length ?? 0} rated`}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </MenuItem>
+            ))}
+          </Select>
+
+          {/* KRAs reviewed counter */}
+          <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, px: 2, py: 1, minWidth: 130, flexShrink: 0 }}>
             <Typography sx={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, mb: 0.3 }}>KRAs Reviewed</Typography>
             <Stack direction="row" alignItems="baseline" spacing={0.5}>
               <Typography sx={{ fontSize: 20, fontWeight: 800, color: BLUE }}>{reviewed}</Typography>
@@ -352,36 +395,45 @@ function EmployeeReviewPanel({ emp, ratings, currentCycleStageId, completedStage
 
       {/* Scrollable KRA list */}
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
-
-        {/* Stage-lock banner */}
         {!editable && lockReason && (
           <Alert severity="warning" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
             {lockReason} KRA data is shown in read-only mode.
           </Alert>
         )}
+        {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
 
-        {toast.msg && (
-          <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>
+        {/* KRA search bar */}
+        {localKras.length > 0 && (
+          <TextField size="small" fullWidth
+            placeholder={`Search ${localKras.length} KRAs…`}
+            value={kraSearch}
+            onChange={e => setKraSearch(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#94a3b8' }} /></InputAdornment> }}
+            sx={{ mb: 2, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 13, bgcolor: '#fff' } }}
+          />
         )}
 
         {localKras.length === 0 ? (
           <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, p: 5, textAlign: 'center' }}>
             <Typography sx={{ color: '#94a3b8' }}>No KRAs assigned to this employee.</Typography>
           </Paper>
-        ) : (
-          localKras.map(row => (
-            <KRAReviewRow
-              key={row.employee_kra_level_id}
-              row={row}
-              ratings={ratings}
-              editable={editable}
-              lockReason={lockReason}
-              onSave={handleSave}
-              saving={saving}
-              savedId={savedId}
-            />
-          ))
-        )}
+        ) : filteredKras.length === 0 ? (
+          <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, p: 4, textAlign: 'center' }}>
+            <Typography sx={{ color: '#94a3b8', fontSize: 14 }}>No KRAs match "{kraSearch}"</Typography>
+          </Paper>
+        ) : filteredKras.map(row => (
+          <KRAReviewRow
+            key={row.employee_kra_level_id}
+            row={row}
+            ratings={ratings}
+            editable={editable}
+            lockReason={lockReason}
+            onSave={handleSave}
+            saving={saving}
+            savedId={savedId}
+            kraRef={el => { kraRefs.current[row.employee_kra_level_id] = el; }}
+          />
+        ))}
       </Box>
     </Box>
   );
@@ -428,7 +480,6 @@ export default function TeamPerformancePage() {
   const cycle = cycles.find(c => c.id === cycleId);
   const employees = data?.employees ?? [];
 
-  // Stage resolution — prefer API response, fall back to cycle object
   const currentCycleStageId = data?.current_stage_id ?? data?.current_stage?.id ?? cycle?.current_stage_id ?? employees[0]?.current_stage_id ?? null;
   const completedStageIds = data?.completed_stage_ids ?? [];
 
@@ -444,13 +495,13 @@ export default function TeamPerformancePage() {
     return (
       <EmployeeReviewPanel
         emp={selected}
+        allEmployees={employees}
         ratings={ratings}
         currentCycleStageId={currentCycleStageId}
         completedStageIds={completedStageIds}
-        onBack={() => {
-          setSelected(null);
-          refetchProgress(); // this re-triggers the useEffect since loading state resets
-        }}
+        onBack={() => { setSelected(null); refetchProgress(); }}
+        onSwitchEmployee={emp => setSelected(emp)}
+        onKraUpdated={handleKraUpdated}
       />
     );
   }
@@ -467,9 +518,7 @@ export default function TeamPerformancePage() {
                 {cycle.name}
               </Typography>
             )}
-            <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#1e293b' }}>
-              Team Performance Review
-            </Typography>
+            <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#1e293b' }}>Team Performance Review</Typography>
           </Box>
           {cycles.length > 1 && (
             <Select value={cycleId} onChange={e => setCycleId(e.target.value)}
@@ -545,6 +594,7 @@ export default function TeamPerformancePage() {
               </Typography>
               <TextField placeholder="Search team..." value={search}
                 onChange={e => setSearch(e.target.value)} size="small"
+                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#94a3b8' }} /></InputAdornment> }}
                 sx={{ width: 220, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 13, bgcolor: '#fff' } }} />
             </Stack>
 

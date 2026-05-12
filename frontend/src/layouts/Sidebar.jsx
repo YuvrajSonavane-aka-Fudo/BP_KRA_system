@@ -36,8 +36,8 @@ export default function Sidebar({ onToggle }) {
     { label: 'KRAs Library',     icon: <LibraryBooksIcon fontSize="small" />,    path: ROUTES.KRA_LIBRARY },
     { label: 'KRA Assignment',   icon: <GroupsIcon fontSize="small" />,          path: ROUTES.ASSIGNMENTS },
     // Self Assessment — visible to all authenticated users
-    { label: 'Self Assessment',  icon: <SelfImprovementIcon fontSize="small" />, path: ROUTES.ASSESSMENTS_SELF },
-    // Reviews — visible only to leads / HR / admin
+    { label: 'KRA Assessment',  icon: <SelfImprovementIcon fontSize="small" />, path: ROUTES.ASSESSMENTS_SELF },
+    //Reviews — visible only to leads / HR / admin
     // ...(canLeadAssess
     //   ? [{ label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, path: ROUTES.TEAM_PERFORMANCE }]
     //   : []
