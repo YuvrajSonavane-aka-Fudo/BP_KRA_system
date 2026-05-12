@@ -74,79 +74,95 @@ class AssessmentProgressView(APIView):
 
         ekc_qs = EmployeeKRACycle.objects.filter(
             kra_cycle_id=cycle_id
-        ).select_related('employee', 'stage')
+        ).select_related(
+            'employee',
+            'employee__manager',       # ← for manager_name
+            'employee__department',    # ← for department
+            'employee__level',         # ← for level
+            'stage',
+        )
 
         if not _is_hr(caller):
             ekc_qs = ekc_qs.filter(employee__manager_id=caller.id)
 
-        # if employee_id_filter:
-        #     ekc_qs = ekc_qs.filter(employee_id=employee_id_filter)
-        #     if not ekc_qs.exists():
-        #         return Response(
-        #             'You do not have access to this employee',
-        #             status=status.HTTP_403_FORBIDDEN,
-        #         )
         if employee_id_filter:
             ekc_qs = ekc_qs.filter(employee_id=employee_id_filter)
-
             if not ekc_qs.exists():
                 return Response(
                     'Employee not found in this cycle',
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+        # Pre-fetch category weightages for all ekc ids in one query
+        ekc_ids = [ekc.id for ekc in ekc_qs]
+        category_map = {}  # ekc_id → { category_id: weightage }
+        for cat in EmployeeKRACycleCategory.objects.filter(
+            employee_kra_cycle_id__in=ekc_ids
+        ).select_related('category'):
+            category_map.setdefault(cat.employee_kra_cycle_id, {})[cat.category_id] = {
+                'name':      cat.category.name if cat.category else None,
+                'weightage': cat.weightage,
+            }
+
         employees = []
         for ekc in ekc_qs:
+            cats = category_map.get(ekc.id, {})
+
             kra_rows = ekc.kra_level_rows.select_related(
                 'kra_level',
+                'kra_level__category',  # ← for category_name per KRA
                 'self_rating',
                 'lead_rating',
             )
 
             kras = [
                 {
-                    'employee_kra_level_id': r.id,
-                    'kra_level_id': r.kra_level_id,
-                    'kra_name': getattr(r.kra_level, 'name', None),
-                    'self_rating_id': r.self_rating_id,
-                    'self_rating': r.self_rating.rating if r.self_rating else None,
-                    'self_comment': r.self_comment,
-                    'lead_rating_id': r.lead_rating_id,
-                    'lead_rating': r.lead_rating.rating if r.lead_rating else None,
-                    'lead_comment': r.lead_comment,
-                    'progress_notes': r.progress_notes,
-                    'lead_progress_notes': r.lead_progress_notes,
-                    'description_by_lead': r.description_by_lead,
+                    'employee_kra_level_id':      r.id,
+                    'kra_level_id':               r.kra_level_id,
+                    'kra_name':                   getattr(r.kra_level, 'name', None),
+                    'category_name':              getattr(r.kra_level.category, 'name', None) if r.kra_level else None,
+                    'weightage':                  cats.get(r.kra_level.category_id, {}).get('weightage') if r.kra_level else None,
+                    'self_rating_id':             r.self_rating_id,
+                    'self_rating':                r.self_rating.rating if r.self_rating else None,
+                    'self_comment':               r.self_comment,
+                    'lead_rating_id':             r.lead_rating_id,
+                    'lead_rating':                r.lead_rating.rating if r.lead_rating else None,
+                    'lead_comment':               r.lead_comment,
+                    'progress_notes':             r.progress_notes,
+                    'lead_progress_notes':        r.lead_progress_notes,
+                    'description_by_lead':        r.description_by_lead,
                     'help_and_assistance_required': r.help_and_assistance_required,
                 }
                 for r in kra_rows
             ]
 
+            emp = ekc.employee
             employees.append({
-                'employee_id': ekc.employee_id,
-                'full_name': f'{ekc.employee.first_name} {ekc.employee.last_name}',
+                'employee_id':           ekc.employee_id,
+                'full_name':             f'{emp.first_name} {emp.last_name}',
                 'employee_kra_cycle_id': ekc.id,
-                'status': ekc.status,
-                'current_stage_id': ekc.stage_id,
-                'current_stage_name': ekc.stage.name if ekc.stage else None,
-                'kras': kras,
+                'status':                ekc.status,
+                'current_stage_id':      ekc.stage_id,
+                'current_stage_name':    ekc.stage.name if ekc.stage else None,
+                'department':            emp.department.department_name if emp.department else None,
+                'level':                 emp.level.name if emp.level else None,
+                'manager_name':          f'{emp.manager.first_name} {emp.manager.last_name}' if emp.manager else None,
+                'kras':                  kras,
             })
 
-        #  AUDIT LOG (READ)
         _audit(
             request,
             "ASSESSMENT_PROGRESS_VIEWED",
             "KRACycle",
             cycle_id,
             new_data={
-                "employee_filter": employee_id_filter,
+                "employee_filter":  employee_id_filter,
                 "records_returned": len(employees),
-                "viewer_role": caller.role.name if getattr(caller, "role", None) else None,
+                "viewer_role":      caller.role.name if getattr(caller, "role", None) else None,
             }
         )
 
         return Response({'cycle_id': cycle_id, 'employees': employees}, status=status.HTTP_200_OK)
-    
     
 class LeadReviewView(APIView):
     permission_classes = [IsAuthenticated]
