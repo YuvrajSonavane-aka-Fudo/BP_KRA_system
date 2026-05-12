@@ -30,7 +30,7 @@ const STAGES = [
   { id: 2, name: 'Self Assessment' },
   { id: 3, name: 'Lead Assessment' },
   { id: 4, name: 'HR Validation' },
-  { id: 5, name: 'Completed' },
+  { id: 5, name: 'Closure' },
 ];
 const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const WEEK_DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -344,8 +344,8 @@ function StageStepper({ currentStageId, canAdvance, onAdvanceClick }) {
   return (
     <Box sx={{ px: 2.5, pb: 2 }}>
       {canAdvance && (
-        <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', mb: 1, fontWeight: 500 }}>
-          Click the next stage to advance
+        <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.65)', mb: 1 }}>
+          Click the next stage to continue
         </Typography>
       )}
       <Box sx={{ position: 'relative' }}>
@@ -464,7 +464,7 @@ export default function CycleDetailPage() {
       if (touched[`s${s.id}e`] && !d.end_date)   errors[`s${s.id}`] = 'Required.';
       if (d.start_date && d.end_date && d.end_date < d.start_date) errors[`s${s.id}`] = 'End before start.';
       if (editStart && d.start_date && d.start_date < editStart) errors[`s${s.id}`] = `Before cycle start (${fmt(editStart)}).`;
-      if (editEnd   && d.end_date   && d.end_date > editEnd)     errors[`s${s.id}`] = `After cycle end (${fmt(editEnd)}).`;
+      if (editEnd   && d.end_date   && d.end_date > editEnd)     errors[`s${s.id}`] = `Please select a date on or before (${fmt(editEnd)}).`;
     });
     setFieldErrors(errors);
   }, [editName, editStart, editEnd, editStageDates, touched, isNew]);
@@ -574,7 +574,7 @@ export default function CycleDetailPage() {
       return false;
     });
     if (stageOutOfRange) {
-      setSubmitError(`The "${stageOutOfRange.name}" stage has dates that don't fit within the cycle (${fmt(editStart)} — ${fmt(editEnd)}). Please update that stage's dates to be within the cycle period.`);
+      setSubmitError(`Please update the "${stageOutOfRange.name}" stage dates so they fall within the cycle period (${fmt(editStart)} — ${fmt(editEnd)}).`);
       return;
     }     
     setSubmitting(true); setSubmitError('');
@@ -716,8 +716,8 @@ export default function CycleDetailPage() {
             </IconButton>
 
             <Box minWidth={0} flex={1}>
-              <Typography sx={{ fontSize: 10, fontWeight: 600, opacity: 0.55, textTransform: 'uppercase', letterSpacing: '0.07em', mb: 0.25 }}>
-                {isCreate ? 'New Cycle' : isClone ? `Clone of "${source?.name ?? '…'}"` : 'Cycle Detail'}
+              <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.65)', mb: 0.25 }}>
+                {isCreate ? 'Create New Cycle' : isClone ? `Cloned from ${source?.name ?? '...'}` : 'Cycle Details'}
               </Typography>
 
               {/* Always-editable name field */}
@@ -781,7 +781,7 @@ export default function CycleDetailPage() {
                   onClick={handleSubmit}
                   startIcon={submitting
                     ? <CircularProgress size={13} color="inherit" />
-                    : isClone ? <ContentCopyIcon sx={{ fontSize: 14 }} /> : <AddCircleOutlineIcon sx={{ fontSize: 14 }} />}
+                    : isClone ? <ContentCopyIcon sx={{ fontSize: 14 }} /> : null}
                   sx={{ bgcolor: '#fff', color: '#1E3A8A', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 12, textTransform: 'none', '&:hover': { bgcolor: '#e0f2fe' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.4)' } }}>
                   {submitting ? (isClone ? 'Cloning…' : 'Creating…') : (isClone ? 'Clone Cycle' : 'Create Cycle')}
                 </Button>
@@ -821,13 +821,29 @@ export default function CycleDetailPage() {
                   const isDisabled = action === 'ACTIVE' && !!otherActive;
                   const isPrimary  = action === 'ACTIVE';
                   return (
-                    <Tooltip key={action} title={isDisabled ? 'Another cycle is already active.' : ''}>
+                    <Tooltip
+                      key={action}
+                      title={isDisabled ? `"${otherActive.name}" is already active. Close or put it on hold first.` : ''}
+                    >
                       <span>
                         <Button size="small" disabled={isDisabled}
-                          onClick={() => { setStatusError(''); setStatusConfirm({ open: true, action }); }}
+                          onClick={() => {
+                            setStatusError('');
+                            setStatusConfirm({ open: true, action });
+                          }}
                           sx={isPrimary && !isDisabled
-                            ? { bgcolor: '#fff', color: '#1E3A8A', fontWeight: 700, borderRadius: 1.5, px: 1.75, fontSize: 12, textTransform: 'none', '&:hover': { bgcolor: '#e0f2fe' }, '&.Mui-disabled': { opacity: 0.45 } }
-                            : { bgcolor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600, borderRadius: 1.5, px: 1.75, fontSize: 12, textTransform: 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, '&.Mui-disabled': { opacity: 0.4 } }}>
+                            ? { bgcolor: '#fff', color: '#1E3A8A', fontWeight: 700, borderRadius: 1.5, px: 1.75, fontSize: 12, textTransform: 'none', '&:hover': { bgcolor: '#e0f2fe' },'&.Mui-disabled': {
+   opacity: 1,
+  bgcolor: 'rgba(255,255,255,0.08)',
+  color: 'rgba(255,255,255,0.45)',
+  border: '1px solid rgba(255,255,255,0.12)',
+} }
+                            : { bgcolor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600, borderRadius: 1.5, px: 1.75, fontSize: 12, textTransform: 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }, '&.Mui-disabled': {
+   opacity: 1,
+  bgcolor: 'rgba(255,255,255,0.08)',
+  color: 'rgba(255,255,255,0.45)',
+  border: '1px solid rgba(255,255,255,0.12)',
+} }}>
                           {cfg.label}
                         </Button>
                       </span>
@@ -842,7 +858,7 @@ export default function CycleDetailPage() {
                       <Button size="small" startIcon={<DeleteOutlineIcon sx={{ fontSize: 13 }} />}
                         disabled={!canDelete}
                         onClick={() => { setDeleteError(''); setDeleteOpen(true); }}
-                        sx={{ bgcolor: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', fontWeight: 600, borderRadius: 1.5, px: 1.5, fontSize: 12, textTransform: 'none', '&:hover': { bgcolor: 'rgba(239,68,68,0.25)' }, '&.Mui-disabled': { color: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.08)' } }}>
+                        sx={{ bgcolor: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', fontWeight: 600, borderRadius: 1.5, px: 1.5, fontSize: 12, textTransform: 'none', '&:hover': { bgcolor: 'rgba(239,68,68,0.25)' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.28)', border: '1px solid rgba(255,255,255,0.08)' } }}>
                         Delete
                       </Button>
                     </span>
@@ -871,11 +887,6 @@ export default function CycleDetailPage() {
         {successMsg && (
           <Alert severity="success" onClose={() => setMsg('')} sx={{ borderRadius: 1.5, flexShrink: 0 }}>{successMsg}</Alert>
         )}
-        {otherActive && !isNew && availableActions.includes('ACTIVE') && (
-          <Alert severity="warning" sx={{ borderRadius: 1.5, fontSize: 12, flexShrink: 0 }}>
-            <strong>Cannot activate.</strong> "{otherActive.name}" is already active. Close or put it on hold first.
-          </Alert>
-        )}
         {submitError && (
           <Alert severity="error" sx={{ borderRadius: 1.5, fontSize: 12, flexShrink: 0 }}>{submitError}</Alert>
         )}
@@ -888,7 +899,7 @@ export default function CycleDetailPage() {
               <Typography fontSize={12} color="#1d4ed8" fontWeight={500}>
                 {isClone
                   ? `Cloning from "${source?.name}". Set new dates for this cycle and each stage.`
-                  : 'Fill in the cycle name, overall period, then set date windows for all 5 stages.'}
+                  : 'Fill in the cycle name, overall period, then set date for all 5 stages.'}
               </Typography>
             </Stack>
           </Box>
@@ -897,90 +908,7 @@ export default function CycleDetailPage() {
         {/* ── Two-column layout ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5, alignItems: 'start' }}>
 
-          {/* ── LEFT: Stage Date Windows ── */}
-          <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between"
-              sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
-              <Typography fontWeight={700} fontSize={13} color="#1e293b">Stage Date Windows</Typography>
-              <Typography fontSize={11} color="#94a3b8">
-                {isNew ? `${configuredCount}/5 configured` : canManageCycles && !isFrozen ? 'Edit inline' : ''}
-              </Typography>
-            </Stack>
-
-            {STAGES.map((stage, idx) => {
-              const isLast = idx === STAGES.length - 1;
-              const win    = !isNew ? stageWindows.find(w => w.stage_id === stage.id || w.stage?.id === stage.id) : null;
-              const done   = !isNew && currentStageId && stage.id < currentStageId;
-              const active = !isNew && currentStageId === stage.id;
-
-              const stageStart = !isNew
-                ? (editStageDates[stage.id]?.start_date || toDateOnly(win?.start_date))
-                : editStageDates[stage.id]?.start_date;
-              const stageEnd = !isNew
-                ? (editStageDates[stage.id]?.end_date || toDateOnly(win?.end_date))
-                : editStageDates[stage.id]?.end_date;
-              const hasErr     = isNew && !!fieldErrors[`s${stage.id}`] && !!touched[`s${stage.id}s`];
-              const configured = !!stageStart && !!stageEnd;
-
-              return (
-                <Box key={stage.id} sx={{
-                  borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
-                  bgcolor: active ? '#f0f7ff' : configured && !isNew ? '#fafffe' : configured ? '#f0f7ff' : '#fff',
-                  transition: 'background-color 0.15s',
-                }}>
-                  <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.25 }} spacing={1.5}>
-
-                    {/* Stage circle */}
-                    <Box sx={{
-                      width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-                      background: done ? '#10b981' : active ? gradient : (configured && isNew) ? gradient : hasErr ? '#fee2e2' : '#f1f5f9',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'all 0.2s',
-                    }}>
-                      {done
-                        ? <CheckCircleIcon sx={{ fontSize: 13, color: '#fff' }} />
-                        : <Typography sx={{ fontSize: 10, fontWeight: 800, color: (active || (configured && isNew)) ? '#fff' : hasErr ? '#ef4444' : '#94a3b8' }}>
-                            {stage.id}
-                          </Typography>}
-                    </Box>
-
-                    {/* Stage name */}
-                    <Typography
-                      fontWeight={active ? 700 : configured ? 600 : 500}
-                      fontSize={13}
-                      color={active ? '#1E3A8A' : hasErr ? '#dc2626' : '#374151'}
-                      sx={{ width: 180, flexShrink: 0 }}
-                    >
-                      {stage.name}
-                    </Typography>
-
-                    {/* Date inline to the right */}
-                    <Box flex={1} minWidth={0}>
-                      {(!isNew && isFrozen) ? (
-                        <Typography fontSize={12} color="#64748b">
-                          {configured
-                            ? `${fmt(stageStart)} → ${fmt(stageEnd)}`
-                            : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Not configured</span>}
-                        </Typography>
-                      ) : (
-                        <DateRangeField
-                          startDate={stageStart}
-                          endDate={stageEnd}
-                          onChange={val => updateStageDraft(stage.id, val)}
-                          minDate={editStart || undefined}
-                          disabled={!canManageCycles && !isNew}
-                          error={hasErr ? fieldErrors[`s${stage.id}`] : undefined}
-                        />
-                      )}
-                    </Box>
-
-                  </Stack>
-                </Box>
-              );
-            })}
-          </Paper>
-
-          {/* ── RIGHT: Cycle Info ── */}
+          {/* ── Left: Cycle Info ── */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
               <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
@@ -1131,6 +1059,89 @@ export default function CycleDetailPage() {
               </Box>
             )}
           </Box>
+
+          {/* ── right: Stage Date Windows ── */}
+          <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between"
+              sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
+              <Typography fontWeight={700} fontSize={13} color="#1e293b">Stage Date</Typography>
+              <Typography fontSize={11} color="#94a3b8">
+                {isNew ? `${configuredCount}/5 configured` : canManageCycles && !isFrozen ? 'Edit inline' : ''}
+              </Typography>
+            </Stack>
+
+            {STAGES.map((stage, idx) => {
+              const isLast = idx === STAGES.length - 1;
+              const win    = !isNew ? stageWindows.find(w => w.stage_id === stage.id || w.stage?.id === stage.id) : null;
+              const done   = !isNew && currentStageId && stage.id < currentStageId;
+              const active = !isNew && currentStageId === stage.id;
+
+              const stageStart = !isNew
+                ? (editStageDates[stage.id]?.start_date || toDateOnly(win?.start_date))
+                : editStageDates[stage.id]?.start_date;
+              const stageEnd = !isNew
+                ? (editStageDates[stage.id]?.end_date || toDateOnly(win?.end_date))
+                : editStageDates[stage.id]?.end_date;
+              const hasErr     = isNew && !!fieldErrors[`s${stage.id}`] && !!touched[`s${stage.id}s`];
+              const configured = !!stageStart && !!stageEnd;
+
+              return (
+                <Box key={stage.id} sx={{
+                  borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
+                  bgcolor: active ? '#f0f7ff' : configured && !isNew ? '#fafffe' : configured ? '#f0f7ff' : '#fff',
+                  transition: 'background-color 0.15s',
+                }}>
+                  <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.25 }} spacing={1.5}>
+
+                    {/* Stage circle */}
+                    <Box sx={{
+                      width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                      background: done ? '#10b981' : active ? gradient : (configured && isNew) ? gradient : hasErr ? '#fee2e2' : '#f1f5f9',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.2s',
+                    }}>
+                      {done
+                        ? <CheckCircleIcon sx={{ fontSize: 13, color: '#fff' }} />
+                        : <Typography sx={{ fontSize: 10, fontWeight: 800, color: (active || (configured && isNew)) ? '#fff' : hasErr ? '#ef4444' : '#94a3b8' }}>
+                            {stage.id}
+                          </Typography>}
+                    </Box>
+
+                    {/* Stage name */}
+                    <Typography
+                      fontWeight={active ? 700 : configured ? 600 : 500}
+                      fontSize={13}
+                      color={active ? '#1E3A8A' : hasErr ? '#dc2626' : '#374151'}
+                      sx={{ width: 180, flexShrink: 0 }}
+                    >
+                      {stage.name}
+                    </Typography>
+
+                    {/* Date inline to the right */}
+                    <Box flex={1} minWidth={0}>
+                      {(!isNew && isFrozen) ? (
+                        <Typography fontSize={12} color="#64748b">
+                          {configured
+                            ? `${fmt(stageStart)} → ${fmt(stageEnd)}`
+                            : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Not configured</span>}
+                        </Typography>
+                      ) : (
+                        <DateRangeField
+                          startDate={stageStart}
+                          endDate={stageEnd}
+                          onChange={val => updateStageDraft(stage.id, val)}
+                          minDate={editStart || undefined}
+                          disabled={!canManageCycles && !isNew}
+                          error={hasErr ? fieldErrors[`s${stage.id}`] : undefined}
+                        />
+                      )}
+                    </Box>
+
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Paper>
         </Box>
       </Box>
 
