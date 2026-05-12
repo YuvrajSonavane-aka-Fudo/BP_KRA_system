@@ -11,6 +11,7 @@ import AddIcon         from '@mui/icons-material/Add';
 import EditIcon        from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CategoryIcon    from '@mui/icons-material/Category';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
@@ -33,40 +34,62 @@ export default function AddKRAModal({
 }) {
   const isEdit  = mode === 'edit';
   const isClone = mode === 'clone';
+  // In add/clone mode the modal stays open; in edit mode it closes after save
+  const stayOpen = !isEdit;
 
   const [name,           setName]           = useState('');
   const [description,    setDesc]           = useState('');
   const [selectedLevels, setSelectedLevels] = useState([]);
+  const [categoryId,     setCategoryId]     = useState(null);
   const [saving,         setSaving]         = useState(false);
   const [errors,         setErrors]         = useState({});
+  const [savedCount,     setSavedCount]     = useState(0); // shows "X added" feedback
 
-  const lockedCategoryId = prefillCategoryId ?? (kra?.category_id ? Number(kra.category_id) : null);
-  const lockedCategory   = categories.find(c =>
-    c.id === lockedCategoryId || String(c.id) === String(lockedCategoryId)
-  );
+  // Resolve the initial category from the prefill or the kra prop
+  const initialCatId = prefillCategoryId
+    ? Number(prefillCategoryId)
+    : kra?.category_id
+    ? Number(kra.category_id)
+    : null;
 
+  // Reset form whenever the modal opens
   useEffect(() => {
-  if (open) {
-    if (isClone) {
-      const baseName = (kra?.name ?? '').replace(/\s*\(\d+\)$/, '').trim();
-      let n = 1;
-      while (kraNames.includes(`${baseName} (${n})`)) n++;
-      setName(`${baseName} (${n})`);
-    } else {
-      setName(kra?.name ?? '');
+    if (open) {
+      if (isClone) {
+        const baseName = (kra?.name ?? '').replace(/\s*\(\d+\)$/, '').trim();
+        let n = 1;
+        while (kraNames.includes(`${baseName} (${n})`)) n++;
+        setName(`${baseName} (${n})`);
+      } else {
+        setName(kra?.name ?? '');
+      }
+      setDesc(kra?.description ?? '');
+      setSelectedLevels(kra?.levels?.map(l => l.level_id).filter(Boolean) ?? []);
+      setCategoryId(initialCatId);
+      setErrors({});
+      setSaving(false);
+      setSavedCount(0);
     }
-    setDesc(kra?.description ?? '');
-    setSelectedLevels(kra?.levels?.map(l => l.level_id).filter(Boolean) ?? []);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function resetForNext() {
+    setName('');
+    setDesc('');
+    setSelectedLevels([]);
+    // keep the same categoryId so the user can keep adding to same category
     setErrors({});
     setSaving(false);
   }
-}, [open, kra, mode, prefillCategoryId, kraNames]);
+
+  const selectedCategory = categories.find(
+    c => c.id === categoryId || String(c.id) === String(categoryId)
+  );
 
   function validate() {
     const e = {};
     if (!name.trim())             e.name   = 'KRA name is required';
     if (name.trim().length > 120) e.name   = 'Max 120 characters';
-    if (!lockedCategoryId)        e.cat    = 'No category selected — please open this modal from a category';
+    if (!categoryId)              e.cat    = 'Select a category';
     if (!selectedLevels.length)   e.levels = 'Select at least one level';
     return e;
   }
@@ -76,15 +99,21 @@ export default function AddKRAModal({
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
     try {
-      const isStandard = lockedCategory ? lockedCategory.is_standard : true;
+      const isStandard = selectedCategory ? selectedCategory.is_standard : true;
       const payload = {
         name:        name.trim(),
         description: description.trim(),
-        category_id: Number(lockedCategoryId),
+        category_id: Number(categoryId),
         is_standard: isStandard,
         levels: selectedLevels.map(id => ({ level_id: id })),
       };
       await onSaved(payload, isEdit ? kra.id : (isClone ? kra.id : null), mode);
+
+      if (stayOpen) {
+        setSavedCount(c => c + 1);
+        resetForNext();
+      }
+      // If isEdit, the parent closes the modal via onSaved
     } catch (err) {
       setErrors({ submit: err?.response?.data?.error || 'Something went wrong. Please try again.' });
       setSaving(false);
@@ -98,13 +127,26 @@ export default function AddKRAModal({
                     :           <AddIcon          sx={{ color: '#fff', fontSize: 20 }} />;
   const headerTitle = isClone ? 'Clone KRA' : isEdit ? 'Edit KRA' : 'Add New KRA';
   const headerSub   = isClone ? 'Duplicate this KRA — customise name & levels before saving'
-                    : isEdit  ? 'Update KRA details' : 'Add a KRA to the library';
-  const btnLabel    = saving ? 'Saving...' : isClone ? 'Save Clone' : isEdit ? 'Save Changes' : 'Add KRA';
+                    : isEdit  ? 'Update KRA details'
+                    : 'Fill in details and keep adding — close when done';
+  const btnLabel    = saving
+    ? 'Saving…'
+    : isClone ? 'Save Clone'
+    : isEdit  ? 'Save Changes'
+    : 'Add KRA';
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
-      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }}>
-
+    <Dialog
+      open={open}
+      onClose={(_e, reason) => {
+        // Only allow explicit close (X button / Cancel), not backdrop or Escape
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        onClose();
+      }}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }}
+    >
       {/* Gradient header */}
       <Box sx={{ background: gradient, px: 3, pt: 3, pb: 2.5 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -118,13 +160,28 @@ export default function AddKRAModal({
               <Typography fontSize={11} color="rgba(255,255,255,0.65)">{headerSub}</Typography>
             </Box>
           </Stack>
-          <IconButton size="small" onClick={onClose}
-            sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { color: '#fff' } }}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            {/* "N added" badge — visible after at least one save in stay-open mode */}
+            {stayOpen && savedCount > 0 && (
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 0.5,
+                px: 1, py: 0.35, borderRadius: 99,
+                bgcolor: 'rgba(255,255,255,0.18)',
+              }}>
+                <CheckCircleIcon sx={{ fontSize: 12, color: '#86efac' }} />
+                <Typography fontSize={11} fontWeight={700} color="#86efac">
+                  {savedCount} added
+                </Typography>
+              </Box>
+            )}
+            <IconButton size="small" onClick={onClose}
+              sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { color: '#fff' } }}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
         </Stack>
 
-        {/* Clone badge */}
+        {/* Clone source badge */}
         {isClone && kra && (
           <Box sx={{ mt: 1.5, px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.1)',
             display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
@@ -142,24 +199,52 @@ export default function AddKRAModal({
             <Alert severity="error" sx={{ borderRadius: 1.5, fontSize: 13 }}>{errors.submit}</Alert>
           )}
 
-          {/* Category — read-only pill */}
-          {lockedCategory ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1,
-              borderRadius: 1.5, bgcolor: lockedCategory.is_standard ? '#f0fdf4' : '#eff6ff',
-              border: `1px solid ${lockedCategory.is_standard ? '#bbf7d0' : '#bfdbfe'}` }}>
-              <CategoryIcon sx={{ fontSize: 15, color: lockedCategory.is_standard ? '#166534' : '#1d4ed8' }} />
-              <Typography fontSize={12.5} fontWeight={700}
-                color={lockedCategory.is_standard ? '#166534' : '#1d4ed8'}>
-                {lockedCategory.name}
-              </Typography>
-              <Chip label={lockedCategory.is_standard ? 'Standard' : 'Custom'} size="small"
-                sx={{ fontSize: 9.5, height: 17, fontWeight: 700, ml: 0.5,
-                  bgcolor: lockedCategory.is_standard ? '#dcfce7' : '#dbeafe',
-                  color:   lockedCategory.is_standard ? '#15803d' : '#1d4ed8' }} />
-            </Box>
-          ) : errors.cat ? (
-            <Alert severity="warning" sx={{ borderRadius: 1.5, fontSize: 12 }}>{errors.cat}</Alert>
-          ) : null}
+          {/* ── Category dropdown (always visible, pre-selected) ── */}
+          <FormControl fullWidth size="small" error={Boolean(errors.cat)}>
+            <InputLabel>Category *</InputLabel>
+            <Select
+              value={categoryId ?? ''}
+              label="Category *"
+              onChange={e => {
+                setCategoryId(Number(e.target.value));
+                setErrors(v => ({ ...v, cat: undefined }));
+              }}
+              disabled={isEdit} // lock category in edit mode
+              sx={{ borderRadius: 1.5 }}
+              MenuProps={{ PaperProps: { sx: { maxHeight: 260, borderRadius: 2 } } }}
+            >
+              {categories.length === 0 ? (
+                <MenuItem disabled>
+                  <Typography fontSize={13} color="#94a3b8">No categories available</Typography>
+                </MenuItem>
+              ) : (
+                categories.map(cat => {
+                  const isStd = cat.is_standard;
+                  return (
+                    <MenuItem key={cat.id} value={cat.id}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Box sx={{
+                          width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                          bgcolor: isStd ? '#16a34a' : '#1d4ed8',
+                        }} />
+                        <Typography fontSize={13} fontWeight={600} color="#1e293b">{cat.name}</Typography>
+                        <Chip
+                          label={isStd ? 'Org Level' : 'Project Level'}
+                          size="small"
+                          sx={{
+                            fontSize: 9, height: 16, fontWeight: 700,
+                            bgcolor: isStd ? '#dcfce7' : '#dbeafe',
+                            color:   isStd ? '#166534' : '#1d4ed8',
+                          }}
+                        />
+                      </Stack>
+                    </MenuItem>
+                  );
+                })
+              )}
+            </Select>
+            {errors.cat && <FormHelperText>{errors.cat}</FormHelperText>}
+          </FormControl>
 
           {/* KRA Name */}
           <TextField
@@ -168,6 +253,7 @@ export default function AddKRAModal({
             onChange={e => { setName(e.target.value); setErrors(v => ({ ...v, name: undefined })); }}
             error={Boolean(errors.name)} helperText={errors.name}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
+            autoFocus
           />
 
           {/* Description */}
@@ -196,7 +282,6 @@ export default function AddKRAModal({
                     const lv = levelMap[id];
                     if (!lv) return null;
                     const s = lvlStyle(lv.idx);
-                    // Chip shows level name only (no exp range)
                     return (
                       <Box key={id} sx={{
                         display: 'inline-flex', alignItems: 'center',
@@ -217,7 +302,6 @@ export default function AddKRAModal({
                   <Typography fontSize={13} color="#94a3b8">No levels available — add levels first</Typography>
                 </MenuItem>
               ) : (
-                // Dropdown items show level name + exp range
                 levels.map((lv, i) => {
                   const s = lvlStyle(i);
                   const hasExp = lv.min_experience != null || lv.max_experience != null;
@@ -258,16 +342,14 @@ export default function AddKRAModal({
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 3, pt: 2 }}>
-        <Button onClick={onClose} disabled={saving}
-          sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5 }}>
-          Cancel
-        </Button>
+      <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
         <Button onClick={handleSave} disabled={saving} variant="contained"
           startIcon={saving ? <CircularProgress size={14} color="inherit" /> : null}
-          sx={{ textTransform: 'none', fontWeight: 700, background: gradient, borderRadius: 1.5,
+          sx={{
+            textTransform: 'none', fontWeight: 700, background: gradient, borderRadius: 1.5,
             px: 3, minWidth: 130, boxShadow: '0 4px 12px rgba(30,58,138,0.3)',
-            '&:hover': { background: gradient, opacity: 0.9 } }}>
+            '&:hover': { background: gradient, opacity: 0.9 },
+          }}>
           {btnLabel}
         </Button>
       </DialogActions>

@@ -252,7 +252,7 @@ function GlobalSearchBar({ kras, categories, onSelectKRA, onSelectCategory }) {
                           '&:hover': { bgcolor: '#f8fafc' }, borderBottom: '1px solid #f8fafc' }}>
                         <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: style.color, flexShrink: 0 }} />
                         <Typography fontSize={12.5} fontWeight={600} color="#1e293b" flex={1}>{cat.name}</Typography>
-                        <Chip label={cat.is_standard ? 'Standard' : 'Custom'} size="small"
+                        <Chip label={cat.is_standard ? 'Org Level' : 'Project Level'} size="small"
                           sx={{ fontSize: 9, height: 16, fontWeight: 700,
                             bgcolor: cat.is_standard ? '#dcfce7' : '#dbeafe',
                             color:   cat.is_standard ? '#166534' : '#1d4ed8' }} />
@@ -339,7 +339,7 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
         onClick={() => setExpanded(v => !v)}>
 
         {/* Checkbox cell */}
-        <TableCell sx={{ py: 1.1, pl: 1.5, pr: 0, borderBottom: expanded ? 'none' : undefined, width: 36 }}
+        <TableCell sx={{ py: 1.1, pl: 0.75, pr: 0, borderBottom: expanded ? 'none' : undefined, width: 28 }}
           onClick={e => e.stopPropagation()}>
           {canManage && (
             <Checkbox size="small"
@@ -354,32 +354,77 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
           )}
         </TableCell>
 
-        <TableCell sx={{ py: 1.1, pl: 1, pr: 1, borderBottom: expanded ? 'none' : undefined, width: '48%' }}>
+        <TableCell sx={{ py: 1.1, pl: 0.25, pr: 1, borderBottom: expanded ? 'none' : undefined, width: '90%' }}>
           <Stack direction="row" alignItems="center" spacing={1}>
             <Box sx={{ color: '#cbd5e1', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
               {expanded ? <ExpandLessIcon sx={{ fontSize: 14 }} /> : <ExpandMoreIcon sx={{ fontSize: 14 }} />}
             </Box>
-            <Box minWidth={0}>
-              <Typography fontWeight={650} fontSize={13} color="#1e293b" noWrap>{kra.name}</Typography>
+            <Box minWidth={0} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography fontWeight={650} fontSize={13} color="#1e293b" noWrap>
+                {kra.name}
+              </Typography>
               {kra.description && !expanded && (
-                <Typography fontSize={11.5} color="#94a3b8" noWrap sx={{ maxWidth: 340 }}>{kra.description}</Typography>
+                <Typography
+                  fontSize={11.5}
+                  color="#94a3b8"
+                  noWrap
+                  sx={{
+                    maxWidth: 470,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  — {kra.description}
+                </Typography>
               )}
             </Box>
           </Stack>
         </TableCell>
 
         {/* Collapsed → level name only, no exp range */}
-        <TableCell sx={{ py: 1.1, borderBottom: expanded ? 'none' : undefined }}>
-          <Stack direction="row" flexWrap="wrap" gap={0.4}>
-            {kra.levels?.length
-              ? kra.levels.map((lv, i) => (
-                  <LevelChip key={lv.id ?? i} lv={lv} idx={i} levelMap={levelMap} showExp={false} />
-                ))
-              : <Typography fontSize={11} color="#cbd5e1" fontStyle="italic">—</Typography>}
+        <TableCell sx={{ py: 1.1, borderBottom: expanded ? 'none' : undefined, width: 120 }}>
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              whiteSpace: 'nowrap',
+              '&::-webkit-scrollbar': { display: 'none' },
+            }}
+          >
+            {kra.levels?.length ? (
+                <>
+                  {kra.levels.slice(0, 3).map((lv, i) => (
+                    <LevelChip
+                      key={lv.id ?? i}
+                      lv={lv}
+                      idx={i}
+                      levelMap={levelMap}
+                      showExp={false}
+                    />
+                  ))}
+
+                  {kra.levels.length > 3 && (
+                    <Typography
+                      fontSize={9}
+                      fontWeight={500}
+                      color="#94a3b8"
+                      sx={{ alignSelf: 'center', ml: 0.25 }}
+                    >
+                      +{kra.levels.length - 3} more
+                    </Typography>
+                  )}
+                </>
+              ) : (
+                <Typography fontSize={11} color="#cbd5e1" fontStyle="italic">
+                  —
+                </Typography>
+              )}
           </Stack>
         </TableCell>
 
-        <TableCell align="right" sx={{ py: 1.1, pr: 1.5, borderBottom: expanded ? 'none' : undefined, width: 80 }}
+        <TableCell align="right" sx={{ py: 1.1, pr: 1.5, borderBottom: expanded ? 'none' : undefined, width: 120 }}
           onClick={e => e.stopPropagation()}>
           {canManage && (
             <Stack direction="row" spacing={0} justifyContent="flex-end"
@@ -610,7 +655,7 @@ function CategoriesPanel({
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5 }}>
                 <StarIcon sx={{ fontSize: 10, color: '#16a34a' }} />
                 <Typography fontSize={9.5} fontWeight={700} color="#16a34a" textTransform="uppercase" letterSpacing="0.07em" flex={1}>
-                  Standard <Box component="span" sx={{ opacity: 0.65 }}>({standardCats.length})</Box>
+                  Org Level <Box component="span" sx={{ opacity: 0.65 }}>({standardCats.length})</Box>
                 </Typography>
               </Stack>
               <Box sx={{
@@ -629,7 +674,7 @@ function CategoriesPanel({
               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1.5, pb: 0.5 }}>
                 <TuneIcon sx={{ fontSize: 10, color: '#1d4ed8' }} />
                 <Typography fontSize={9.5} fontWeight={700} color="#1d4ed8" textTransform="uppercase" letterSpacing="0.07em" flex={1}>
-                  Project <Box component="span" sx={{ opacity: 0.65 }}>({customCats.length})</Box>
+                  Project Level <Box component="span" sx={{ opacity: 0.65 }}>({customCats.length})</Box>
                 </Typography>
               </Stack>
               <Box sx={{
@@ -660,7 +705,7 @@ function CategoriesPanel({
               <Box sx={{ width: 9, height: 9, borderRadius: '50%',
                 bgcolor: selectedCat.is_standard ? '#16a34a' : '#1d4ed8', flexShrink: 0 }} />
               <Typography fontSize={14} fontWeight={700} color="#1e293b">{selectedCat.name}</Typography>
-              <Chip label={selectedCat.is_standard ? 'Standard' : 'Custom'} size="small"
+              <Chip label={selectedCat.is_standard ? 'Org Level' : 'Project Level'} size="small"
                 sx={{ fontSize: 9.5, height: 17, fontWeight: 700,
                   bgcolor: selectedCat.is_standard ? '#dcfce7' : '#dbeafe',
                   color:   selectedCat.is_standard ? '#166634' : '#1d4ed8' }} />
@@ -670,10 +715,12 @@ function CategoriesPanel({
           )}
           <Stack direction="row" alignItems="center" spacing={1}>
             {selectedCat && filtered.length > 0 && (
-              <>
-                <Typography fontSize={11} color="#94a3b8">Sort KRAs:</Typography>
-                <SortToggle sortDir={kraSortDir} onToggle={() => setKraSortDir(d => d === 'asc' ? 'desc' : 'asc')} />
-              </>
+              <Chip
+                label="↕ Sort"
+                size="small"
+                onClick={() => setKraSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                sx={{ height: 22, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', bgcolor: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 1.25, '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' } }}
+              />
             )}
             <Typography fontSize={11.5} color="#94a3b8" sx={{ ml: 1 }}>
               {filtered.length} KRA{filtered.length !== 1 ? 's' : ''}
@@ -708,7 +755,7 @@ function CategoriesPanel({
                 <TableHead>
                   <TableRow>
                     {/* Select-all checkbox header */}
-                    <TableCell sx={{ pl: 1.5, py: 0.9, bgcolor: '#fafbfc', width: 36 }}>
+                    <TableCell sx={{ pl: 0.75, py: 0.9, bgcolor: '#fafbfc', width: 28 }}>
                       {canManage && (
                         <Checkbox size="small"
                           checked={allPageChecked}
@@ -764,11 +811,7 @@ function CategoriesPanel({
                       sx={{ minWidth: 24, px: 0.5, fontSize: 12, color: '#475569', textTransform: 'none' }}>›</Button>
                   </Stack>
                 </Stack>
-              ) : (
-                <Typography fontSize={11.5} color="#b0bac4">
-                  {filtered.length} KRA{filtered.length !== 1 ? 's' : ''}{selectedCat ? ` in ${selectedCat.name}` : ''}
-                </Typography>
-              )}
+              ) : null}
             </Box>
           </>
         )}
@@ -870,11 +913,17 @@ export default function KRALibraryPage() {
       if (mode === 'edit')       await updateKRA(id, payload);
       else if (mode === 'clone') await cloneKRA(id, { name: payload.name, category_id: payload.category_id });
       else                       await createKRA(payload);
-      setKraModal({ open: false, kra: null, mode: 'add', prefillCatId: null });
+  
+      // Only close on edit; add/clone modal manages its own stay-open + reset
+      if (mode === 'edit') {
+        setKraModal({ open: false, kra: null, mode: 'add', prefillCatId: null });
+      }
+  
       showToast(mode === 'edit' ? 'KRA updated' : mode === 'clone' ? 'KRA cloned' : 'KRA added');
       refresh();
     } catch (err) {
       showToast(err?.response?.data?.error || 'Failed to save KRA', 'error');
+      throw err; // re-throw so modal can catch & show inline error
     }
   }
 
@@ -897,10 +946,18 @@ export default function KRALibraryPage() {
   async function handleCatSave(payload, id) {
     try {
       if (id) await updateCategory(id, payload); else await createCategory(payload);
-      setCatModal({ open: false, cat: null });
+  
+      // Only close when editing
+      if (id) {
+        setCatModal({ open: false, cat: null });
+      }
+  
       showToast(id ? 'Category updated' : 'Category added');
       refresh();
-    } catch (err) { showToast(err?.response?.data?.error || 'Failed to save category', 'error'); }
+    } catch (err) {
+      showToast(err?.response?.data?.error || 'Failed to save category', 'error');
+      throw err; // re-throw so modal can catch & show inline error
+    }
   }
 
   async function handleCatDelete() {
@@ -984,13 +1041,22 @@ export default function KRALibraryPage() {
 
       <Box sx={{ px: 0, borderBottom: '1px solid #e2e8f0', bgcolor: '#fff', flexShrink: 0 }}>
         <Stack direction="row" alignItems="center" sx={{ px: 2.5, minHeight: 40, gap: 1 }}>
-          <Typography fontSize={12} fontWeight={700} color="#1e293b">
-            Categories
-            <Box component="sup" sx={{ fontSize: 9, fontWeight: 800, color: '#1d4ed8', ml: 0.25, verticalAlign: 'super' }}>
-              {categories.length}
-            </Box>
+          <Typography fontSize={12.5} fontWeight={700} color="#1e293b">
+            Categories ({categories.length})
           </Typography>
-          <SortToggle sortDir={catSortDir} onToggle={() => setCatSortDir(d => d === 'asc' ? 'desc' : 'asc')} />
+          <Chip
+            label="↕ Sort"
+            size="small"
+            onClick={() => setCatSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            sx={{
+              height: 22, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', bgcolor: '#fff', color: '#64748b',
+              border: '1px solid #e2e8f0', borderRadius: 1.25, 
+              '&:hover': {
+                bgcolor: '#f8fafc',
+                borderColor: '#cbd5e1',
+              },
+            }}
+          />
           {canManage && (
             <Chip label="+ Category" size="small"
               onClick={() => setCatModal({ open: true, cat: null })}
