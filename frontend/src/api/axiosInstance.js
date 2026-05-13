@@ -19,7 +19,7 @@ axiosInstance.interceptors.response.use(
   (res) => res,
   (error) => {
     const status = error.response?.status;
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       // Let AuthProvider listen to this and wipe user state.
       window.dispatchEvent(new CustomEvent('kra:unauthorized'));
     }
