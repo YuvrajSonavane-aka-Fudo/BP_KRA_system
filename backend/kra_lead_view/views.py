@@ -262,11 +262,11 @@ class LeadDescriptionView(APIView):
         if not _caller_can_act_on(caller, row.employee_id):
             return Response('Forbidden', status=status.HTTP_403_FORBIDDEN)
 
-        if row.employee_kra_cycle.stage_id not in (1, 2):
-            return Response(
-                'Description can only be set in Stage 1 or Stage 2',
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # if row.employee_kra_cycle.stage_id not in (1, 2):
+        #     return Response(
+        #         'Description can only be set in Stage 1 or Stage 2',
+        #         status=status.HTTP_403_FORBIDDEN,
+        #     )
 
         # OLD DATA
         old_data = {

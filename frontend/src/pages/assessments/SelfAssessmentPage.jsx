@@ -13,7 +13,7 @@ import ExpandLessIcon           from '@mui/icons-material/ExpandLess';
 import LockOutlinedIcon         from '@mui/icons-material/LockOutlined';
 import RateReviewIcon           from '@mui/icons-material/RateReview';
 import PendingIcon              from '@mui/icons-material/Pending';
-import { getSelfAssessment, saveSelfAssessmentRow, getAssessmentProgress, submitLeadReview } from '../../api/assessmentsApi';
+import { getSelfAssessment, saveSelfAssessmentRow, getAssessmentProgress, submitLeadReview, saveLeadDescription } from '../../api/assessmentsApi';
 import { getCycles }            from '../../api/cyclesApi';
 import { getReferenceData }     from '../../api/referenceDataApi';
 import { getStageStates, canSelfAssess, canLeadReview, getStageLockReason, STAGE } from '../../utils/stageUtils';
@@ -34,7 +34,7 @@ const CATEGORY_COLORS = {
 function categoryColor(name) { return CATEGORY_COLORS[name] || CATEGORY_COLORS.default; }
 function initials(name = '') { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'; }
 
-//  Role helpers 
+// ── Role helpers ──────────────────────────────────────────────────────────────
 const HR_ROLES   = ['Admin', 'HR', 'Vertical Lead'];
 const LEAD_ROLES = ['Manager', 'Team Lead'];
 
@@ -48,7 +48,7 @@ function resolveRole(user) {
   return 'employee';
 }
 
-// Shared: Stage stepper 
+// ── Shared: Stage stepper ─────────────────────────────────────────────────────
 function CycleStageStepper({ currentStageId, completedStageIds }) {
   if (!currentStageId) return null;
   const states = getStageStates(currentStageId, completedStageIds);
@@ -89,9 +89,9 @@ function CycleStageStepper({ currentStageId, completedStageIds }) {
   );
 }
 
-
+// ══════════════════════════════════════════════════════════════════════════════
 // EMPLOYEE VIEW
-
+// ══════════════════════════════════════════════════════════════════════════════
 
 function RatingChip({ label, selected, onClick, disabled }) {
   return (
@@ -270,7 +270,7 @@ function ProgressSidebar({ kras, onJumpTo }) {
   const avgDisplay = avgRatings.length ? (avgRatings.reduce((a, b) => a + b, 0) / avgRatings.length).toFixed(1) : '—';
 
   return (
-    <Box sx={{ position: 'sticky', top: 24 }}>
+    <Box>
       <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, overflow: 'hidden', mb: 2 }}>
         <Box sx={{ px: 2.5, py: 2, bgcolor: NAVY }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Assessment Progress</Typography>
@@ -323,28 +323,7 @@ function ProgressSidebar({ kras, onJumpTo }) {
         </Box>
       </Paper>
 
-      <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-        <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>Rating Guidelines</Typography>
-        </Box>
-        <Box sx={{ px: 2.5, py: 1.5 }}>
-          <Stack spacing={1.5}>
-            {[
-              { label: 'A',  desc: 'Exceptional. Goal exceeded by >20% with major impact.' },
-              { label: 'B+', desc: 'Exceeds Expectations. Goal achieved with extra contributions.' },
-              { label: 'B',  desc: 'Meets Expectations. All parameters fulfilled.' },
-              { label: 'B-', desc: 'Below Expectations. Partial achievement with gaps.' },
-            ].map(g => (
-              <Stack key={g.label} direction="row" spacing={1.5} alignItems="flex-start">
-                <Box sx={{ width: 26, height: 26, borderRadius: 1, bgcolor: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{g.label}</Typography>
-                </Box>
-                <Typography sx={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{g.desc}</Typography>
-              </Stack>
-            ))}
-          </Stack>
-        </Box>
-      </Paper>
+      
     </Box>
   );
 }
@@ -427,48 +406,53 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, hideCycleHeader
         </Box>
       )}
 
-      <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
-        {!loading && lockReason && (
-          <Alert severity="warning" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
-            {lockReason} Your responses are shown in read-only mode.
-          </Alert>
-        )}
-        {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
-        {error     && <Alert severity="error"           sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
-        {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: BLUE }} /></Box>}
+      <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'row' }}>
+        {/* Main scrollable content */}
+        <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2, minWidth: 0 }}>
+          {!loading && lockReason && (
+            <Alert severity="warning" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
+              {lockReason} Your responses are shown in read-only mode.
+            </Alert>
+          )}
+          {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
+          {error     && <Alert severity="error"           sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+          {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: BLUE }} /></Box>}
 
-        {!loading && !error && (
-          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} alignItems="flex-start">
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              {kras.length === 0 ? (
-                <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, p: 6, textAlign: 'center' }}>
-                  <Typography sx={{ color: '#94a3b8', fontSize: 15 }}>No KRAs have been assigned to you for this cycle yet.</Typography>
-                </Paper>
-              ) : (
-                <Stack spacing={2}>
-                  {kras.map(row => (
-                    <KRACard key={row.employee_kra_level_id} row={row} ratings={ratings}
-                      onSave={handleSave} saving={saving} savedId={savedId}
-                      editable={editable} showLeadRating={showLeadRating}
-                      kraRef={el => { kraRefs.current[row.employee_kra_level_id] = el; }}
-                    />
-                  ))}
-                </Stack>
-              )}
-            </Box>
-            <Box sx={{ width: { xs: '100%', lg: 300 }, flexShrink: 0 }}>
-              <ProgressSidebar kras={kras} onJumpTo={handleJumpTo} />
-            </Box>
-          </Stack>
-        )}
+          {!loading && !error && (
+            kras.length === 0 ? (
+              <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, p: 6, textAlign: 'center' }}>
+                <Typography sx={{ color: '#94a3b8', fontSize: 15 }}>No KRAs have been assigned to you for this cycle yet.</Typography>
+              </Paper>
+            ) : (
+              <Stack spacing={2}>
+                {kras.map(row => (
+                  <KRACard key={row.employee_kra_level_id} row={row} ratings={ratings}
+                    onSave={handleSave} saving={saving} savedId={savedId}
+                    editable={editable} showLeadRating={false}
+                    kraRef={el => { kraRefs.current[row.employee_kra_level_id] = el; }}
+                  />
+                ))}
+              </Stack>
+            )
+          )}
+        </Box>
+
+        {/* Sticky sidebar — its own scroll container so it stays fixed while KRAs scroll */}
+        <Box sx={{
+          width: 300, flexShrink: 0,
+          display: { xs: 'none', lg: 'block' },
+          overflowY: 'auto', py: 2, pr: 3,
+        }}>
+          <ProgressSidebar kras={kras} onJumpTo={handleJumpTo} />
+        </Box>
       </Box>
     </Box>
   );
 }
 
-
+// ══════════════════════════════════════════════════════════════════════════════
 // LEAD / ADMIN VIEW — grid
-
+// ══════════════════════════════════════════════════════════════════════════════
 
 // dirty state shape: { [employee_kra_level_id]: { lead_rating_id, lead_comment, lead_progress_notes } }
 
@@ -478,9 +462,10 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
   const kras        = emp.kras ?? [];
   const reviewed    = kras.filter(k => k.lead_rating_id || dirtyMap[k.employee_kra_level_id]?.lead_rating_id).length;
   const pct         = kras.length ? Math.round((reviewed / kras.length) * 100) : 0;
-  const ratingEditable  = canLeadReview(currentStageId);   // rating only in lead stage
-  // comments always editable regardless of stage
-  const commentEditable = true;
+
+  // Use the employee's own stage_id for the rating lock — backend allows rating at stage 3 and 4
+  const empStageId     = emp.current_stage_id ?? currentStageId;
+  const ratingEditable = canLeadReview(empStageId);  // true only at stage 3 (Assessment) or 4 (HR Validation)
 
   return (
     <Box ref={sectionRef} sx={{ mb: 3, scrollMarginTop: '80px' }}>
@@ -490,7 +475,7 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
         sx={{
           display: 'flex', alignItems: 'center', gap: 2,
           px: 2.5, py: 1.5, cursor: 'pointer',
-          bgcolor: NAVY, borderRadius: collapsed ? 2 : '8px 8px 0 0',
+          bgcolor: '#1e40af', borderRadius: collapsed ? 2 : '8px 8px 0 0',
           transition: 'border-radius 0.2s',
         }}
       >
@@ -565,9 +550,22 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
                           {kra.weightage && <Typography sx={{ fontSize: 10, color: '#94a3b8', mt: 0.3 }}>{kra.weightage}%</Typography>}
                         </TableCell>
 
-                        {/* Description by lead */}
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 180 }}>
-                          <Typography sx={{ fontSize: 12, color: '#475569', lineHeight: 1.5 }}>{kra.description_by_lead || '—'}</Typography>
+                        {/* Description by lead — always editable */}
+                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
+                          <TextField multiline minRows={2} fullWidth size="small"
+                            placeholder="Add description…"
+                            defaultValue={kra.description_by_lead ?? ''}
+                            onBlur={e => {
+                              const val = e.target.value;
+                              if (val !== (kra.description_by_lead ?? '')) {
+                                onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'description_by_lead', val);
+                              }
+                            }}
+                            sx={{ '& .MuiOutlinedInput-root': { fontSize: 12, borderRadius: 1.5,
+                              '&:hover fieldset': { borderColor: ACCENT },
+                              '&.Mui-focused fieldset': { borderColor: ACCENT },
+                            }}}
+                          />
                         </TableCell>
 
                         {/* Self rating (read-only) */}
@@ -576,20 +574,20 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
                             <Chip label={selfRatingLabel ? `${kra.self_rating} – ${selfRatingLabel.description}` : kra.self_rating}
                               size="small" sx={{ bgcolor: '#eff6ff', color: BLUE, fontWeight: 700, fontSize: 10 }} />
                           ) : (
-                            <Typography sx={{ fontSize: 11, color: '#cbd5e1', fontStyle: 'italic' }}>Pending</Typography>
+                            <Typography sx={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>Pending</Typography>
                           )}
                         </TableCell>
 
                         {/* Self comment (read-only) */}
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.self_comment ? 'normal' : 'italic', color: kra.self_comment ? '#475569' : '#cbd5e1' }}>
+                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.self_comment ? 'normal' : 'italic', color: kra.self_comment ? '#475569' : '#94a3b8' }}>
                             {kra.self_comment || 'No comment'}
                           </Typography>
                         </TableCell>
 
                         {/* Progress notes (read-only) */}
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.progress_notes ? 'normal' : 'italic', color: kra.progress_notes ? '#64748b' : '#cbd5e1' }}>
+                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.progress_notes ? 'normal' : 'italic', color: kra.progress_notes ? '#64748b' : '#94a3b8' }}>
                             {kra.progress_notes || '—'}
                           </Typography>
                         </TableCell>
@@ -687,8 +685,18 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
     const promises = [];
     for (const [empId, kraMap] of Object.entries(dirtyMap)) {
       for (const [kraLevelId, payload] of Object.entries(kraMap)) {
-        if (Object.keys(payload).length > 0) {
-          promises.push(submitLeadReview(kraLevelId, payload));
+        if (Object.keys(payload).length === 0) continue;
+
+        // Split description_by_lead (different endpoint) from review fields
+        const { description_by_lead, ...reviewPayload } = payload;
+
+        if (description_by_lead !== undefined) {
+          promises.push(
+            saveLeadDescription(kraLevelId, { description_by_lead })
+          );
+        }
+        if (Object.keys(reviewPayload).length > 0) {
+          promises.push(submitLeadReview(kraLevelId, reviewPayload));
         }
       }
     }
@@ -891,8 +899,9 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
   );
 }
 
-
+// ══════════════════════════════════════════════════════════════════════════════
 // ROOT — role-based entry point
+// ══════════════════════════════════════════════════════════════════════════════
 export default function KRAAssessmentPage() {
   const { user } = useAuth();
   const [cycles,  setCycles]  = useState([]);
