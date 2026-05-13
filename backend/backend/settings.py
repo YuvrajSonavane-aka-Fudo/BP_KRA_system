@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-zx^g98%-oedb*^l+*-&u3b0gffjn+sq6fdp4py8*(t^t^pp0#g
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -93,6 +93,7 @@ TEMPLATES = [
 # With this:
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
+    'https://krasystem.netlify.app',
 ]
 CORS_ALLOW_CREDENTIALS = True
 
