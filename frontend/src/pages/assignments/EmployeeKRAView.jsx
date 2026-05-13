@@ -647,7 +647,11 @@ export default function EmployeeKRAView({
               variant="contained"
               sx={{ fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,
                 px: 2.5, height: 34, background: gradient, '&:hover': { opacity: 0.9 },
-                '&.Mui-disabled': { opacity: 0.38 } }}>
+                '&.Mui-disabled': {
+                  opacity: 1,
+                  background: '#c7d2fe',
+                  color: '#6b7280',
+                } }}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </Stack>
