@@ -227,9 +227,21 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
               </Box>
               <Collapse in={isOpen} unmountOnExit>
                 <Box sx={{ pl: 1.5 }}>
-                  {group.kras.slice().sort((a, b) => a.name.localeCompare(b.name)).map(kra =>
-                    (kra.levels ?? []).map(level => {
-                      const kraLevelId = makeKey(kra.id, level);
+                  {group.kras.flatMap(kra => (kra.levels ?? []).map(level => ({ kra, level, kraLevelId: makeKey(kra.id, level),})) )
+                    .sort((a, b) => {
+                      const aSelected = selectedKraLevelIds.includes(a.kraLevelId);
+                      const bSelected = selectedKraLevelIds.includes(b.kraLevelId);
+                      if (aSelected && !bSelected) return -1;
+                      if (!aSelected && bSelected) return 1;
+
+                      if (a.kra.name === b.kra.name) {
+                        return (a.level.level_name || '').localeCompare(
+                          b.level.level_name || ''
+                        );
+                      }
+                      return a.kra.name.localeCompare(b.kra.name);
+                    })
+                    .map(({ kra, level, kraLevelId }) => {
                       const isSelected = selectedKraLevelIds.includes(kraLevelId);
                       const ktc = typeColor(kra.is_standard);
                       const dupCount = employeeDuplicateMap?.[kraLevelId] ?? 0;
@@ -253,7 +265,7 @@ function KRAPanel({ kras, categories, selectedKraLevelIds, onToggleKRA, isReadOn
                         </Box>
                       );
                     })
-                  )}
+                  }
                 </Box>
               </Collapse>
             </Box>
@@ -304,8 +316,20 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
     }
     // Column-based sort
     list = [...list].sort((a, b) => {
+      const aSelected = selectedEmployeeIds.includes(a.employee_id);
+      const bSelected = selectedEmployeeIds.includes(b.employee_id);
+      
+      // Selected always on top
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      
+      // Within same group, apply column sort
       let va, vb;
-      if (sort.col === 'id') { va = a.employee_id; vb = b.employee_id; return sort.dir === 'asc' ? va - vb : vb - va; }
+      if (sort.col === 'id') { 
+        va = Number(a.employee_id); 
+        vb = Number(b.employee_id); 
+        return sort.dir === 'asc' ? va - vb : vb - va; 
+      }
       if (sort.col === 'name') { va = a.full_name?.toLowerCase() ?? ''; vb = b.full_name?.toLowerCase() ?? ''; }
       if (sort.col === 'role') { va = (a.title || a.department || '').toLowerCase(); vb = (b.title || b.department || '').toLowerCase(); }
       if (va < vb) return sort.dir === 'asc' ? -1 : 1;
@@ -313,7 +337,7 @@ function EmployeePanel({ employees, selectedEmployeeIds, onToggleEmployee, isRea
       return 0;
     });
     return list;
-  }, [employees, tab, deptFilter, levelFilter, search, sort]);
+  }, [employees, tab, deptFilter, levelFilter, search, sort, selectedEmployeeIds]);
 
   const assigned = employees.filter(e => e.assigned_to_cycle).length;
   const unassigned = employees.filter(e => !e.assigned_to_cycle).length;
