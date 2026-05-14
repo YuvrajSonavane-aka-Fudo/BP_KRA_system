@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect  } from 'react';
 import {
   Box, Typography, Stack, Paper, Button, Chip,
   CircularProgress, Alert, Tabs, Tab, IconButton,
@@ -21,7 +21,7 @@ import OpenInNewIcon        from '@mui/icons-material/OpenInNew';
 import { useNavigate }      from 'react-router-dom';
 import ROUTES               from '../../config/routes';
 import { useCycles, invalidateCyclesCache } from '../../hooks/useCycles';
-import { updateCycle, advanceCycleStage }   from '../../api/cyclesApi';
+import { updateCycle, advanceCycleStage, getReferenceData  }   from '../../api/cyclesApi';
 import useRoleAccess        from '../../hooks/useRoleAccess';
 import { Dialog, DialogContent, DialogActions } from '@mui/material';
 
@@ -35,13 +35,6 @@ const STATUS_STYLES = {
   CANCELLED: { bgcolor: '#fee2e2', color: '#991b1b' },
 };
 
-const STAGES = [
-  { id: 1, name: 'KRA Assignment' },
-  { id: 2, name: 'Self Assessment' },
-  { id: 3, name: 'Lead Assessment' },
-  { id: 4, name: 'HR Validation' },
-  { id: 5, name: 'Completed' },
-];
 
 const STATUS_ACTIONS = {
   DRAFT:     ['ACTIVE'],
@@ -69,12 +62,12 @@ function formatDate(dateStr) {
 }
 
 /* ── Stage stepper for active cycle banner ── */
-function BannerStepper({ currentStageId, canAdvance, onAdvanceClick }) {
+function BannerStepper({stages, currentStageId, canAdvance, onAdvanceClick }) {
   return (
     <Box sx={{ position: 'relative', mt: 1.5 }}>
       <Box sx={{ position: 'absolute', top: 12, left: '5%', right: '5%', height: 2, bgcolor: 'rgba(255,255,255,0.2)', zIndex: 0 }} />
       <Stack direction="row" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
-        {STAGES.map((stage) => {
+        {stages.map((stage) => {
           const done   = stage.id < currentStageId;
           const active = stage.id === currentStageId;
           const isNext = canAdvance && stage.id === currentStageId + 1;
@@ -157,6 +150,13 @@ export default function DashboardPage() {
   const { canManageCycles } = useRoleAccess();
   const { data: allCycles, loading, error, refetch } = useCycles();
 
+  const [stages, setStages] = useState([]);
+
+  useEffect(() => {
+    getReferenceData()
+      .then(res => setStages(res.data.stages ?? []))
+      .catch(() => {});
+  }, []);
   const [tab, setTab]       = useState(0);
   const [page, setPage]     = useState(0);
   const [search, setSearch] = useState('');
@@ -278,7 +278,8 @@ export default function DashboardPage() {
 
   const currentStageId   = activeCycle?.current_stage?.id ?? null;
   const activeActions    = activeCycle ? (STATUS_ACTIONS[activeCycle.status] ?? []) : [];
-  const canAdvanceActive = !!activeCycle && activeCycle.status === 'ACTIVE' && canManageCycles && currentStageId && currentStageId < 5;
+  const maxStageId = stages.length > 0 ? Math.max(...stages.map(s => s.id)) : 5;
+  const canAdvanceActive = !!activeCycle && activeCycle.status === 'ACTIVE' && canManageCycles && currentStageId && currentStageId < maxStageId;
 
   const paginatedRows = filteredAndSorted.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE);
 
@@ -363,6 +364,7 @@ export default function DashboardPage() {
             </Stack>
 
             <BannerStepper
+              stages={stages}
               currentStageId={currentStageId ?? 1}
               canAdvance={canAdvanceActive}
               onAdvanceClick={(stage) => {
@@ -449,8 +451,8 @@ export default function DashboardPage() {
               {paginatedRows.map((cycle) => {
                 const stageId   = cycle.current_stage?.id ?? 1;
                 const stageName = cycle.current_stage
-                  ? (STAGES.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name)
-                  : STAGES[0].name;
+                  ? (stages.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name)
+                  : (stages[0]?.name ?? '—');
                 const canDelete = cycle.status === 'DRAFT';
                 const isActive  = cycle.status === 'ACTIVE';
 
@@ -597,7 +599,7 @@ export default function DashboardPage() {
         open={advanceConfirm.open}
         title="Advance Stage"
         message={`Move "${advanceConfirm.cycle?.name}" to Stage ${advanceConfirm.toStage?.id}: "${advanceConfirm.toStage?.name}"?`}
-        warning="All enrolled employees will be moved to the new stage. This cannot be undone."
+        warning="All enrolled employees will be moved to the new stage."
         confirmLabel="Advance Stage"
         confirmColor="#1E3A8A"
         loading={advanceLoading}

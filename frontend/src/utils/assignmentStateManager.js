@@ -7,7 +7,7 @@ const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 let _memCache = null; // null = not loaded yet
 
 function getMemCache() {
-  if (_memCache !== null) return _memCache; // already loaded
+  if (_memCache !== null) return _memCache;
   _memCache = loadFromStorage();
   return _memCache;
 }
@@ -23,12 +23,33 @@ function loadFromStorage() {
   }
 }
 
+// ── Debounced persist ─────────────────────────────────────────────────────────
+// Batches rapid writes (e.g. bulk-assign 100 employees) into a single
+// localStorage.setItem call instead of one per employee.
+let _persistTimer = null;
+
 function persistToStorage() {
+  if (_persistTimer) clearTimeout(_persistTimer);
+  _persistTimer = setTimeout(_flushToStorage, 300);
+}
+
+function _flushToStorage() {
+  _persistTimer = null;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(_memCache));
   } catch {
     // Storage full or private mode — fail silently
   }
+}
+
+// Flush immediately before the page unloads so no data is lost.
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    if (_persistTimer) {
+      clearTimeout(_persistTimer);
+      _flushToStorage();
+    }
+  });
 }
 
 function pruneStale() {
@@ -44,7 +65,7 @@ function pruneStale() {
       pruned = true;
     }
   });
-  if (pruned) persistToStorage(); // only write if something was actually removed
+  if (pruned) persistToStorage();
 }
 
 // Prune once on module load — not on every read
@@ -82,6 +103,7 @@ export const bulkRemoveFromCache = (employeeKraCycleIds = []) => {
 
 export const clearAssignmentCache = () => {
   _memCache = {};
+  if (_persistTimer) { clearTimeout(_persistTimer); _persistTimer = null; }
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
