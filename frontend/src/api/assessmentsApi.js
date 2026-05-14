@@ -24,10 +24,10 @@ export const saveSelfAssessmentRow = (employeeKraLevelId, payload) =>
  * Lead/HR: returns all enrolled employees (or one if employee_id given) with KRA rows,
  * self-assessment data, and any existing lead ratings.
  */
-export const getAssessmentProgress = (cycleId, employeeId = null) =>
-  axiosInstance.get(`/kra/cycles/${cycleId}/progress`, {
-    params: employeeId ? { employee_id: employeeId } : {},
-  });
+// export const getAssessmentProgress = (cycleId, employeeId = null) =>
+//   axiosInstance.get(`/kra/cycles/${cycleId}/progress`, {
+//     params: employeeId ? { employee_id: employeeId } : {},
+//   });
 
 /**
  * PATCH /kra/assessments/:employeeKraLevelId/lead-review
@@ -43,3 +43,12 @@ export const submitLeadReview = (employeeKraLevelId, payload) =>
  */
 export const saveLeadDescription = (employeeKraLevelId, payload) =>
   axiosInstance.patch(`/kra/assessments/${employeeKraLevelId}/description`, payload);
+
+export const getAssessmentProgress = (cycleId, employeeId = null, page = 1, perPage = 20) =>
+  axiosInstance.get(`/kra/cycles/${cycleId}/progress`, {
+    params: {
+      ...(employeeId ? { employee_id: employeeId } : {}),
+      page,
+      per_page: perPage,
+    },
+  });
