@@ -895,19 +895,20 @@ class KRACycleAdvanceStageView(APIView):
                 'Cycle has no current stage assigned',
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if cycle.stage_id >= 5:
-            return Response(
-                'Cycle is already at the final stage',
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        ordered_stages = list(Stage.objects.order_by('id'))
+        stage_ids      = [s.id for s in ordered_stages]
+
+        if cycle.stage_id not in stage_ids:
+            return Response('Current stage not found in DB', status=status.HTTP_400_BAD_REQUEST)
+
+        current_index = stage_ids.index(cycle.stage_id)
+
+        if current_index >= len(stage_ids) - 1:
+            return Response('Cycle is already at the final stage', status=status.HTTP_400_BAD_REQUEST)
 
         previous_stage = cycle.stage
-        new_stage_id   = cycle.stage_id + 1
-
-        try:
-            new_stage = Stage.objects.get(id=new_stage_id)
-        except Stage.DoesNotExist:
-            return Response('Next stage does not exist', status=status.HTTP_400_BAD_REQUEST)
+        new_stage      = ordered_stages[current_index + 1]
+        new_stage_id   = new_stage.id
 
         with transaction.atomic():
             cycle.stage = new_stage
