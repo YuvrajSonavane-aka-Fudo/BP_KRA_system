@@ -3,6 +3,7 @@ import {
   Box, Typography, Paper, Stack, Chip, TextField, Select, MenuItem,
   LinearProgress, Alert, CircularProgress, Divider, Collapse,
   InputAdornment, Avatar, Table, TableBody, TableCell, TableHead, TableRow,
+  Autocomplete,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -670,6 +671,8 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
   // dirtyMap: { [employeeId]: { [kraLevelId]: { lead_rating_id?, lead_comment? } } }
   const [dirtyMap, setDirtyMap] = useState({});
   const [selectedEmpId, setSelectedEmpId] = useState('');
+  const [sortBy,  setSortBy]  = useState('name');      // 'name' | 'lead_progress' | 'self_progress'
+  const [sortDir, setSortDir] = useState('asc');        // 'asc' | 'desc'
   const [page, setPage] = useState(1);
   const [allEmployees, setAllEmployees] = useState([]);
   const [hasMore, setHasMore] = useState(false);
@@ -805,6 +808,31 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
   const totalKras = employees.reduce((acc, emp) => acc + (emp.kras?.length ?? 0), 0);
   const overallPct = totalKras ? Math.round((totalReviewed / totalKras) * 100) : 0;
 
+  // ── Sorted employees ────────────────────────────────────────────────────────
+  const sortedEmployees = [...allEmployees].sort((a, b) => {
+    let valA, valB;
+    if (sortBy === 'name') {
+      valA = (a.full_name ?? '').toLowerCase();
+      valB = (b.full_name ?? '').toLowerCase();
+      return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    }
+    if (sortBy === 'lead_progress') {
+      const ratedA = a.kras?.filter(k => k.lead_rating_id).length ?? 0;
+      const ratedB = b.kras?.filter(k => k.lead_rating_id).length ?? 0;
+      const pctA   = a.kras?.length ? ratedA / a.kras.length : 0;
+      const pctB   = b.kras?.length ? ratedB / b.kras.length : 0;
+      valA = pctA; valB = pctB;
+    }
+    if (sortBy === 'self_progress') {
+      const ratedA = a.kras?.filter(k => k.self_rating_id).length ?? 0;
+      const ratedB = b.kras?.filter(k => k.self_rating_id).length ?? 0;
+      const pctA   = a.kras?.length ? ratedA / a.kras.length : 0;
+      const pctB   = b.kras?.length ? ratedB / b.kras.length : 0;
+      valA = pctA; valB = pctB;
+    }
+    return sortDir === 'asc' ? valA - valB : valB - valA;
+  });
+
   // If tab is 'self', render the employee self-assessment view for the lead themselves
   if (tab === 'self') {
     return (
@@ -872,24 +900,42 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
               </Select>
             )}
 
-            {/* Employee jump dropdown */}
+            {/* Employee jump dropdown — searchable */}
             {employees.length > 0 && (
-              <Select value={selectedEmpId}
-                onChange={e => handleJumpToEmployee(e.target.value)}
+              <Autocomplete
+                value={allEmployeesList.find(e => e.employee_id === selectedEmpId) ?? null}
+                onChange={(_, newVal) => { if (newVal) handleJumpToEmployee(newVal.employee_id); }}
+                options={allEmployeesList}
+                getOptionLabel={e => e.full_name ?? ''}
+                isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
                 size="small"
-                sx={{ minWidth: 200, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
-                {allEmployeesList.map(e => (
-                  <MenuItem key={e.employee_id} value={e.employee_id} sx={{ fontSize: 13 }}>
+                disableClearable
+                sx={{ minWidth: 220 }}
+                renderInput={params => (
+                  <TextField
+                    {...params}
+                    placeholder="Jump to employee…"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        fontSize: 13, borderRadius: 2, bgcolor: '#fff',
+                      },
+                    }}
+                  />
+                )}
+                renderOption={(props, e) => (
+                  <Box component="li" {...props} key={e.employee_id}>
                     <Stack direction="row" alignItems="center" spacing={1}>
-                      <Avatar sx={{ width: 20, height: 20, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>{initials(e.full_name)}</Avatar>
+                      <Avatar sx={{ width: 22, height: 22, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>
+                        {initials(e.full_name)}
+                      </Avatar>
                       <Typography sx={{ fontSize: 13 }}>{e.full_name}</Typography>
                       {e.kras?.filter(k => k.lead_rating_id).length === e.kras?.length && e.kras?.length > 0 && (
-                        <CheckCircleIcon sx={{ fontSize: 13, color: '#22c55e' }} />
+                        <CheckCircleIcon sx={{ fontSize: 13, color: '#22c55e', ml: 'auto !important' }} />
                       )}
                     </Stack>
-                  </MenuItem>
-                ))}
-              </Select>
+                  </Box>
+                )}
+              />
             )}
 
             {/* Save All */}
@@ -931,6 +977,50 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
 
       {/* Scrollable grid */}
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
+
+        {/* Sort bar */}
+        {allEmployees.length > 1 && !loading && (
+          <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', flexShrink: 0 }}>Sort by:</Typography>
+            {[
+              { key: 'name',          label: 'Name' },
+              { key: 'lead_progress', label: 'Lead Review Progress' },
+              { key: 'self_progress', label: 'Self-Assessment Progress' },
+            ].map(opt => {
+              const active = sortBy === opt.key;
+              return (
+                <Box
+                  key={opt.key}
+                  onClick={() => {
+                    if (active) {
+                      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy(opt.key);
+                      setSortDir(opt.key === 'name' ? 'asc' : 'desc'); // pending-first by default for progress
+                    }
+                  }}
+                  sx={{
+                    display: 'inline-flex', alignItems: 'center', gap: 0.5,
+                    px: 1.5, py: 0.5, borderRadius: 2, cursor: 'pointer',
+                    fontSize: 12, fontWeight: active ? 700 : 500,
+                    bgcolor: active ? `${BLUE}12` : '#f1f5f9',
+                    color:   active ? BLUE : '#64748b',
+                    border:  `1.5px solid ${active ? BLUE : '#e2e8f0'}`,
+                    transition: 'all 0.15s',
+                    '&:hover': { borderColor: BLUE, color: BLUE, bgcolor: `${BLUE}08` },
+                  }}
+                >
+                  {opt.label}
+                  {active && (
+                    <Box component="span" sx={{ fontSize: 11, ml: 0.3 }}>
+                      {sortDir === 'asc' ? '↑' : '↓'}
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
+        )}
         {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
         {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
@@ -948,7 +1038,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
           </Paper>
         ) : (
           <>
-            {allEmployees.map(emp => (
+            {sortedEmployees.map(emp => (
               <EmployeeSection
                 key={emp.employee_id}
                 emp={emp}
