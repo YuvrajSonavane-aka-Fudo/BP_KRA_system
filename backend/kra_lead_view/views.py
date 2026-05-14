@@ -8,6 +8,9 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db.models import Prefetch
+from django.core.paginator import Paginator
+
 
 from kra_cycle.models import (
     Employee,
@@ -76,10 +79,20 @@ class AssessmentProgressView(APIView):
             kra_cycle_id=cycle_id
         ).select_related(
             'employee',
-            'employee__manager',       # ← for manager_name
-            'employee__department',    # ← for department
-            'employee__level',         # ← for level
+            'employee__manager',
+            'employee__department',
+            'employee__level',
             'stage',
+        ).prefetch_related(
+            Prefetch(
+                'kra_level_rows',
+                queryset=EmployeeKRALevel.objects.select_related(
+                    'kra_level',
+                    'kra_level__category',
+                    'self_rating',
+                    'lead_rating',
+                )
+            )
         )
 
         if not _is_hr(caller):
@@ -107,13 +120,7 @@ class AssessmentProgressView(APIView):
         employees = []
         for ekc in ekc_qs:
             cats = category_map.get(ekc.id, {})
-
-            kra_rows = ekc.kra_level_rows.select_related(
-                'kra_level',
-                'kra_level__category',  # ← for category_name per KRA
-                'self_rating',
-                'lead_rating',
-            )
+            kra_rows = ekc.kra_level_rows.all()
 
             kras = [
                 {
@@ -150,6 +157,12 @@ class AssessmentProgressView(APIView):
                 'kras':                  kras,
             })
 
+        page      = int(request.query_params.get('page', 1))
+        per_page  = int(request.query_params.get('per_page', 20))
+        paginator = Paginator(employees, per_page)
+        page_obj  = paginator.get_page(page)
+
+        # ← audit must be BEFORE the return
         _audit(
             request,
             "ASSESSMENT_PROGRESS_VIEWED",
@@ -162,7 +175,19 @@ class AssessmentProgressView(APIView):
             }
         )
 
-        return Response({'cycle_id': cycle_id, 'employees': employees}, status=status.HTTP_200_OK)
+        return Response({
+            'cycle_id':   cycle_id,
+            'employees':  list(page_obj),
+            'pagination': {
+                'page':        page,
+                'per_page':    per_page,
+                'total':       paginator.count,
+                'total_pages': paginator.num_pages,
+                'has_next':    page_obj.has_next(),
+                'has_prev':    page_obj.has_previous(),
+            }
+        }, status=status.HTTP_200_OK)
+        
     
 class LeadReviewView(APIView):
     permission_classes = [IsAuthenticated]

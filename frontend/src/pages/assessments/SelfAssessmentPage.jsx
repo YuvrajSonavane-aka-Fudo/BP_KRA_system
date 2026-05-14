@@ -4,46 +4,48 @@ import {
   LinearProgress, Alert, CircularProgress, Divider, Collapse,
   InputAdornment, Avatar, Table, TableBody, TableCell, TableHead, TableRow,
 } from '@mui/material';
-import CheckCircleIcon          from '@mui/icons-material/CheckCircle';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
-import SaveIcon                 from '@mui/icons-material/Save';
-import HelpOutlineIcon          from '@mui/icons-material/HelpOutline';
-import ExpandMoreIcon           from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon           from '@mui/icons-material/ExpandLess';
-import LockOutlinedIcon         from '@mui/icons-material/LockOutlined';
-import RateReviewIcon           from '@mui/icons-material/RateReview';
-import PendingIcon              from '@mui/icons-material/Pending';
+import SaveIcon from '@mui/icons-material/Save';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import PendingIcon from '@mui/icons-material/Pending';
 import { getSelfAssessment, saveSelfAssessmentRow, getAssessmentProgress, submitLeadReview, saveLeadDescription } from '../../api/assessmentsApi';
-import { getCycles }            from '../../api/cyclesApi';
-import { getReferenceData }     from '../../api/referenceDataApi';
+import { getCycles } from '../../api/cyclesApi';
+import { getReferenceData } from '../../api/referenceDataApi';
 import { getStageStates, canSelfAssess, canLeadReview, getStageLockReason, STAGE } from '../../utils/stageUtils';
-import useAuth                  from '../../auth/useAuth';
+import useAuth from '../../auth/useAuth';
 
-const NAVY   = '#0f1b4c';
-const BLUE   = '#1E3A8A';
+const NAVY = '#0f1b4c';
+const BLUE = '#1E3A8A';
 const ACCENT = '#3b82f6';
 
 const CATEGORY_COLORS = {
   'Core Development': '#3b82f6',
-  'Behavioural':      '#8b5cf6',
-  'Leadership':       '#f59e0b',
-  'Strategic':        '#10b981',
-  'Technical':        '#ef4444',
-  'default':          '#6366f1',
+  'Behavioural': '#8b5cf6',
+  'Leadership': '#f59e0b',
+  'Strategic': '#10b981',
+  'Technical': '#ef4444',
+  'default': '#6366f1',
 };
 function categoryColor(name) { return CATEGORY_COLORS[name] || CATEGORY_COLORS.default; }
 function initials(name = '') { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'; }
 
 // ── Role helpers ──────────────────────────────────────────────────────────────
-const HR_ROLES   = ['Admin', 'HR', 'Vertical Lead'];
+const HR_ROLES = ['Admin', 'HR', 'Vertical Lead'];
 const LEAD_ROLES = ['Manager', 'Team Lead'];
+
+
 
 function resolveRole(user) {
   const roles = user?.roles ?? [];
-  const isHR   = roles.some(r => HR_ROLES.includes(r));
+  const isHR = roles.some(r => HR_ROLES.includes(r));
   const isLead = roles.some(r => LEAD_ROLES.includes(r));
   // HR supersedes lead; lead supersedes employee
-  if (isHR)   return 'hr';
+  if (isHR) return 'hr';
   if (isLead) return 'lead';
   return 'employee';
 }
@@ -147,25 +149,25 @@ function LeadRatingPanel({ row, ratings }) {
 }
 
 function KRACard({ row, ratings, onSave, saving, savedId, editable, showLeadRating, kraRef }) {
-  const [selfRatingId,  setSelfRatingId]  = useState(row.self_rating_id ?? '');
-  const [selfComment,   setSelfComment]   = useState(row.self_comment   ?? '');
+  const [selfRatingId, setSelfRatingId] = useState(row.self_rating_id ?? '');
+  const [selfComment, setSelfComment] = useState(row.self_comment ?? '');
   const [progressNotes, setProgressNotes] = useState(row.progress_notes ?? '');
-  const [help,          setHelp]          = useState(row.help_and_assistance_required ?? '');
-  const [showHelp,      setShowHelp]      = useState(false);
-  const [dirty,         setDirty]         = useState(false);
+  const [help, setHelp] = useState(row.help_and_assistance_required ?? '');
+  const [showHelp, setShowHelp] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const isSaving = saving && savedId === row.employee_kra_level_id;
-  const isDone   = !!selfRatingId && !!selfComment;
+  const isDone = !!selfRatingId && !!selfComment;
 
   useEffect(() => { setDirty(false); }, [editable]);
   function handleChange(setter) { return (val) => { setter(val); setDirty(true); }; }
 
   function handleSave() {
     onSave(row.employee_kra_level_id, {
-      self_rating_id:               selfRatingId  || null,
-      self_comment:                 selfComment   || null,
-      progress_notes:               progressNotes || null,
-      help_and_assistance_required: help          || null,
+      self_rating_id: selfRatingId || null,
+      self_comment: selfComment || null,
+      progress_notes: progressNotes || null,
+      help_and_assistance_required: help || null,
     });
     setDirty(false);
   }
@@ -265,7 +267,7 @@ function KRACard({ row, ratings, onSave, saving, savedId, editable, showLeadRati
 function ProgressSidebar({ kras, onJumpTo }) {
   const rated = kras.filter(k => k.self_rating_id).length;
   const total = kras.length;
-  const pct   = total ? Math.round((rated / total) * 100) : 0;
+  const pct = total ? Math.round((rated / total) * 100) : 0;
   const avgRatings = kras.filter(k => k.self_rating).map(k => k.self_rating);
   const avgDisplay = avgRatings.length ? (avgRatings.reduce((a, b) => a + b, 0) / avgRatings.length).toFixed(1) : '—';
 
@@ -323,18 +325,18 @@ function ProgressSidebar({ kras, onJumpTo }) {
         </Box>
       </Paper>
 
-      
+
     </Box>
   );
 }
 
 function EmployeeView({ cycleId, cycles, onCycleChange, ratings, hideCycleHeader = false }) {
-  const [data,      setData]      = useState(null);
-  const [loading,   setLoading]   = useState(false);
-  const [saving,    setSaving]    = useState(false);
-  const [savedId,   setSavedId]   = useState(null);
-  const [error,     setError]     = useState('');
-  const [toast,     setToast]     = useState({ msg: '', severity: 'success' });
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState(null);
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState({ msg: '', severity: 'success' });
   const kraRefs = useRef({});
 
   useEffect(() => {
@@ -367,13 +369,13 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, hideCycleHeader
     }, 50);
   }
 
-  const kras              = data?.kras ?? [];
-  const cycle             = cycles.find(c => c.id === cycleId);
-  const currentStageId    = data?.current_stage?.id ?? cycle?.current_stage_id ?? null;
+  const kras = data?.kras ?? [];
+  const cycle = cycles.find(c => c.id === cycleId);
+  const currentStageId = data?.current_stage?.id ?? cycle?.current_stage_id ?? null;
   const completedStageIds = data?.completed_stage_ids ?? [];
-  const editable          = canSelfAssess(currentStageId);
-  const lockReason        = !editable && currentStageId ? getStageLockReason(currentStageId, 'employee') : null;
-  const showLeadRating    = currentStageId >= STAGE.LEAD_ASSESSMENT;
+  const editable = canSelfAssess(currentStageId);
+  const lockReason = !editable && currentStageId ? getStageLockReason(currentStageId, 'employee') : null;
+  const showLeadRating = currentStageId >= STAGE.LEAD_ASSESSMENT;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
@@ -415,7 +417,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, hideCycleHeader
             </Alert>
           )}
           {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
-          {error     && <Alert severity="error"           sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
           {loading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: BLUE }} /></Box>}
 
           {!loading && !error && (
@@ -457,14 +459,14 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, hideCycleHeader
 // dirty state shape: { [employee_kra_level_id]: { lead_rating_id, lead_comment, lead_progress_notes } }
 
 function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange, sectionRef }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
-  const kras        = emp.kras ?? [];
-  const reviewed    = kras.filter(k => k.lead_rating_id || dirtyMap[k.employee_kra_level_id]?.lead_rating_id).length;
-  const pct         = kras.length ? Math.round((reviewed / kras.length) * 100) : 0;
+  const kras = emp.kras ?? [];
+  const reviewed = kras.filter(k => k.lead_rating_id || dirtyMap[k.employee_kra_level_id]?.lead_rating_id).length;
+  const pct = kras.length ? Math.round((reviewed / kras.length) * 100) : 0;
 
   // Use the employee's own stage_id for the rating lock — backend allows rating at stage 3 and 4
-  const empStageId     = emp.current_stage_id ?? currentStageId;
+  const empStageId = emp.current_stage_id ?? currentStageId;
   const ratingEditable = canLeadReview(empStageId);  // true only at stage 3 (Assessment) or 4 (HR Validation)
 
   return (
@@ -496,14 +498,16 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
             </Typography>
           </Box>
           <LinearProgress variant="determinate" value={pct}
-            sx={{ width: 80, height: 5, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.15)',
-              '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#4ade80' : ACCENT } }} />
+            sx={{
+              width: 80, height: 5, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.15)',
+              '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#4ade80' : ACCENT }
+            }} />
           {collapsed ? <ExpandMoreIcon sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 20 }} /> : <ExpandLessIcon sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 20 }} />}
         </Stack>
       </Box>
 
       {/* KRA grid table */}
-      <Collapse in={!collapsed}>
+      {!collapsed && (
         <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
           {kras.length === 0 ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -511,10 +515,10 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
             </Box>
           ) : (
             <Box sx={{ overflowX: 'auto' }}>
-              <Table size="small" sx={{ minWidth: 1100 }}>
+              <Table size="small" sx={{ minWidth: 1300 }}>
                 <TableHead>
                   <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                    {['Category', 'KRA', 'Description by Lead', 'Self Rating', 'Self Comment', 'Progress Notes', 'Lead Rating', 'Lead Comment'].map(h => (
+                    {['Category', 'KRA', 'Description by Lead', 'Self Rating', 'Self Comment', 'Progress Notes', 'Help & Assistance', 'Lead Rating', 'Lead Comment'].map(h => (
                       <TableCell key={h} sx={{
                         fontSize: 10, fontWeight: 700, color: '#64748b',
                         textTransform: 'uppercase', letterSpacing: '0.07em',
@@ -526,11 +530,11 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
                 </TableHead>
                 <TableBody>
                   {kras.map((kra, idx) => {
-                    const dirty      = dirtyMap[kra.employee_kra_level_id] ?? {};
-                    const leadRating = dirty.lead_rating_id  ?? kra.lead_rating_id  ?? '';
-                    const leadComment= dirty.lead_comment    ?? kra.lead_comment    ?? '';
+                    const dirty = dirtyMap[kra.employee_kra_level_id] ?? {};
+                    const leadRating = dirty.lead_rating_id ?? kra.lead_rating_id ?? '';
+                    const leadComment = dirty.lead_comment ?? kra.lead_comment ?? '';
                     const selfRatingLabel = ratings.find(r => r.id === kra.self_rating_id);
-                    const isDirty    = !!dirtyMap[kra.employee_kra_level_id];
+                    const isDirty = !!dirtyMap[kra.employee_kra_level_id];
 
                     return (
                       <TableRow key={kra.employee_kra_level_id}
@@ -561,10 +565,13 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
                                 onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'description_by_lead', val);
                               }
                             }}
-                            sx={{ '& .MuiOutlinedInput-root': { fontSize: 12, borderRadius: 1.5,
-                              '&:hover fieldset': { borderColor: ACCENT },
-                              '&.Mui-focused fieldset': { borderColor: ACCENT },
-                            }}}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                fontSize: 12, borderRadius: 1.5,
+                                '&:hover fieldset': { borderColor: ACCENT },
+                                '&.Mui-focused fieldset': { borderColor: ACCENT },
+                              }
+                            }}
                           />
                         </TableCell>
 
@@ -592,14 +599,23 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
                           </Typography>
                         </TableCell>
 
+                        {/* Help & Assistance Required (read-only) */}
+                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
+                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.help_and_assistance_required ? 'normal' : 'italic', color: kra.help_and_assistance_required ? '#64748b' : '#94a3b8' }}>
+                            {kra.help_and_assistance_required || '—'}
+                          </Typography>
+                        </TableCell>
+
                         {/* Lead rating — editable only in lead assessment stage */}
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 150 }}>
                           {ratingEditable ? (
                             <Select value={leadRating}
                               onChange={e => onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'lead_rating_id', e.target.value)}
                               displayEmpty size="small" fullWidth
-                              sx={{ fontSize: 12, borderRadius: 1.5,
-                                '& .MuiOutlinedInput-notchedOutline': { borderColor: leadRating ? '#22c55e' : '#e2e8f0' } }}>
+                              sx={{
+                                fontSize: 12, borderRadius: 1.5,
+                                '& .MuiOutlinedInput-notchedOutline': { borderColor: leadRating ? '#22c55e' : '#e2e8f0' }
+                              }}>
                               <MenuItem value="" sx={{ fontSize: 12, color: '#94a3b8' }}>Select…</MenuItem>
                               {ratings.map(r => (
                                 <MenuItem key={r.id} value={r.id} sx={{ fontSize: 12 }}>{r.rating} – {r.description}</MenuItem>
@@ -621,11 +637,14 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
                             placeholder="Add comment…"
                             value={leadComment}
                             onChange={e => onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'lead_comment', e.target.value)}
-                            sx={{ '& .MuiOutlinedInput-root': { fontSize: 12, borderRadius: 1.5,
-                              '&:hover fieldset': { borderColor: ACCENT },
-                              '&.Mui-focused fieldset': { borderColor: ACCENT },
-                              ...(isDirty ? { '& fieldset': { borderColor: '#f59e0b' } } : {}),
-                            } }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                fontSize: 12, borderRadius: 1.5,
+                                '&:hover fieldset': { borderColor: ACCENT },
+                                '&.Mui-focused fieldset': { borderColor: ACCENT },
+                                ...(isDirty ? { '& fieldset': { borderColor: '#f59e0b' } } : {}),
+                              }
+                            }}
                           />
                         </TableCell>
                       </TableRow>
@@ -636,36 +655,60 @@ function EmployeeSection({ emp, ratings, currentStageId, dirtyMap, onFieldChange
             </Box>
           )}
         </Paper>
-      </Collapse>
+      )}
     </Box>
   );
 }
 
 function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
-  const [tab,      setTab]      = useState('self'); // 'self' | 'team'
-  const [data,     setData]     = useState(null);
-  const [loading,  setLoading]  = useState(false);
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState('');
-  const [toast,    setToast]    = useState({ msg: '', severity: 'success' });
+  const [tab, setTab] = useState('self'); // 'self' | 'team'
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState({ msg: '', severity: 'success' });
   // dirtyMap: { [employeeId]: { [kraLevelId]: { lead_rating_id?, lead_comment? } } }
   const [dirtyMap, setDirtyMap] = useState({});
   const [selectedEmpId, setSelectedEmpId] = useState('');
+  const [page, setPage] = useState(1);
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [allEmployeesList, setAllEmployeesList] = useState([]);
 
-  const sectionRefs = useRef({});
+  useEffect(() => {
+    if (!cycleId) return;
+    getAssessmentProgress(cycleId, null, 1, 200)
+      .then(res => setAllEmployeesList(res.data?.employees ?? []))
+      .catch(() => { });
+  }, [cycleId]);
 
   useEffect(() => {
     if (!cycleId) return;
     setLoading(true); setError(''); setDirtyMap({});
-    getAssessmentProgress(cycleId)
+    setPage(1); setAllEmployees([]);
+    getAssessmentProgress(cycleId, null, 1, 20)
       .then(res => {
         setData(res.data);
+        setAllEmployees(res.data?.employees ?? []);
+        setHasMore(res.data?.pagination?.has_next ?? false);
         const emps = res.data?.employees ?? [];
         if (emps.length > 0) setSelectedEmpId(emps[0].employee_id);
       })
       .catch(err => setError(err?.response?.data?.error || 'Failed to load'))
       .finally(() => setLoading(false));
   }, [cycleId]);
+
+  async function loadMore() {
+    const nextPage = page + 1;
+    const res = await getAssessmentProgress(cycleId, null, nextPage, 20);
+    setAllEmployees(prev => [...prev, ...(res.data?.employees ?? [])]);
+    setHasMore(res.data?.pagination?.has_next ?? false);
+    setPage(nextPage);
+  }
+
+  const sectionRefs = useRef({});
+
+
 
   function handleFieldChange(employeeId, kraLevelId, field, value) {
     setDirtyMap(prev => ({
@@ -703,16 +746,15 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
     try {
       await Promise.all(promises);
       // Merge dirty into data so UI reflects saved state
-      setData(prev => ({
-        ...prev,
-        employees: prev.employees.map(emp => ({
-          ...emp,
-          kras: emp.kras.map(k => {
-            const patch = dirtyMap[emp.employee_id]?.[k.employee_kra_level_id];
-            return patch ? { ...k, ...patch } : k;
-          }),
-        })),
+      const applyPatches = emps => emps.map(emp => ({
+        ...emp,
+        kras: emp.kras.map(k => {
+          const patch = dirtyMap[emp.employee_id]?.[k.employee_kra_level_id];
+          return patch ? { ...k, ...patch } : k;
+        }),
       }));
+      setData(prev => ({ ...prev, employees: applyPatches(prev?.employees ?? []) }));
+      setAllEmployees(prev => applyPatches(prev));
       setDirtyMap({});
       setToast({ msg: `Saved successfully`, severity: 'success' });
     } catch (err) {
@@ -723,24 +765,45 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
     }
   }
 
-  function handleJumpToEmployee(empId) {
+  async function handleJumpToEmployee(empId) {
     setSelectedEmpId(empId);
-    setTimeout(() => {
-      const el = sectionRefs.current[empId];
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+
+    // Check if already loaded
+    const existing = allEmployees.find(e => e.employee_id === empId);
+    if (existing) {
+      setTimeout(() => {
+        const el = sectionRefs.current[empId];
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+      return;
+    }
+
+    // Not loaded yet — fetch just this employee
+    try {
+      const res = await getAssessmentProgress(cycleId, empId, 1, 1);
+      const fetched = res.data?.employees?.[0];
+      if (fetched) {
+        setAllEmployees(prev => [...prev, fetched]);
+        setTimeout(() => {
+          const el = sectionRefs.current[empId];
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100); // slightly longer delay to let the new section render
+      }
+    } catch (err) {
+      console.error('Failed to load employee', err);
+    }
   }
 
-  const employees         = data?.employees ?? [];
-  const cycle             = cycles.find(c => c.id === cycleId);
-  const currentStageId    = data?.current_stage_id ?? data?.current_stage?.id ?? cycle?.current_stage_id ?? null;
+  const employees = allEmployees;
+  const cycle = cycles.find(c => c.id === cycleId);
+  const currentStageId = data?.current_stage_id ?? data?.current_stage?.id ?? cycle?.current_stage_id ?? null;
   const completedStageIds = data?.completed_stage_ids ?? [];
 
   const totalDirty = Object.values(dirtyMap).reduce((acc, kraMap) => acc + Object.keys(kraMap).length, 0);
 
   const totalReviewed = employees.reduce((acc, emp) => acc + (emp.kras?.filter(k => k.lead_rating_id).length ?? 0), 0);
-  const totalKras     = employees.reduce((acc, emp) => acc + (emp.kras?.length ?? 0), 0);
-  const overallPct    = totalKras ? Math.round((totalReviewed / totalKras) * 100) : 0;
+  const totalKras = employees.reduce((acc, emp) => acc + (emp.kras?.length ?? 0), 0);
+  const overallPct = totalKras ? Math.round((totalReviewed / totalKras) * 100) : 0;
 
   // If tab is 'self', render the employee self-assessment view for the lead themselves
   if (tab === 'self') {
@@ -815,7 +878,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
                 onChange={e => handleJumpToEmployee(e.target.value)}
                 size="small"
                 sx={{ minWidth: 200, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
-                {employees.map(e => (
+                {allEmployeesList.map(e => (
                   <MenuItem key={e.employee_id} value={e.employee_id} sx={{ fontSize: 13 }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Avatar sx={{ width: 20, height: 20, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>{initials(e.full_name)}</Avatar>
@@ -857,8 +920,10 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: BLUE }}>{overallPct}%</Typography>
             </Stack>
             <LinearProgress variant="determinate" value={overallPct}
-              sx={{ height: 6, borderRadius: 3, bgcolor: '#e2e8f0',
-                '& .MuiLinearProgress-bar': { bgcolor: overallPct === 100 ? '#22c55e' : ACCENT } }} />
+              sx={{
+                height: 6, borderRadius: 3, bgcolor: '#e2e8f0',
+                '& .MuiLinearProgress-bar': { bgcolor: overallPct === 100 ? '#22c55e' : ACCENT }
+              }} />
           </Box>
         )}
         <Divider sx={{ mt: 2 }} />
@@ -867,7 +932,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
       {/* Scrollable grid */}
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
         {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
-        {error     && <Alert severity="error"           sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
         {!canLeadReview(currentStageId) && currentStageId && (
           <Alert severity="info" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
@@ -882,17 +947,30 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
             <Typography sx={{ color: '#94a3b8', fontSize: 15 }}>No employees enrolled in this cycle.</Typography>
           </Paper>
         ) : (
-          employees.map(emp => (
-            <EmployeeSection
-              key={emp.employee_id}
-              emp={emp}
-              ratings={ratings}
-              currentStageId={currentStageId}
-              dirtyMap={dirtyMap[emp.employee_id] ?? {}}
-              onFieldChange={handleFieldChange}
-              sectionRef={el => { sectionRefs.current[emp.employee_id] = el; }}
-            />
-          ))
+          <>
+            {allEmployees.map(emp => (
+              <EmployeeSection
+                key={emp.employee_id}
+                emp={emp}
+                ratings={ratings}
+                currentStageId={currentStageId}
+                dirtyMap={dirtyMap[emp.employee_id] ?? {}}
+                onFieldChange={handleFieldChange}
+                sectionRef={el => { sectionRefs.current[emp.employee_id] = el; }}
+              />
+            ))}
+            {hasMore && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                <Box onClick={loadMore} sx={{
+                  px: 3, py: 1, borderRadius: 2, cursor: 'pointer',
+                  bgcolor: BLUE, color: '#fff', fontSize: 13, fontWeight: 600,
+                  '&:hover': { bgcolor: ACCENT },
+                }}>
+                  Load More Employees
+                </Box>
+              </Box>
+            )}
+          </>
         )}
       </Box>
     </Box>
@@ -904,7 +982,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings }) {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function KRAAssessmentPage() {
   const { user } = useAuth();
-  const [cycles,  setCycles]  = useState([]);
+  const [cycles, setCycles] = useState([]);
   const [cycleId, setCycleId] = useState('');
   const [ratings, setRatings] = useState([]);
 
