@@ -238,12 +238,16 @@ export default function EmployeeKRAView({
     employee?.assigned_kras?.map(k => k.kra_level_id) ?? cachedData?.kra_level_ids ?? [],
     [employee, cachedData]);
 
+  // ── FIX #1: convert to Set once so the grouped useMemo uses O(1) lookups
+  // instead of O(n) Array.includes() for every KRA × level combination.
+  const kraLevelIdSet = useMemo(() => new Set(kraLevelIds), [kraLevelIds]);
+
   const grouped = useMemo(() => {
     const map = {};
     kraLibrary.forEach(kra => {
       kra.levels?.forEach(level => {
         const lid = level.kra_level_id ?? level.id;
-        if (!kraLevelIds.includes(lid)) return;
+        if (!kraLevelIdSet.has(lid)) return;
         const cid = kra.category_id;
         if (!map[cid]) {
           map[cid] = {
@@ -264,7 +268,7 @@ export default function EmployeeKRAView({
       });
     });
     return Object.values(map).sort((a, b) => a.category_name.localeCompare(b.category_name));
-  }, [kraLibrary, kraLevelIds, categories]);
+  }, [kraLibrary, kraLevelIdSet, categories]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return grouped;
@@ -309,6 +313,13 @@ export default function EmployeeKRAView({
   };
 
   const handleSave = async () => {
+    if (totalW > 100) {
+      push?.(
+        `Total weightage is ${totalW}%. Please reduce some values to continue.`,
+        'warning'
+      );
+      return;
+    }
     setSaving(true);
     try {
       await onSaveWeightages?.(weightages);
@@ -642,7 +653,7 @@ export default function EmployeeKRAView({
               <Chip icon={<CheckCircleIcon sx={{ fontSize: '11px !important' }} />} label="Saved!" size="small"
                 sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: 10 }} />
             )}
-            <Button onClick={handleSave} disabled={saving || !dirty}
+            <Button onClick={handleSave} disabled={saving || !dirty || totalW > 100}
               startIcon={saving ? <CircularProgress size={12} /> : <SaveIcon sx={{ fontSize: 14 }} />}
               variant="contained"
               sx={{ fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,

@@ -478,3 +478,17 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f'{self.employee_id} → {self.action} on {self.entity}:{self.entity_id} at {self.timestamp}'
+    
+class EmployeeKRACycleStage(models.Model):
+    """Per-employee stage date overrides. Created only when an employee is sent back."""
+    employee_kra_cycle = models.ForeignKey(
+        EmployeeKRACycle,
+        on_delete=models.CASCADE,
+        related_name='stage_overrides'
+    )
+    stage = models.ForeignKey(Stage, on_delete=models.CASCADE)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    class Meta:
+        unique_together = ('employee_kra_cycle', 'stage')

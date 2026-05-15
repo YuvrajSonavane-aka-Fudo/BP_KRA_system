@@ -8,6 +8,7 @@ from .views import (
     KRACycleAdvanceStageView,
     ReferenceDataView,
     KRALibraryView,
+    EmployeeStageOverrideDatesView,
 )
 
 urlpatterns = [
@@ -19,4 +20,5 @@ urlpatterns = [
     path('kra/cycles/<int:cycle_id>/advance-stage' , KRACycleAdvanceStageView.as_view()),
     path('kra/reference-data',ReferenceDataView.as_view()),
     path('kra/library',KRALibraryView.as_view()),
+    path('kra/employee-cycles/<int:ekc_id>/stage-dates', EmployeeStageOverrideDatesView.as_view()),
 ]

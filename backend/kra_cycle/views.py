@@ -14,6 +14,7 @@ from .models import (
     KRACycle,
     KRACycleStage,
     EmployeeKRACycle,
+    EmployeeKRACycleStage,
     EmployeeKRACycleCategory,
     EmployeeKRALevel,
     KRALevel,
@@ -895,19 +896,20 @@ class KRACycleAdvanceStageView(APIView):
                 'Cycle has no current stage assigned',
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if cycle.stage_id >= 5:
-            return Response(
-                'Cycle is already at the final stage',
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        ordered_stages = list(Stage.objects.order_by('id'))
+        stage_ids      = [s.id for s in ordered_stages]
+
+        if cycle.stage_id not in stage_ids:
+            return Response('Current stage not found in DB', status=status.HTTP_400_BAD_REQUEST)
+
+        current_index = stage_ids.index(cycle.stage_id)
+
+        if current_index >= len(stage_ids) - 1:
+            return Response('Cycle is already at the final stage', status=status.HTTP_400_BAD_REQUEST)
 
         previous_stage = cycle.stage
-        new_stage_id   = cycle.stage_id + 1
-
-        try:
-            new_stage = Stage.objects.get(id=new_stage_id)
-        except Stage.DoesNotExist:
-            return Response('Next stage does not exist', status=status.HTTP_400_BAD_REQUEST)
+        new_stage      = ordered_stages[current_index + 1]
+        new_stage_id   = new_stage.id
 
         with transaction.atomic():
             cycle.stage = new_stage
@@ -962,20 +964,31 @@ class KRACycleAdvanceStageView(APIView):
                 )
             ekc_qs = ekc_qs.filter(employee_id__in=employee_ids)
 
+        old_cycle_stage_id   = cycle.stage_id
+        old_cycle_stage_name = cycle.stage.name if cycle.stage else None
+
         with transaction.atomic():
             affected = ekc_qs.update(stage_id=target_stage_id)
+
+            # When rolling back ALL employees (no specific employee_ids),
+            # also move the cycle's own current_stage pointer so the
+            # stepper and "Current Stage" chip reflect the rollback.
+            if not employee_ids:
+                cycle.stage = target_stage
+                cycle.save(update_fields=['stage'])
 
         scope = f'employees {employee_ids}' if employee_ids else 'all employees'
 
         #  AUDIT LOG
         _audit(self.request, "EMPLOYEE_STAGE_OVERRIDE", "KRACycle", cycle.id,
             old_data={
-                "cycle_stage_id": cycle.stage_id,
-                "cycle_stage_name": cycle.stage.name if cycle.stage else None,
+                "cycle_stage_id":   old_cycle_stage_id,
+                "cycle_stage_name": old_cycle_stage_name,
             },
             new_data={
-                "target_stage_id": target_stage.id,
+                "target_stage_id":   target_stage.id,
                 "target_stage_name": target_stage.name,
+                "cycle_stage_updated": not bool(employee_ids),
                 "scope": scope,
                 "employees_updated": affected,
             }
@@ -1060,3 +1073,34 @@ class KRALibraryView(APIView):
             })
 
         return Response({'kras': kras}, status=status.HTTP_200_OK)
+    
+
+class EmployeeStageOverrideDatesView(APIView):
+    """
+    POST /api/v1/kra/employee-cycles/:ekc_id/stage-dates
+    Save per-employee stage date overrides.
+    Body: { stages: [{ stage_id, start_date, end_date }] }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, ekc_id):
+        caller = _get_caller(request)
+        if not _is_hr(caller):
+            return Response({'error': 'Only HR/Admin can set stage overrides'},
+                          status=status.HTTP_403_FORBIDDEN)
+
+        ekc = get_object_or_404(EmployeeKRACycle, id=ekc_id)
+        stages_data = request.data.get('stages', [])
+
+        with transaction.atomic():
+            for s in stages_data:
+                EmployeeKRACycleStage.objects.update_or_create(
+                    employee_kra_cycle=ekc,
+                    stage_id=s['stage_id'],
+                    defaults={
+                        'start_date': s['start_date'],
+                        'end_date':   s['end_date'],
+                    }
+                )
+
+        return Response({'message': 'Stage dates saved'}, status=status.HTTP_200_OK)

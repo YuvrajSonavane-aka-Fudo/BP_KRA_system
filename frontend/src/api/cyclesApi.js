@@ -49,3 +49,9 @@ export const advanceCycleStage = (id, payload = {}) =>
   axiosInstance.post(`/kra/cycles/${id}/advance-stage`, payload);
 
 
+/**
+ * GET /kra/reference-data
+ * Response: { stages, levels, ratings, categories }
+ */
+export const getReferenceData = () =>
+  axiosInstance.get('/kra/reference-data');

@@ -339,11 +339,24 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmCol
   );
 }
 
-/* ─────────────── Stage Stepper (view only, no top bar) ─────────────── */
-function StageStepper({ currentStageId, canAdvance, onAdvanceClick }) {
+/* ─────────────────────────────────────────────────────────────
+   Stage Stepper
+   
+   FIX 1: Accept rollbackTargetId prop so stepper correctly
+           highlights the rollback target stage (not the current
+           stage) and shows it as the "selected" one.
+   FIX 2: Stepper no longer shows stage 1 as "completed" (green)
+           when it IS the rollback target — it shows it as active.
+   ───────────────────────────────────────────────────────────── */
+function StageStepper({ currentStageId, canAdvance, onAdvanceClick, rollbackTargetId }) {
   return (
     <Box sx={{ px: 2.5, pb: 2 }}>
-      {canAdvance && (
+      {rollbackTargetId && (
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)', mb: 1 }}>
+          Rolling back to "{STAGES.find(s => s.id === rollbackTargetId)?.name}" — update dates below and save
+        </Typography>
+      )}
+      {!rollbackTargetId && canAdvance && (
         <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.65)', mb: 1 }}>
           Click the next stage to continue
         </Typography>
@@ -352,9 +365,22 @@ function StageStepper({ currentStageId, canAdvance, onAdvanceClick }) {
         <Box sx={{ position: 'absolute', top: 14, left: '4%', right: '4%', height: 2, bgcolor: 'rgba(255,255,255,0.15)', zIndex: 0 }} />
         <Stack direction="row" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
           {STAGES.map((stage) => {
-            const done   = currentStageId && stage.id < currentStageId;
-            const active = currentStageId === stage.id;
-            const isNext = canAdvance && stage.id === (currentStageId ?? 0) + 1;
+            // FIX: In rollback mode, the rollbackTarget stage is "active/selected",
+            // stages BEFORE it are "done", stages AFTER are "future".
+            // Without rollback: normal current/done/future logic.
+            const isRollbackTarget = !!rollbackTargetId && stage.id === rollbackTargetId;
+
+            const done = rollbackTargetId
+              ? stage.id < rollbackTargetId   // stages before rollback target = done
+              : (currentStageId && stage.id < currentStageId);
+
+            // Active = rollback target (when rolling back) OR current stage (normal mode)
+            const active = rollbackTargetId
+              ? isRollbackTarget
+              : (currentStageId === stage.id);
+
+            const isNext = !rollbackTargetId && canAdvance && stage.id === (currentStageId ?? 0) + 1;
+
             return (
               <Tooltip key={stage.id} title={isNext ? `Advance to "${stage.name}"` : stage.name}>
                 <Stack alignItems="center" spacing={0.5} sx={{
@@ -365,10 +391,15 @@ function StageStepper({ currentStageId, canAdvance, onAdvanceClick }) {
                   <Box className="sdot" sx={{
                     width: active ? 32 : 24, height: active ? 32 : 24, borderRadius: '50%', flexShrink: 0,
                     bgcolor: done ? '#10b981' : active ? '#fff' : 'rgba(255,255,255,0.15)',
-                    border: `2px solid ${active ? 'rgba(255,255,255,0.5)' : done ? 'rgba(255,255,255,0.6)' : isNext ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)'}`,
+                    border: `2px solid ${isRollbackTarget ? '#60a5fa' : active ? 'rgba(255,255,255,0.5)' : done ? 'rgba(255,255,255,0.6)' : isNext ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    outline: active ? '5px solid rgba(255,255,255,0.1)' : 'none',
+                    outline: isRollbackTarget ? '5px solid rgba(96,165,250,0.35)' : active ? '5px solid rgba(255,255,255,0.1)' : 'none',
                     transition: 'all 0.18s',
+                    animation: isRollbackTarget ? 'rbPulse 1.8s ease-in-out infinite' : undefined,
+                    '@keyframes rbPulse': {
+                      '0%,100%': { outline: '5px solid rgba(96,165,250,0.25)' },
+                      '50%': { outline: '5px solid rgba(96,165,250,0.5)' },
+                    },
                   }}>
                     {done   && <CheckCircleIcon sx={{ color: '#fff', fontSize: 14 }} />}
                     {active && <Typography sx={{ fontSize: 11, color: '#1E3A8A', fontWeight: 800 }}>{stage.id}</Typography>}
@@ -376,11 +407,12 @@ function StageStepper({ currentStageId, canAdvance, onAdvanceClick }) {
                   </Box>
                   <Typography sx={{
                     fontSize: 9, fontWeight: active ? 700 : 500, textAlign: 'center', lineHeight: 1.2, maxWidth: 70,
-                    color: active ? '#fff' : done ? '#86efac' : isNext ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.4)',
+                    color: isRollbackTarget ? '#93c5fd' : active ? '#fff' : done ? '#86efac' : isNext ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.4)',
                   }}>
                     {stage.name}
                   </Typography>
                   {isNext && <Typography sx={{ fontSize: 8, color: 'rgba(147,197,253,0.9)', fontWeight: 700 }}>advance →</Typography>}
+                  {isRollbackTarget && <Typography sx={{ fontSize: 8, color: '#93c5fd', fontWeight: 700 }}>← target</Typography>}
                 </Stack>
               </Tooltip>
             );
@@ -394,7 +426,7 @@ function StageStepper({ currentStageId, canAdvance, onAdvanceClick }) {
 /* ══════════════ MAIN COMPONENT ══════════════ */
 export default function CycleDetailPage() {
   const { id }  = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { canManageCycles } = useRoleAccess();
 
@@ -402,6 +434,8 @@ export default function CycleDetailPage() {
   const cloneId  = searchParams.get('clone');
   const isClone  = isNew && !!cloneId;
   const isCreate = isNew && !cloneId;
+  const rollbackTargetId = searchParams.get('rollback') ? parseInt(searchParams.get('rollback'), 10) : null;
+  const stageDateRef = useRef(null);
 
   const [cycle, setCycle]     = useState(null);
   const [source, setSource]   = useState(null);
@@ -470,66 +504,60 @@ export default function CycleDetailPage() {
   }, [editName, editStart, editEnd, editStageDates, touched, isNew]);
 
   /* ── Data loading ── */
- const fetchData = useCallback(async () => {
-  setLoading(true); setError('');
-  try {
-    const listRes = await getCycles();
-    const cycles  = listRes.data?.cycles ?? listRes.data ?? [];
-    setAll(cycles);
+  const fetchData = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const listRes = await getCycles();
+      const cycles  = listRes.data?.cycles ?? listRes.data ?? [];
+      setAll(cycles);
 
-    if (isCreate) {
-      // nothing
+      if (isCreate) {
+        // nothing
 
-    } else if (isClone) {
-      const src = cycles.find(c => String(c.id) === String(cloneId));
-      if (!src) throw new Error('Source cycle not found');
-      setSource(src);
-      // Strip any existing " (N)" suffix to get the base name
-      const baseName = src.name.replace(/\s*\(\d+\)$/, '');
+      } else if (isClone) {
+        const src = cycles.find(c => String(c.id) === String(cloneId));
+        if (!src) throw new Error('Source cycle not found');
+        setSource(src);
+        const baseName = src.name.replace(/\s*\(\d+\)$/, '');
+        const usedNumbers = cycles
+          .map(c => {
+            const match = c.name.match(new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\((\\d+)\\)$`));
+            return match ? parseInt(match[1], 10) : null;
+          })
+          .filter(n => n !== null);
+        const nextNum = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
+        setEditName(`${baseName} (${nextNum})`);
+        setEditDesc(src.description || '');
+        setEditStart(''); setEditEnd('');
+        const sd = {};
+        STAGES.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
+        (src.cycle_stages ?? []).forEach(w => {
+          const sid = w.stage_id ?? w.stage?.id;
+          if (sid) sd[sid] = { start_date: toDateOnly(w.start_date), end_date: toDateOnly(w.end_date) };
+        });
+        setEditStages(sd);
 
-      //  Correct — uses fresh data from this fetch
-      const usedNumbers = cycles
-        .map(c => {
-          const match = c.name.match(new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\((\\d+)\\)$`));
-          return match ? parseInt(match[1], 10) : null;
-        })
-        .filter(n => n !== null);
-
-      // Pick the next available number
-      const nextNum = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
-
-      setEditName(`${baseName} (${nextNum})`);
-      setEditDesc(src.description || '');
-      setEditStart(''); setEditEnd('');
-      const sd = {};
-      STAGES.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
-      (src.cycle_stages ?? []).forEach(w => {
-        const sid = w.stage_id ?? w.stage?.id;
-        if (sid) sd[sid] = { start_date: toDateOnly(w.start_date), end_date: toDateOnly(w.end_date) };
-      });
-      setEditStages(sd);
-
-    } else {
-      const found = cycles.find(c => String(c.id) === String(id));
-      if (!found) throw new Error('Cycle not found');
-      setCycle(found);
-      setEditName(found.name);
-      setEditDesc(found.description || '');
-      setEditStart(toDateOnly(found.start_date));
-      setEditEnd(toDateOnly(found.end_date));
-      const sd = {};
-      STAGES.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
-      (found.cycle_stages ?? []).forEach(w => {
-        const sid = w.stage_id ?? w.stage?.id;
-        if (sid) sd[sid] = { start_date: toDateOnly(w.start_date), end_date: toDateOnly(w.end_date) };
-      });
-      setEditStages(sd);
-      setIsDirty(false);
-    }
-  } catch (err) {
-    setError(err?.response?.data?.error || err.message || 'Failed to load data.');
-  } finally { setLoading(false); }
-}, [id, isNew, isCreate, isClone, cloneId]);
+      } else {
+        const found = cycles.find(c => String(c.id) === String(id));
+        if (!found) throw new Error('Cycle not found');
+        setCycle(found);
+        setEditName(found.name);
+        setEditDesc(found.description || '');
+        setEditStart(toDateOnly(found.start_date));
+        setEditEnd(toDateOnly(found.end_date));
+        const sd = {};
+        STAGES.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
+        (found.cycle_stages ?? []).forEach(w => {
+          const sid = w.stage_id ?? w.stage?.id;
+          if (sid) sd[sid] = { start_date: toDateOnly(w.start_date), end_date: toDateOnly(w.end_date) };
+        });
+        setEditStages(sd);
+        setIsDirty(false);
+      }
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message || 'Failed to load data.');
+    } finally { setLoading(false); }
+  }, [id, isNew, isCreate, isClone, cloneId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -549,6 +577,22 @@ export default function CycleDetailPage() {
   const durationDays = editStart && editEnd && editEnd > editStart
     ? Math.round((new Date(editEnd) - new Date(editStart)) / 86400000) : null;
 
+  /* ── On rollback landing: immediately mark dirty + scroll to target stage.
+     Deps: rollbackTargetId only — NOT loading.
+     Including `loading` caused the effect to re-fire when fetchData()
+     toggled loading true→false after save, setting isDirty=true again
+     and requiring a second Save click to dismiss the button. */
+  useEffect(() => {
+    if (!rollbackTargetId) return;
+    setIsDirty(true);
+    const timer = setTimeout(() => {
+      if (stageDateRef.current) {
+        stageDateRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [rollbackTargetId]);
+
   function handleCycleDates({ start_date, end_date }) {
     if (start_date !== undefined) { setEditStart(start_date); touch('start'); markDirty(); }
     if (end_date   !== undefined) { setEditEnd(end_date);     touch('end');   markDirty(); }
@@ -565,7 +609,6 @@ export default function CycleDetailPage() {
     STAGES.forEach(s => { allT[`s${s.id}s`] = true; allT[`s${s.id}e`] = true; });
     setTouched(allT);
     if (!step0Valid || !step1Valid) { setSubmitError('Please fill in all required fields.'); return; }
-    // Validate all stage dates fall within cycle period
     const stageOutOfRange = STAGES.find(s => {
       const d = editStageDates[s.id] ?? {};
       if (!d.start_date || !d.end_date) return false;
@@ -576,7 +619,7 @@ export default function CycleDetailPage() {
     if (stageOutOfRange) {
       setSubmitError(`Please update the "${stageOutOfRange.name}" stage dates so they fall within the cycle period (${fmt(editStart)} — ${fmt(editEnd)}).`);
       return;
-    }     
+    }
     setSubmitting(true); setSubmitError('');
     try {
       const payload = {
@@ -600,11 +643,22 @@ export default function CycleDetailPage() {
     } finally { setSubmitting(false); }
   }
 
-  /* ── SAVE existing cycle (name/desc/dates + all stage dates) ── */
+  /* ──────────────────────────────────────────────────────────────
+     handleSave — two-step when rolling back:
+       Step 1: PATCH cycle to update stage date windows (always)
+       Step 2: POST advance-stage with target_stage_id to actually
+               move cycle.current_stage + all employees back
+               (only when ?rollback=N is in the URL)
+
+     Without Step 2 the dates are saved but the cycle's
+     current_stage never changes, so the UI still shows the old
+     stage after the reload.
+     ────────────────────────────────────────────────────────────── */
   async function handleSave() {
     if (!editName.trim()) { setSaveError('Cycle name is required.'); return; }
     setIsSaving(true); setSaveError('');
     try {
+      // Step 1 — always: persist name / dates / stage windows
       await updateCycle(id, {
         name: editName.trim(),
         description: editDesc.trim() || null,
@@ -616,10 +670,35 @@ export default function CycleDetailPage() {
           end_date: editStageDates[s.id]?.end_date || null,
         })),
       });
+
+      // Step 2 — only when rolling back: move cycle + all employees
+      // to the target stage via the advance-stage endpoint (Mode 2).
+      // The backend's _override_employee_stages() handles backward
+      // movement correctly and updates both cycle.stage and all
+      // EmployeeKRACycle.stage_id rows atomically.
+      if (rollbackTargetId) {
+        await advanceCycleStage(id, { target_stage_id: rollbackTargetId });
+      }
+
       invalidateCyclesCache();
+
+      // Clear ?rollback= BEFORE fetchData() so that when fetchData
+      // sets loading=false, rollbackTargetId is already null and the
+      // "mark dirty on landing" useEffect does NOT re-fire.
+      // If we clear it after fetchData the loading flip triggers the
+      // effect one extra time → isDirty becomes true again → Save
+      // button re-appears and requires a second click to dismiss.
+      if (rollbackTargetId) {
+        setSearchParams({}, { replace: true });
+      }
+
       await fetchData();
       setIsDirty(false);
-      flash('Changes saved.');
+
+      flash(rollbackTargetId
+        ? `Rolled back to "${STAGES.find(s => s.id === rollbackTargetId)?.name}" and saved.`
+        : 'Changes saved.'
+      );
     } catch (err) {
       setSaveError(err?.response?.data?.error || 'Save failed.');
     } finally { setIsSaving(false); }
@@ -640,6 +719,10 @@ export default function CycleDetailPage() {
       setEditStages(sd);
       setIsDirty(false);
       setSaveError('');
+      // Also clear rollback param on discard
+      if (rollbackTargetId) {
+        setSearchParams({}, { replace: true });
+      }
     }
   }
 
@@ -869,11 +952,14 @@ export default function CycleDetailPage() {
           </Stack>
         </Stack>
 
-        {/* Stage stepper — only for existing cycles */}
+        {/* ── Stage stepper — only for existing cycles ──
+            FIX 5: Pass rollbackTargetId so stepper highlights
+            the correct stage when navigating from dashboard. */}
         {!isNew && (
           <StageStepper
             currentStageId={currentStageId}
             canAdvance={canAdvance}
+            rollbackTargetId={rollbackTargetId}
             onAdvanceClick={(stage) => { setAdvanceError(''); setAdvanceConfirm({ open: true, toStage: stage }); }}
           />
         )}
@@ -918,7 +1004,7 @@ export default function CycleDetailPage() {
               </Box>
               <Box sx={{ p: 2 }}>
                 <Stack spacing={2}>
-                  {/* Name — in create mode AND in edit mode for non-frozen cycles */}
+                  {/* Name */}
                   {(isNew || (canManageCycles && !isFrozen)) && (
                     <Box>
                       <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', mb: 0.6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -937,7 +1023,7 @@ export default function CycleDetailPage() {
                     </Box>
                   )}
 
-                  {/* Description — always editable for non-frozen */}
+                  {/* Description */}
                   {(isNew || (canManageCycles && !isFrozen)) ? (
                     <Box>
                       <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', mb: 0.6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -986,7 +1072,7 @@ export default function CycleDetailPage() {
                     )}
                   </Box>
 
-                  {/* Status/stage info for existing cycles */}
+                  {/* Status/stage info */}
                   {!isNew && (
                     <Stack direction="row" spacing={3}>
                       <Box flex={1}>
@@ -1060,7 +1146,7 @@ export default function CycleDetailPage() {
             )}
           </Box>
 
-          {/* ── right: Stage Date Windows ── */}
+          {/* ── Right: Stage Date Windows ── */}
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between"
               sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
@@ -1070,11 +1156,29 @@ export default function CycleDetailPage() {
               </Typography>
             </Stack>
 
+            {/* Rollback hint banner */}
+            {rollbackTargetId && !isNew && (
+              <Box sx={{ px: 2, py: 1, bgcolor: '#fff7ed', borderBottom: '1px solid #fde68a' }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Box sx={{ fontSize: 14 }}>⬅</Box>
+                  <Box>
+                    <Typography fontSize={12} fontWeight={700} color="#92400e">
+                      Rolling back to "{STAGES.find(s => s.id === rollbackTargetId)?.name}"
+                    </Typography>
+                    <Typography fontSize={11} color="#b45309">
+                      Update the highlighted stage dates below, then click Save.
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            )}
+
             {STAGES.map((stage, idx) => {
               const isLast = idx === STAGES.length - 1;
               const win    = !isNew ? stageWindows.find(w => w.stage_id === stage.id || w.stage?.id === stage.id) : null;
               const done   = !isNew && currentStageId && stage.id < currentStageId;
               const active = !isNew && currentStageId === stage.id;
+              const isRollbackTarget = rollbackTargetId === stage.id;
 
               const stageStart = !isNew
                 ? (editStageDates[stage.id]?.start_date || toDateOnly(win?.start_date))
@@ -1085,35 +1189,52 @@ export default function CycleDetailPage() {
               const hasErr     = isNew && !!fieldErrors[`s${stage.id}`] && !!touched[`s${stage.id}s`];
               const configured = !!stageStart && !!stageEnd;
 
+              // FIX 6: Date picker must be enabled for ALL stages when in rollback mode,
+              // not just the target stage. Admin needs to adjust surrounding dates too.
+              const datePickerDisabled = isFrozen || (
+                !rollbackTargetId && !canManageCycles && !isNew
+              );
+
               return (
-                <Box key={stage.id} sx={{
+                <Box key={stage.id}
+                  ref={isRollbackTarget ? stageDateRef : undefined}
+                  sx={{
                   borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
-                  bgcolor: active ? '#f0f7ff' : configured && !isNew ? '#fafffe' : configured ? '#f0f7ff' : '#fff',
+                  bgcolor: isRollbackTarget ? '#eff6ff' : active ? '#f0f7ff' : configured && !isNew ? '#fafffe' : configured ? '#f0f7ff' : '#fff',
+                  border: isRollbackTarget ? '2px solid #3b82f6' : undefined,
+                  borderRadius: isRollbackTarget ? 1 : undefined,
                   transition: 'background-color 0.15s',
+                  animation: isRollbackTarget ? 'rollbackPulse 1.5s ease-in-out 2' : undefined,
+                  '@keyframes rollbackPulse': {
+                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(59,130,246,0)' },
+                    '50%': { boxShadow: '0 0 0 4px rgba(59,130,246,0.25)' },
+                  },
                 }}>
                   <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.25 }} spacing={1.5}>
 
                     {/* Stage circle */}
                     <Box sx={{
                       width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-                      background: done ? '#10b981' : active ? gradient : (configured && isNew) ? gradient : hasErr ? '#fee2e2' : '#f1f5f9',
+                      background: done ? '#10b981' : isRollbackTarget ? '#3b82f6' : active ? gradient : (configured && isNew) ? gradient : hasErr ? '#fee2e2' : '#f1f5f9',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       transition: 'all 0.2s',
+                      boxShadow: isRollbackTarget ? '0 0 0 3px rgba(59,130,246,0.2)' : 'none',
                     }}>
                       {done
                         ? <CheckCircleIcon sx={{ fontSize: 13, color: '#fff' }} />
-                        : <Typography sx={{ fontSize: 10, fontWeight: 800, color: (active || (configured && isNew)) ? '#fff' : hasErr ? '#ef4444' : '#94a3b8' }}>
+                        : <Typography sx={{ fontSize: 10, fontWeight: 800, color: (isRollbackTarget || active || (configured && isNew)) ? '#fff' : hasErr ? '#ef4444' : '#94a3b8' }}>
                             {stage.id}
                           </Typography>}
                     </Box>
 
                     {/* Stage name */}
                     <Typography
-                      fontWeight={active ? 700 : configured ? 600 : 500}
+                      fontWeight={isRollbackTarget ? 700 : active ? 700 : configured ? 600 : 500}
                       fontSize={13}
-                      color={active ? '#1E3A8A' : hasErr ? '#dc2626' : '#374151'}
+                      color={isRollbackTarget ? '#1E3A8A' : active ? '#1E3A8A' : hasErr ? '#dc2626' : '#374151'}
                       sx={{ width: 180, flexShrink: 0 }}
                     >
+                      {isRollbackTarget && <span style={{ marginRight: 4 }}>📍</span>}
                       {stage.name}
                     </Typography>
 
@@ -1130,8 +1251,8 @@ export default function CycleDetailPage() {
                           startDate={stageStart}
                           endDate={stageEnd}
                           onChange={val => updateStageDraft(stage.id, val)}
-                          minDate={editStart || undefined}
-                          disabled={!canManageCycles && !isNew}
+                          minDate={rollbackTargetId ? undefined : (editStart || undefined)}
+                          disabled={datePickerDisabled}
                           error={hasErr ? fieldErrors[`s${stage.id}`] : undefined}
                         />
                       )}
