@@ -974,7 +974,7 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
         sx={{
           display: 'flex', alignItems: 'center', gap: 2,
           px: 2.5, py: 1.5, cursor: 'pointer',
-          bgcolor: '#1e40af', borderRadius: collapsed ? 2 : '8px 8px 0 0',
+          bgcolor: '#cde7f0', borderRadius: collapsed ? 2 : '8px 8px 0 0',
           transition: 'border-radius 0.2s',
         }}
       >
@@ -982,8 +982,8 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
           {initials(emp.full_name)}
         </Avatar>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>{emp.full_name}</Typography>
-          <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#1a1818' }}>{emp.full_name}</Typography>
+          <Typography sx={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.5)' }}>
             Manager: {emp.manager_name || '—'} &nbsp;·&nbsp; {emp.department || '—'} &nbsp;·&nbsp; {emp.level || '—'}
           </Typography>
         </Box>
@@ -998,17 +998,17 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
             }}
           />
           <Box sx={{ textAlign: 'right' }}>
-            <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', mb: 0.3 }}>Lead Reviewed</Typography>
-            <Typography sx={{ fontSize: 13, fontWeight: 700, color: pct === 100 ? '#4ade80' : '#fff' }}>
+            <Typography sx={{ fontSize: 11, color: 'rgba(0, 0, 0, 0.5)', mb: 0.3 }}>Lead Reviewed</Typography>
+            <Typography sx={{ fontSize: 13, fontWeight: 700, color: pct === 100 ? '#4ade80' : '#000000' }}>
               {reviewed}/{kras.length}
             </Typography>
           </Box>
           <LinearProgress variant="determinate" value={pct}
             sx={{
-              width: 80, height: 5, borderRadius: 3, bgcolor: 'rgba(255,255,255,0.15)',
+              width: 80, height: 5, borderRadius: 3, bgcolor: '#ffffff80 ',border: '1.5px solid rgba(0,0,0,0.4)', borderColor : '#000000',
               '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#4ade80' : ACCENT }
             }} />
-          {collapsed ? <ExpandMoreIcon sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 20 }} /> : <ExpandLessIcon sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 20 }} />}
+          {collapsed ? <ExpandMoreIcon sx={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: 20 }} /> : <ExpandLessIcon sx={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: 20 }} />}
         </Stack>
       </Box>
 
@@ -1036,23 +1036,38 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
         <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
           {kras.length === 0 ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>
-              <Typography sx={{ color: '#94a3b8', fontSize: 13 }}>No KRAs assigned.</Typography>
+              <Typography sx={{ color: '#292a2c', fontSize: 13 }}>No KRAs assigned.</Typography>
             </Box>
           ) : (
-            <Box sx={{ overflowX: 'auto' }}>
-              <Table size="small" sx={{ minWidth: 1300 }}>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                    {['Category', 'KRA', 'Description by Lead', 'Self Rating', 'Self Comment', 'Progress Notes', 'Help & Assistance', 'Lead Rating', 'Lead Comment'].map(h => (
-                      <TableCell key={h} sx={{
-                        fontSize: 10, fontWeight: 700, color: '#64748b',
-                        textTransform: 'uppercase', letterSpacing: '0.07em',
-                        py: 1, borderBottom: '1.5px solid #e2e8f0',
-                        whiteSpace: 'nowrap',
-                      }}>{h}</TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
+            /* Scrollbar-on-top trick: outer box is flipped, inner is flipped back */
+            <Box sx={{
+              transform: 'rotateX(180deg)',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+            }}>
+              <Box sx={{
+                transform: 'rotateX(180deg)',
+                maxHeight: 420,
+                overflowY: 'auto',
+                overflowX: 'visible',
+              }}>
+                <Table size="small" sx={{ minWidth: 1300 }}>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                      {['Category', 'KRA', 'Description by Lead', 'Self Rating', 'Self Comment', 'Progress Notes', 'Help & Assistance', 'Lead Rating', 'Lead Comment'].map(h => (
+                        <TableCell key={h} sx={{
+                          fontSize: 10, fontWeight: 700, color: '#1b1c1c',
+                          textTransform: 'uppercase', letterSpacing: '0.07em',
+                          py: 1, borderBottom: '1.5px solid #e2e8f0',
+                          whiteSpace: 'nowrap',
+                          position: 'sticky',
+                          top: 0,
+                          bgcolor: '#f8fafc',
+                          zIndex: 2,
+                        }}>{h}</TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
                 <TableBody>
                   {kras.map((kra, idx) => {
                     const dirty = dirtyMap[kra.employee_kra_level_id] ?? {};
@@ -1074,7 +1089,7 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
 
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
                           <Typography sx={{ fontWeight: 600, fontSize: 12, color: '#1e293b' }}>{kra.kra_name}</Typography>
-                          {kra.weightage && <Typography sx={{ fontSize: 10, color: '#94a3b8', mt: 0.3 }}>{kra.weightage}%</Typography>}
+                          {kra.weightage && <Typography sx={{ fontSize: 10, color: '#2b2c2d', mt: 0.3 }}>{kra.weightage}%</Typography>}
                         </TableCell>
 
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
@@ -1096,24 +1111,24 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
                             <Chip label={selfRatingLabel ? `${kra.self_rating} – ${selfRatingLabel.description}` : kra.self_rating}
                               size="small" sx={{ bgcolor: '#eff6ff', color: BLUE, fontWeight: 700, fontSize: 10 }} />
                           ) : (
-                            <Typography sx={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>Pending</Typography>
+                            <Typography sx={{ fontSize: 11, color: '#111112', fontStyle: 'italic' }}>Pending</Typography>
                           )}
                         </TableCell>
 
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.self_comment ? 'normal' : 'italic', color: kra.self_comment ? '#475569' : '#94a3b8' }}>
+                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.self_comment ? 'normal' : 'italic', color: kra.self_comment ? '#000000' : '#000000' }}>
                             {kra.self_comment || 'No comment'}
                           </Typography>
                         </TableCell>
 
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.progress_notes ? 'normal' : 'italic', color: kra.progress_notes ? '#64748b' : '#94a3b8' }}>
+                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.progress_notes ? 'normal' : 'italic', color: kra.progress_notes ? '#000000' : '#000000' }}>
                             {kra.progress_notes || '—'}
                           </Typography>
                         </TableCell>
 
                         <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.help_and_assistance_required ? 'normal' : 'italic', color: kra.help_and_assistance_required ? '#64748b' : '#94a3b8' }}>
+                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.help_and_assistance_required ? 'normal' : 'italic', color: kra.help_and_assistance_required ? '#000000' : '#000000' }}>
                             {kra.help_and_assistance_required || '—'}
                           </Typography>
                         </TableCell>
@@ -1134,7 +1149,7 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
                               <Chip label={`${kra.lead_rating} – ${ratings.find(r => r.id === kra.lead_rating_id)?.description ?? ''}`}
                                 size="small" sx={{ bgcolor: '#dcfce7', color: '#16a34a', fontWeight: 700, fontSize: 10 }} />
                             ) : (
-                              <Typography sx={{ fontSize: 11, color: '#cbd5e1', fontStyle: 'italic' }}>Not rated</Typography>
+                              <Typography sx={{ fontSize: 11, color: '#191a1b', fontStyle: 'italic' }}>Not rated</Typography>
                             )
                           )}
                         </TableCell>
@@ -1159,7 +1174,8 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
                   })}
                 </TableBody>
               </Table>
-            </Box>
+              </Box>  
+            </Box>  /* outer rotated box */
           )}
         </Paper>
       )}
