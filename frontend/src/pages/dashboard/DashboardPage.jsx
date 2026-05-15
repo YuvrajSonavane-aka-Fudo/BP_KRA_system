@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect  } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box, Typography, Stack, Paper, Button, Chip,
   CircularProgress, Alert, Tabs, Tab, IconButton,
@@ -21,7 +21,7 @@ import OpenInNewIcon        from '@mui/icons-material/OpenInNew';
 import { useNavigate }      from 'react-router-dom';
 import ROUTES               from '../../config/routes';
 import { useCycles, invalidateCyclesCache } from '../../hooks/useCycles';
-import { updateCycle, advanceCycleStage, getReferenceData  }   from '../../api/cyclesApi';
+import { updateCycle, advanceCycleStage, getReferenceData }   from '../../api/cyclesApi';
 import useRoleAccess        from '../../hooks/useRoleAccess';
 import { Dialog, DialogContent, DialogActions } from '@mui/material';
 
@@ -55,6 +55,98 @@ const TAB_FILTERS = [null, 'DRAFT', 'CLOSED', 'ON_HOLD', 'CANCELLED'];
 const TAB_LABELS  = ['All', 'Draft', 'Closed', 'On Hold', 'Cancelled'];
 const ROWS_PER_PAGE = 7;
 
+/* ─── Calendar helpers ─── */
+const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WEEK_DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+function toDateOnly(s) { return s ? String(s).split('T')[0].split(' ')[0].trim() : ''; }
+function toISO(y, m, d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function fmtShort(s) {
+  if (!s) return null;
+  const d = new Date(toDateOnly(s) + 'T00:00:00');
+  return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+/* ─── RangePicker (same as CycleDetailPage) ─── */
+function RangePicker({ startDate, endDate, onChange, onClose }) {
+  const init = () => {
+    const src = startDate;
+    if (src) { const d = new Date(toDateOnly(src) + 'T00:00:00'); return { y: d.getFullYear(), m: d.getMonth() }; }
+    const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() };
+  };
+  const [vy, setVy] = useState(() => init().y);
+  const [vm, setVm] = useState(() => init().m);
+  const [picking, setPicking] = useState(startDate ? 'end' : 'start');
+  const [hover, setHover] = useState(null);
+  const startD = startDate ? new Date(toDateOnly(startDate) + 'T00:00:00') : null;
+  const endD   = endDate   ? new Date(toDateOnly(endDate)   + 'T00:00:00') : null;
+  const totalDays = new Date(vy, vm+1, 0).getDate();
+  const firstDay  = new Date(vy, vm, 1).getDay();
+  const cells = [...Array(firstDay).fill(null), ...Array.from({ length: totalDays }, (_, i) => i+1)];
+  function disabled(d) {
+    if (!d) return true;
+    if (picking === 'end' && startD) { const s = new Date(startD); s.setHours(0,0,0,0); if (new Date(vy,vm,d)<s) return true; }
+    return false;
+  }
+  function dayState(d) {
+    if (!d) return {};
+    const dt = new Date(vy,vm,d); dt.setHours(0,0,0,0);
+    const st = startD ? new Date(startD).setHours(0,0,0,0) : null;
+    const et = endD   ? new Date(endD).setHours(0,0,0,0)   : null;
+    const ht = hover  ? new Date(vy,vm,hover).setHours(0,0,0,0) : null;
+    const dtt = dt.getTime();
+    const isStart = st!==null && dtt===st, isEnd = et!==null && dtt===et;
+    const re = picking==='end'&&ht ? ht : et;
+    const inRange = st!==null&&re!==null&&dtt>st&&dtt<re;
+    return { isStart, isEnd, inRange };
+  }
+  function isToday(d) { const t=new Date(); return !!d&&t.getFullYear()===vy&&t.getMonth()===vm&&t.getDate()===d; }
+  function selectDay(d) {
+    const iso = toISO(vy,vm,d);
+    if (picking==='start') { onChange({ start_date:iso, end_date:'' }); setPicking('end'); }
+    else { onChange({ start_date:startDate, end_date:iso }); onClose&&onClose(); }
+    setHover(null);
+  }
+  return (
+    <Box sx={{ width:248, borderRadius:2, overflow:'hidden', bgcolor:'#fff', boxShadow:'0 12px 40px -4px rgba(15,23,42,0.18)', border:'1px solid #e2e8f0' }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px:1.25, py:0.75, background:gradient }}>
+        <IconButton size="small" onClick={() => vm===0?(setVm(11),setVy(y=>y-1)):setVm(m=>m-1)} sx={{ color:'#fff',p:0.2,'&:hover':{bgcolor:'rgba(255,255,255,0.15)',borderRadius:1} }}><ChevronLeftIcon sx={{ fontSize:14 }}/></IconButton>
+        <Typography sx={{ fontWeight:700, fontSize:12, color:'#fff' }}>{MONTHS[vm].slice(0,3)} {vy}</Typography>
+        <IconButton size="small" onClick={() => vm===11?(setVm(0),setVy(y=>y+1)):setVm(m=>m+1)} sx={{ color:'#fff',p:0.2,'&:hover':{bgcolor:'rgba(255,255,255,0.15)',borderRadius:1} }}><ChevronRightIcon sx={{ fontSize:14 }}/></IconButton>
+        <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml:0.5 }}>
+          {[{key:'start',val:startDate},{key:'end',val:endDate}].map(({key,val},i)=>(
+            <React.Fragment key={key}>
+              {i===1&&<Typography sx={{fontSize:9,color:'rgba(255,255,255,0.5)'}}>→</Typography>}
+              <Box onClick={()=>key==='end'&&!startDate?null:setPicking(key)} sx={{ px:0.75,py:0.2,borderRadius:1,bgcolor:picking===key?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.1)',cursor:key==='end'&&!startDate?'default':'pointer',border:picking===key?'1px solid rgba(255,255,255,0.4)':'1px solid transparent',opacity:key==='end'&&!startDate?0.45:1,transition:'all 0.12s' }}>
+                <Typography sx={{fontSize:9.5,fontWeight:700,color:'#fff',whiteSpace:'nowrap'}}>{val?fmtShort(val):(key==='start'?'From':'To')}</Typography>
+              </Box>
+            </React.Fragment>
+          ))}
+          {(startDate||endDate)&&<IconButton size="small" onClick={()=>onChange({start_date:'',end_date:''})} sx={{color:'rgba(255,255,255,0.5)',p:0.15,ml:0.25,'&:hover':{color:'#fff'}}}><CloseIcon sx={{fontSize:11}}/></IconButton>}
+        </Stack>
+      </Stack>
+      <Box sx={{ px:1.25, pt:0.75, pb:0.75 }}>
+        <Stack direction="row" mb={0.4}>{WEEK_DAYS.map(d=><Box key={d} sx={{flex:1,textAlign:'center'}}><Typography sx={{fontSize:9,fontWeight:700,color:'#cbd5e1'}}>{d}</Typography></Box>)}</Stack>
+        {Array.from({length:Math.ceil(cells.length/7)},(_,ri)=>(
+          <Stack key={ri} direction="row" sx={{mb:0.1}}>
+            {cells.slice(ri*7,ri*7+7).map((d,ci)=>{
+              const dis=disabled(d);
+              const {isStart,isEnd,inRange}=dayState(d);
+              const today=isToday(d), hi=isStart||isEnd;
+              return (
+                <Box key={ci} sx={{flex:1,display:'flex',justifyContent:'center'}}>
+                  {d?<Box onClick={()=>!dis&&selectDay(d)} onMouseEnter={()=>!dis&&picking==='end'&&setHover(d)} onMouseLeave={()=>setHover(null)} sx={{ width:26,height:26,borderRadius:hi?'50%':inRange?0:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:dis?'not-allowed':'pointer',bgcolor:hi?'#1E3A8A':inRange?'#dbeafe':'transparent',color:hi?'#fff':dis?'#cbd5e1':today?'#1E3A8A':'#374151',fontWeight:hi?700:today?700:400,fontSize:11,outline:today&&!hi?'1.5px solid #93c5fd':'none',outlineOffset:'-1px',transition:'background 0.1s','&:hover':!dis?{bgcolor:hi?'#1E3A8A':'#eff6ff',color:hi?'#fff':'#1E3A8A',fontWeight:600}:{} }}>{d}</Box>:<Box sx={{width:26,height:26}}/>}
+                </Box>
+              );
+            })}
+          </Stack>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+/* StageDatePickerRow and RollbackDatesDialog removed — rollback now navigates to CycleDetailPage */
+
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(String(dateStr).split('T')[0] + 'T00:00:00');
@@ -62,7 +154,7 @@ function formatDate(dateStr) {
 }
 
 /* ── Stage stepper for active cycle banner ── */
-function BannerStepper({stages, currentStageId, canAdvance, onAdvanceClick }) {
+function BannerStepper({ stages, currentStageId, canAdvance, canRollback, onAdvanceClick, onRollbackClick }) {
   return (
     <Box sx={{ position: 'relative', mt: 1.5 }}>
       <Box sx={{ position: 'absolute', top: 12, left: '5%', right: '5%', height: 2, bgcolor: 'rgba(255,255,255,0.2)', zIndex: 0 }} />
@@ -71,17 +163,27 @@ function BannerStepper({stages, currentStageId, canAdvance, onAdvanceClick }) {
           const done   = stage.id < currentStageId;
           const active = stage.id === currentStageId;
           const isNext = canAdvance && stage.id === currentStageId + 1;
+          const isBack = canRollback && done;
+          const clickable = isNext || isBack;
+          const tooltipTitle = active ? stage.name
+            : isNext ? `Advance to "${stage.name}"`
+            : isBack ? `Roll back to "${stage.name}"`
+            : stage.name;
           return (
-            <Tooltip key={stage.id} title={isNext ? `Advance to "${stage.name}"` : stage.name}>
+            <Tooltip key={stage.id} title={tooltipTitle}>
               <Stack alignItems="center" spacing={0.5} sx={{
-                width: '18%', cursor: isNext ? 'pointer' : 'default',
-                '&:hover .sdot': isNext ? { bgcolor: 'rgba(255,255,255,0.3) !important', transform: 'scale(1.12)' } : {},
+                width: '18%',
+                cursor: clickable ? 'pointer' : 'default',
+                '&:hover .sdot': clickable ? { opacity: 0.8, transform: 'scale(1.1)' } : {},
               }}
-                onClick={isNext ? () => onAdvanceClick(stage) : undefined}>
+                onClick={clickable ? () => {
+                  if (isNext) onAdvanceClick(stage);
+                  else if (isBack) onRollbackClick(stage);
+                } : undefined}>
                 <Box className="sdot" sx={{
                   width: active ? 36 : 28, height: active ? 36 : 28, borderRadius: '50%',
                   bgcolor: done ? '#10b981' : active ? '#fff' : 'rgba(255,255,255,0.15)',
-                  border: `2px solid ${isNext ? 'rgba(255,255,255,0.5)' : active ? 'rgba(255,255,255,0.5)' : 'transparent'}`,
+                  border: `2px solid ${isNext ? 'rgba(255,255,255,0.5)' : active ? 'rgba(255,255,255,0.5)' : done ? 'rgba(255,255,255,0.3)' : 'transparent'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   outline: active ? '4px solid rgba(255,255,255,0.12)' : 'none',
                   transition: 'all 0.2s', flexShrink: 0,
@@ -102,11 +204,19 @@ function BannerStepper({stages, currentStageId, canAdvance, onAdvanceClick }) {
                   {stage.name}
                 </Typography>
                 {isNext && <Typography sx={{ fontSize: 8, color: 'rgba(147,197,253,0.9)', fontWeight: 700 }}>tap →</Typography>}
+                {isBack && <Typography sx={{ fontSize: 8, color: 'rgba(253,186,116,0.9)', fontWeight: 700 }}>← back</Typography>}
               </Stack>
             </Tooltip>
           );
         })}
       </Stack>
+      {(canAdvance || canRollback) && (
+        <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', mt: 0.75, textAlign: 'center' }}>
+          {canAdvance && canRollback ? 'Click next stage to advance · Click past stage to roll back'
+            : canAdvance ? 'Click next stage to advance'
+            : 'Click a past stage to roll back'}
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -174,6 +284,8 @@ export default function DashboardPage() {
   const [advanceConfirm, setAdvanceConfirm] = useState({ open: false, toStage: null, cycle: null });
   const [advanceLoading, setAdvanceLoading] = useState(false);
   const [advanceError, setAdvanceError]     = useState('');
+
+  // Rollback now navigates to CycleDetailPage with ?rollback=STAGE_ID
 
   const [deleteOpen, setDeleteOpen]       = useState(false);
   const [deleteTarget, setDeleteTarget]   = useState(null);
@@ -254,6 +366,8 @@ export default function DashboardPage() {
     } finally { setAdvanceLoading(false); }
   }
 
+  // handleRollbackStage removed — rollback now navigates to CycleDetailPage
+
   async function handleDelete() {
     if (!deleteTarget || deleteTarget.status !== 'DRAFT') return;
     setDeleteLoading(true); setDeleteError('');
@@ -279,7 +393,9 @@ export default function DashboardPage() {
   const currentStageId   = activeCycle?.current_stage?.id ?? null;
   const activeActions    = activeCycle ? (STATUS_ACTIONS[activeCycle.status] ?? []) : [];
   const maxStageId = stages.length > 0 ? Math.max(...stages.map(s => s.id)) : 5;
+  const minStageId = stages.length > 0 ? Math.min(...stages.map(s => s.id)) : 1;
   const canAdvanceActive = !!activeCycle && activeCycle.status === 'ACTIVE' && canManageCycles && currentStageId && currentStageId < maxStageId;
+  const canRollbackActive = !!activeCycle && activeCycle.status === 'ACTIVE' && canManageCycles && currentStageId && currentStageId > minStageId;
 
   const paginatedRows = filteredAndSorted.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE);
 
@@ -367,16 +483,15 @@ export default function DashboardPage() {
               stages={stages}
               currentStageId={currentStageId ?? 1}
               canAdvance={canAdvanceActive}
+              canRollback={canRollbackActive}
               onAdvanceClick={(stage) => {
                 setAdvanceError('');
                 setAdvanceConfirm({ open: true, toStage: stage, cycle: activeCycle });
               }}
+              onRollbackClick={(stage) => {
+                navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id)}?rollback=${stage.id}`);
+              }}
             />
-            {canAdvanceActive && (
-              <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', mt: 0.75, textAlign: 'center' }}>
-                Click next stage dot to advance
-              </Typography>
-            )}
           </Box>
         </Paper>
       )}
@@ -618,6 +733,7 @@ export default function DashboardPage() {
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDelete}
       />
+      {/* Rollback now handled via CycleDetailPage navigation */}
     </Box>
   );
 }

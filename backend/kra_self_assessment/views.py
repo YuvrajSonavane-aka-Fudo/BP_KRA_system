@@ -12,6 +12,7 @@ from kra_cycle.models import (
     KRACycleStage,
     EmployeeKRACycle,
     EmployeeKRACycleCategory,
+    EmployeeKRACycleStage,
     EmployeeKRALevel,
     KRALevel,
     KRA,
@@ -102,10 +103,35 @@ class SelfAssessmentView(APIView):
             for r in kra_rows
         ]
 
+        # Resolve the employee's effective current stage (personal override takes priority)
+        employee_stage_id = ekc.stage_id
+
+        # Look up personal stage date override for the current stage (if any)
+        stage_end_date = None
+        if employee_stage_id:
+            override = EmployeeKRACycleStage.objects.filter(
+                employee_kra_cycle=ekc,
+                stage_id=employee_stage_id,
+            ).first()
+            if override:
+                stage_end_date = override.end_date.isoformat() if override.end_date else None
+            else:
+                # Fall back to cycle-level stage date
+                cycle_stage = KRACycleStage.objects.filter(
+                    kra_cycle_id=cycle_id,
+                    stage_id=employee_stage_id,
+                ).first()
+                if cycle_stage and cycle_stage.end_date:
+                    stage_end_date = cycle_stage.end_date.isoformat()
+
         return Response({
             'cycle_id':              cycle_id,
             'employee_kra_cycle_id': ekc.id,
             'status':                ekc.status,
+            # employee_stage_id: the employee's personal stage (may differ from cycle stage if sent back)
+            'employee_stage_id':     employee_stage_id,
+            # stage_end_date: personal deadline for current stage (from override or cycle-level)
+            'stage_end_date':        stage_end_date,
             'current_stage':         (
                 {'id': ekc.stage.id, 'name': ekc.stage.name}
                 if ekc.stage else None
