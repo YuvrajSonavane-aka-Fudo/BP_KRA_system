@@ -162,6 +162,18 @@ class AssessmentProgressView(APIView):
         paginator = Paginator(employees, per_page)
         page_obj  = paginator.get_page(page)
 
+        # Fetch cycle-level stage dates to send to frontend
+        cycle_stages = [
+            {
+                'stage_id':   cs.stage_id,
+                'start_date': cs.start_date.isoformat() if cs.start_date else None,
+                'end_date':   cs.end_date.isoformat() if cs.end_date else None,
+            }
+            for cs in KRACycleStage.objects.filter(
+                kra_cycle_id=cycle_id, is_deleted=False
+            ).order_by('id')
+        ]
+
         # ← audit must be BEFORE the return
         _audit(
             request,
@@ -177,6 +189,7 @@ class AssessmentProgressView(APIView):
 
         return Response({
             'cycle_id':   cycle_id,
+            'cycle_stages': cycle_stages, 
             'employees':  list(page_obj),
             'pagination': {
                 'page':        page,

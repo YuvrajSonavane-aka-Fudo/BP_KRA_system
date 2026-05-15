@@ -13,13 +13,210 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SaveIcon from '@mui/icons-material/Save';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SearchIcon from '@mui/icons-material/Search';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { getCycles } from '../../api/cyclesApi';
-import { getReferenceData } from '../../api/referenceDataApi';
-import { getAssessmentProgress, submitLeadReview } from '../../api/assessmentsApi';
-import { getStageStates, canLeadReview, getStageLockReason } from '../../utils/stageUtils';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseIcon from '@mui/icons-material/Close';
+import { getCycles, advanceCycleStage, getReferenceData } from '../../api/cyclesApi';
+import { getAssessmentProgress, submitLeadReview, saveEmployeeStageDates } from '../../api/assessmentsApi';
+import { getStageStates, canLeadReview, getStageLockReason, CYCLE_STAGES } from '../../utils/stageUtils';
+import useRoleAccess from '../../hooks/useRoleAccess';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import EditIcon from '@mui/icons-material/Edit';
+
+/* ─── Shared calendar helpers ─── */
+const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WEEK_DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+const gradient  = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
+
+function toDateOnly(s) { return s ? String(s).split('T')[0].split(' ')[0].trim() : ''; }
+function toISO(y, m, d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(toDateOnly(s) + 'T00:00:00');
+  return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/* ─── RangePicker ─── */
+function RangePicker({ startDate, endDate, onChange, onClose }) {
+  const init = () => {
+    const src = startDate;
+    if (src) { const d = new Date(toDateOnly(src) + 'T00:00:00'); return { y: d.getFullYear(), m: d.getMonth() }; }
+    const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() };
+  };
+  const [vy, setVy] = useState(() => init().y);
+  const [vm, setVm] = useState(() => init().m);
+  const [picking, setPicking] = useState(startDate ? 'end' : 'start');
+  const [hover, setHover]     = useState(null);
+
+  const startD = startDate ? new Date(toDateOnly(startDate) + 'T00:00:00') : null;
+  const endD   = endDate   ? new Date(toDateOnly(endDate)   + 'T00:00:00') : null;
+
+  const totalDays = new Date(vy, vm+1, 0).getDate();
+  const firstDay  = new Date(vy, vm, 1).getDay();
+  const cells     = [...Array(firstDay).fill(null), ...Array.from({ length: totalDays }, (_, i) => i+1)];
+
+  function disabled(d) {
+    if (!d) return true;
+    const dt = new Date(vy, vm, d);
+    if (picking === 'end' && startD) { const s = new Date(startD); s.setHours(0,0,0,0); if (dt < s) return true; }
+    return false;
+  }
+  function dayState(d) {
+    if (!d) return {};
+    const dt = new Date(vy, vm, d); dt.setHours(0,0,0,0);
+    const st = startD ? new Date(startD).setHours(0,0,0,0) : null;
+    const et = endD   ? new Date(endD).setHours(0,0,0,0)   : null;
+    const ht = hover  ? new Date(vy, vm, hover).setHours(0,0,0,0) : null;
+    const dtt = dt.getTime();
+    const isStart = st !== null && dtt === st;
+    const isEnd   = et !== null && dtt === et;
+    const re = picking === 'end' && ht ? ht : et;
+    const inRange = st !== null && re !== null && dtt > st && dtt < re;
+    return { isStart, isEnd, inRange };
+  }
+  function isToday(d) { const t = new Date(); return !!d && t.getFullYear()===vy && t.getMonth()===vm && t.getDate()===d; }
+  function selectDay(d) {
+    const iso = toISO(vy, vm, d);
+    if (picking === 'start') { onChange({ start_date: iso, end_date: '' }); setPicking('end'); }
+    else { onChange({ start_date: startDate, end_date: iso }); onClose && onClose(); }
+    setHover(null);
+  }
+  function fmtShort(s) {
+    if (!s) return null;
+    const d = new Date(toDateOnly(s) + 'T00:00:00');
+    return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  }
+
+  return (
+    <Box sx={{ width: 248, borderRadius: 2, overflow: 'hidden', bgcolor: '#fff', boxShadow: '0 12px 40px -4px rgba(15,23,42,0.18)', border: '1px solid #e2e8f0' }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.25, py: 0.75, background: gradient }}>
+        <IconButton size="small" onClick={() => vm===0 ? (setVm(11),setVy(y=>y-1)) : setVm(m=>m-1)}
+          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
+          <ChevronLeftIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+        <Typography sx={{ fontWeight: 700, fontSize: 12, color: '#fff' }}>{MONTHS[vm].slice(0,3)} {vy}</Typography>
+        <IconButton size="small" onClick={() => vm===11 ? (setVm(0),setVy(y=>y+1)) : setVm(m=>m+1)}
+          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
+          <ChevronRightIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+        <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml: 0.5 }}>
+          {[{ key:'start', val: startDate }, { key:'end', val: endDate }].map(({ key, val }, i) => (
+            <React.Fragment key={key}>
+              {i === 1 && <Typography sx={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>→</Typography>}
+              <Box onClick={() => setPicking(key)}
+                sx={{ px: 0.75, py: 0.2, borderRadius: 1, bgcolor: picking === key ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)', cursor: 'pointer', border: picking === key ? '1px solid rgba(255,255,255,0.4)' : '1px solid transparent', transition: 'all 0.12s' }}>
+                <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
+                  {val ? fmtShort(val) : (key === 'start' ? 'From' : 'To')}
+                </Typography>
+              </Box>
+            </React.Fragment>
+          ))}
+          {(startDate || endDate) && (
+            <IconButton size="small" onClick={() => onChange({ start_date: '', end_date: '' })}
+              sx={{ color: 'rgba(255,255,255,0.5)', p: 0.15, ml: 0.25, '&:hover': { color: '#fff' } }}>
+              <CloseIcon sx={{ fontSize: 11 }} />
+            </IconButton>
+          )}
+        </Stack>
+      </Stack>
+      <Box sx={{ px: 1.25, pt: 0.75, pb: 0.75 }}>
+        <Stack direction="row" mb={0.4}>
+          {WEEK_DAYS.map(d => (
+            <Box key={d} sx={{ flex:1, textAlign:'center' }}>
+              <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', letterSpacing: '0.02em' }}>{d}</Typography>
+            </Box>
+          ))}
+        </Stack>
+        {Array.from({ length: Math.ceil(cells.length/7) }, (_,ri) => (
+          <Stack key={ri} direction="row" sx={{ mb: 0.1 }}>
+            {cells.slice(ri*7, ri*7+7).map((d,ci) => {
+              const dis = disabled(d);
+              const { isStart, isEnd, inRange } = dayState(d);
+              const today = isToday(d);
+              const hi = isStart || isEnd;
+              return (
+                <Box key={ci} sx={{ flex:1, display:'flex', justifyContent:'center' }}>
+                  {d ? (
+                    <Box onClick={() => !dis && selectDay(d)}
+                      onMouseEnter={() => !dis && picking==='end' && setHover(d)}
+                      onMouseLeave={() => setHover(null)}
+                      sx={{ width: 26, height: 26, borderRadius: hi ? '50%' : inRange ? 0 : '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: dis ? 'not-allowed' : 'pointer', bgcolor: hi ? '#1E3A8A' : inRange ? '#dbeafe' : 'transparent', border: today && !hi ? '1.5px solid #1E3A8A' : '1.5px solid transparent', transition: 'background 0.08s', '&:hover': !dis && !hi ? { bgcolor: inRange ? '#bfdbfe' : '#eff6ff' } : {} }}>
+                      <Typography sx={{ fontSize: 11, lineHeight: 1, userSelect: 'none', fontWeight: hi ? 700 : today ? 600 : 400, color: hi ? '#fff' : dis ? '#d1d5db' : inRange ? '#1e40af' : today ? '#1E3A8A' : '#374151' }}>{d}</Typography>
+                    </Box>
+                  ) : <Box sx={{ width: 26, height: 26 }} />}
+                </Box>
+              );
+            })}
+          </Stack>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+/* ─── DateRangeField ─── */
+function DateRangeField({ startDate, endDate, onChange, label }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef();
+  const popupRef   = useRef();
+
+  useEffect(() => {
+    if (!open) return;
+    function h(e) {
+      if (triggerRef.current && !triggerRef.current.contains(e.target) && popupRef.current && !popupRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !popupRef.current || !triggerRef.current) return;
+    const POPUP_W = 248, POPUP_H = 260, GAP = 6;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const tr = triggerRef.current.getBoundingClientRect();
+    let top  = tr.bottom + GAP;
+    let left = tr.left;
+    if (top + POPUP_H > vh - 8) top = tr.top - POPUP_H - GAP;
+    if (left + POPUP_W > vw - 8) left = vw - POPUP_W - 8;
+    if (left < 8) left = 8;
+    popupRef.current.style.top  = top  + 'px';
+    popupRef.current.style.left = left + 'px';
+  }, [open]);
+
+  const bothSet = !!startDate && !!endDate;
+  return (
+    <Box ref={triggerRef} sx={{ position: 'relative' }}>
+      {label && (
+        <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</Typography>
+      )}
+      <Box onClick={() => setOpen(v => !v)}
+        sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.8, border: `1.5px solid ${open ? '#1E3A8A' : bothSet ? '#93c5fd' : '#e2e8f0'}`, borderRadius: 1.5, cursor: 'pointer', bgcolor: bothSet ? '#eff6ff' : '#fafafa', width: '100%', boxSizing: 'border-box', transition: 'all 0.15s', userSelect: 'none', '&:hover': { borderColor: '#1E3A8A', bgcolor: '#f0f7ff' } }}>
+        <CalendarMonthIcon sx={{ fontSize: 13, color: bothSet ? '#1E3A8A' : '#94a3b8', flexShrink: 0 }} />
+        <Typography sx={{ fontSize: 12, color: bothSet ? '#0f172a' : '#94a3b8', fontWeight: bothSet ? 600 : 400, flex: 1 }}>
+          {bothSet ? `${fmtDate(startDate)} → ${fmtDate(endDate)}` : startDate ? `${fmtDate(startDate)} → …` : 'Select date range'}
+        </Typography>
+        {bothSet && (
+          <CloseIcon sx={{ fontSize: 11, color: '#94a3b8', ml: 0.5, '&:hover': { color: '#64748b' } }}
+            onClick={e => { e.stopPropagation(); onChange({ start_date: '', end_date: '' }); }} />
+        )}
+      </Box>
+      {open && (
+        <Box ref={popupRef} sx={{ position: 'fixed', zIndex: 99999 }}>
+          <RangePicker startDate={startDate} endDate={endDate}
+            onChange={v => { onChange(v); if (v.start_date && v.end_date) setOpen(false); }}
+            onClose={() => setOpen(false)} />
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 const NAVY = '#0f1b4c';
 const BLUE = '#1E3A8A';
@@ -28,19 +225,7 @@ const ACCENT = '#3b82f6';
 function initials(name = '') {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 }
-function handleKraUpdated(employeeId, employeeKraLevelId, payload) {
-  setData(prev => ({
-    ...prev,
-    employees: prev.employees.map(e =>
-      e.employee_id !== employeeId ? e : {
-        ...e,
-        kras: e.kras.map(k =>
-          k.employee_kra_level_id === employeeKraLevelId ? { ...k, ...payload } : k
-        ),
-      }
-    ),
-  }));
-}
+
 function selfStatus(kras) {
   if (!kras?.length) return 'locked';
   const rated = kras.filter(k => k.self_rating_id).length;
@@ -272,18 +457,346 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
   );
 }
 
+// ── InlineStageRow — Image 2 style: [stage name col] | [calendar pill col] ──
+function InlineStageRow({ stageData, isTarget, onRangeChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const popupRef = useRef(null);
+  const bothSet = !!stageData.start_date && !!stageData.end_date;
+
+  function fmtShort(s) {
+    if (!s) return null;
+    const d = new Date(toDateOnly(s) + 'T00:00:00');
+    return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function h(e) {
+      if (ref.current && !ref.current.contains(e.target) &&
+          popupRef.current && !popupRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !popupRef.current || !ref.current) return;
+    const POPUP_W = 248, POPUP_H = 270, GAP = 6;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const tr = ref.current.getBoundingClientRect();
+    let top = tr.bottom + GAP, left = tr.left;
+    if (top + POPUP_H > vh - 8) top = tr.top - POPUP_H - GAP;
+    if (left + POPUP_W > vw - 8) left = vw - POPUP_W - 8;
+    if (left < 8) left = 8;
+    popupRef.current.style.top = top + 'px';
+    popupRef.current.style.left = left + 'px';
+  }, [open]);
+
+  return (
+    <Stack ref={ref} direction="row" alignItems="center" sx={{
+      borderRadius: 2,
+      border: isTarget ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+      bgcolor: isTarget ? '#eff6ff' : '#fff',
+      overflow: 'visible',
+      position: 'relative',
+      transition: 'border-color 0.15s',
+    }}>
+      {/* Left: stage name */}
+      <Box sx={{ px: 2, py: 1.25, minWidth: 170, flexShrink: 0, borderRight: '1px solid #e2e8f0' }}>
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          {isTarget && (
+            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#3b82f6', flexShrink: 0 }} />
+          )}
+          <Typography fontSize={13} fontWeight={isTarget ? 700 : 500} color={isTarget ? BLUE : '#374151'}>
+            {stageData.name}
+          </Typography>
+        </Stack>
+      </Box>
+
+      {/* Right: calendar pill */}
+      <Stack direction="row" alignItems="center" spacing={1} flex={1}
+        onClick={() => setOpen(o => !o)}
+        sx={{
+          px: 1.5, py: 1.1, cursor: 'pointer',
+          borderRadius: '0 8px 8px 0',
+          '&:hover': { bgcolor: isTarget ? 'rgba(219,234,254,0.3)' : '#f8fafc' },
+          transition: 'background 0.12s',
+        }}>
+        <CalendarMonthIcon sx={{ fontSize: 14, color: bothSet ? BLUE : '#94a3b8', flexShrink: 0 }} />
+        <Typography sx={{ fontSize: 13, color: bothSet ? '#1e293b' : '#94a3b8', flex: 1, userSelect: 'none' }}>
+          {bothSet ? (
+            <><span style={{ fontWeight: 600 }}>{fmtShort(stageData.start_date)}</span>
+            {' '}<span style={{ color: '#94a3b8' }}>→</span>{' '}
+            <span style={{ fontWeight: 600 }}>{fmtShort(stageData.end_date)}</span></>
+          ) : 'Set date range…'}
+        </Typography>
+        {bothSet && (
+          <IconButton size="small"
+            onClick={e => { e.stopPropagation(); onRangeChange(stageData.stage_id, { start_date: '', end_date: '' }); }}
+            sx={{ p: 0.25, color: '#cbd5e1', '&:hover': { color: '#64748b' } }}>
+            <CloseIcon sx={{ fontSize: 11 }} />
+          </IconButton>
+        )}
+      </Stack>
+
+      {/* Floating calendar popup */}
+      {open && (
+        <Box ref={popupRef} sx={{ position: 'fixed', zIndex: 99999 }}>
+          <RangePicker
+            startDate={stageData.start_date}
+            endDate={stageData.end_date}
+            onChange={({ start_date, end_date }) => {
+              onRangeChange(stageData.stage_id, { start_date, end_date });
+              if (start_date && end_date) setOpen(false);
+            }}
+            onClose={() => setOpen(false)}
+          />
+        </Box>
+      )}
+    </Stack>
+  );
+}
+
+// ── Compact inline stage stepper ──────────────────────────────────────────────
+function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleStages, isAdmin, onStageChanged }) {
+  const [stageChanging, setStageChanging] = useState(false);
+  const [dateSaving, setDateSaving]       = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, direction: null, toStage: null });
+  const [overrideStages, setOverrideStages] = useState([]);
+  const [toast, setToast] = useState('');
+
+  const stages     = CYCLE_STAGES;
+  const currentIdx = stages.findIndex(s => s.id === currentStageId);
+
+  function openBackDialog(toStage) {
+    const prefilled = CYCLE_STAGES.map(s => ({
+      stage_id:   s.id,
+      name:       s.name,
+      start_date: cycleStages?.find(cs => (cs.stage_id ?? cs.stage?.id) === s.id)?.start_date?.split('T')[0] ?? '',
+      end_date:   cycleStages?.find(cs => (cs.stage_id ?? cs.stage?.id) === s.id)?.end_date?.split('T')[0]   ?? '',
+    }));
+    setOverrideStages(prefilled);
+    setConfirmDialog({ open: true, direction: 'back', toStage });
+  }
+
+  function openForwardDialog(toStage) {
+    setConfirmDialog({ open: true, direction: 'forward', toStage });
+  }
+
+  function closeDialog() {
+    setConfirmDialog({ open: false, direction: null, toStage: null });
+    setOverrideStages([]);
+  }
+
+  async function doStageChange() {
+    const { direction, toStage } = confirmDialog;
+    if (!toStage) return;
+    setStageChanging(true);
+    try {
+      await advanceCycleStage(cycleId, {
+        target_stage_id: toStage.id,
+        employee_ids: [employeeId],
+      });
+      onStageChanged(toStage.id);
+
+      if (direction === 'back' && overrideStages.length && ekcId) {
+        setDateSaving(true);
+        await saveEmployeeStageDates(ekcId, overrideStages.map(s => ({
+          stage_id:   s.stage_id,
+          start_date: s.start_date || null,
+          end_date:   s.end_date   || null,
+        })));
+      }
+    } catch (err) {
+      setToast(err?.response?.data?.error || 'Failed to update stage');
+      setTimeout(() => setToast(''), 3500);
+    } finally {
+      setStageChanging(false);
+      setDateSaving(false);
+      closeDialog();
+    }
+  }
+
+  const isBack = confirmDialog.direction === 'back';
+  const isBusy = stageChanging || dateSaving;
+
+  return (
+    <Box sx={{ mt: 1.5 }}>
+      {/* Mini stepper */}
+      <Stack direction="row" alignItems="center" spacing={0}>
+        {stages.map((stage, i) => {
+          const isDone    = stage.id < currentStageId;
+          const isCurrent = stage.id === currentStageId;
+          const isLast    = i === stages.length - 1;
+          return (
+            <React.Fragment key={stage.id}>
+              <Tooltip title={stage.name}>
+                <Stack alignItems="center" spacing={0.3} sx={{ minWidth: 52 }}>
+                  <Box sx={{
+                    width: isCurrent ? 26 : 20, height: isCurrent ? 26 : 20,
+                    borderRadius: '50%',
+                    bgcolor: isDone ? '#22c55e' : isCurrent ? BLUE : '#e2e8f0',
+                    border: isCurrent ? `2.5px solid ${ACCENT}` : isDone ? '2px solid #22c55e' : '2px solid #e2e8f0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: isCurrent ? `0 0 0 3px rgba(59,130,246,0.15)` : 'none',
+                    transition: 'all 0.2s', flexShrink: 0,
+                  }}>
+                    {isDone
+                      ? <CheckCircleIcon sx={{ fontSize: 12, color: '#fff' }} />
+                      : <Typography sx={{ fontSize: 8, fontWeight: 800, color: isCurrent ? '#fff' : '#94a3b8' }}>{stage.id}</Typography>
+                    }
+                  </Box>
+                  <Typography sx={{
+                    fontSize: 8, fontWeight: isCurrent ? 700 : 400,
+                    color: isCurrent ? BLUE : isDone ? '#22c55e' : '#94a3b8',
+                    textAlign: 'center', lineHeight: 1.2, maxWidth: 48,
+                    textTransform: 'uppercase', letterSpacing: '0.03em',
+                  }}>{stage.name}</Typography>
+                </Stack>
+              </Tooltip>
+              {!isLast && (
+                <Box sx={{ flex: 1, height: 1.5, bgcolor: isDone ? '#22c55e' : '#e2e8f0', mt: '-10px', mx: 0.3, transition: 'background 0.3s', minWidth: 8 }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </Stack>
+
+      {/* Admin back/forward controls */}
+      {isAdmin && (
+        <Stack direction="row" alignItems="center" spacing={1} mt={1}>
+          <Tooltip title={currentIdx > 0 ? `Move back to: ${stages[currentIdx - 1]?.name}` : 'Already at first stage'}>
+            <span>
+              <IconButton size="small"
+                disabled={currentIdx <= 0 || stageChanging}
+                onClick={e => { e.stopPropagation(); openBackDialog(stages[currentIdx - 1]); }}
+                sx={{ width: 24, height: 24, bgcolor: currentIdx > 0 ? '#eff6ff' : '#f8fafc', color: currentIdx > 0 ? BLUE : '#cbd5e1', border: `1px solid ${currentIdx > 0 ? '#bfdbfe' : '#e2e8f0'}`, '&:hover': { bgcolor: '#dbeafe' }, '&.Mui-disabled': { opacity: 0.4 } }}>
+                <ArrowBackIcon sx={{ fontSize: 12 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Typography sx={{ fontSize: 10, color: '#94a3b8', flex: 1, textAlign: 'center' }}>
+            {stageChanging ? 'Updating…' : 'Admin: move stage'}
+          </Typography>
+          <Tooltip title={currentIdx < stages.length - 1 ? `Advance to: ${stages[currentIdx + 1]?.name}` : 'Already at final stage'}>
+            <span>
+              <IconButton size="small"
+                disabled={currentIdx >= stages.length - 1 || stageChanging}
+                onClick={e => { e.stopPropagation(); openForwardDialog(stages[currentIdx + 1]); }}
+                sx={{ width: 24, height: 24, bgcolor: currentIdx < stages.length - 1 ? '#eff6ff' : '#f8fafc', color: currentIdx < stages.length - 1 ? BLUE : '#cbd5e1', border: `1px solid ${currentIdx < stages.length - 1 ? '#bfdbfe' : '#e2e8f0'}`, '&:hover': { bgcolor: '#dbeafe' }, '&.Mui-disabled': { opacity: 0.4 } }}>
+                <ArrowForwardIcon sx={{ fontSize: 12 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
+      )}
+
+      {toast && <Typography sx={{ fontSize: 10, color: '#64748b', mt: 0.5 }}>{toast}</Typography>}
+
+      {/* ─── Confirm dialog — unified blue theme ─── */}
+      <Dialog open={confirmDialog.open} onClose={() => !isBusy && closeDialog()}
+        maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 20px 60px -10px rgba(15,23,42,0.2)' } }}>
+
+        {/* Header — always blue */}
+        <Box sx={{
+          bgcolor: '#eff6ff',
+          px: 3, pt: 2.5, pb: 2,
+          borderBottom: '1px solid #bfdbfe',
+        }}>
+          <Stack direction="row" alignItems="center" spacing={1.25}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '50%',
+              bgcolor: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Typography sx={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>
+                {isBack ? '←' : '→'}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography fontWeight={700} fontSize={15} color={BLUE}>
+                {isBack
+                  ? `Move Back to ${confirmDialog.toStage?.name}`
+                  : `Move Forward to ${confirmDialog.toStage?.name}`}
+              </Typography>
+              {isBack && (
+                <Typography fontSize={12} color="#64748b" mt={0.2}>
+                  Set this employee's personal stage dates
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+        </Box>
+
+        <DialogContent sx={{ pt: 2, pb: 1, px: 3, overflow: 'visible' }}>
+          {isBack ? (
+            <>
+              <Typography fontSize={13} color="#374151" mb={2} sx={{ lineHeight: 1.6 }}>
+                Adjust stage dates for this employee. These will override cycle-level dates only for them.
+              </Typography>
+              <Stack spacing={0.75}>
+                {overrideStages.map(s => (
+                  <InlineStageRow
+                    key={s.stage_id}
+                    stageData={s}
+                    isTarget={s.stage_id === confirmDialog.toStage?.id}
+                    onRangeChange={(stageId, val) =>
+                      setOverrideStages(prev => prev.map(x =>
+                        x.stage_id === stageId ? { ...x, ...val } : x
+                      ))
+                    }
+                  />
+                ))}
+              </Stack>
+            </>
+          ) : (
+            <Typography fontSize={13} color="#374151" sx={{ lineHeight: 1.6 }}>
+              Move this employee forward to <strong>{confirmDialog.toStage?.name}</strong>? They will advance by one stage.
+            </Typography>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1.5, gap: 1 }}>
+          <Button onClick={closeDialog} disabled={isBusy}
+            sx={{
+              textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 2, fontSize: 13, px: 2,
+              '&:hover': { bgcolor: '#f1f5f9' },
+            }}>
+            Cancel
+          </Button>
+          <Button onClick={doStageChange}
+            variant="contained"
+            disabled={isBusy}
+            sx={{
+              textTransform: 'none', fontWeight: 700, fontSize: 13, borderRadius: 2, px: 3,
+              bgcolor: BLUE,
+              boxShadow: 'none',
+              '&:hover': { bgcolor: ACCENT, boxShadow: 'none' },
+              '&.Mui-disabled': { opacity: 0.6 },
+            }}>
+            {isBusy
+              ? <><CircularProgress size={13} sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />{dateSaving ? 'Saving dates…' : 'Moving…'}</>
+              : (isBack ? 'Confirm & Save Dates' : 'Confirm Move Forward')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
 // ── Employee review panel ─────────────────────────────────────────────────────
-function EmployeeReviewPanel({ emp, allEmployees, ratings, currentCycleStageId, completedStageIds, onBack, onSwitchEmployee, onKraUpdated }) {
+function EmployeeReviewPanel({ cycleId, emp, allEmployees, ratings, currentCycleStageId, completedStageIds, cycleStages, onBack, onSwitchEmployee, onKraUpdated }) {
+  const { isAdmin } = useRoleAccess();
+  const [empStageId, setEmpStageId] = useState(emp.current_stage_id ?? currentCycleStageId);
+  useEffect(() => { setEmpStageId(emp.current_stage_id ?? currentCycleStageId); }, [emp.employee_id]);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState(null);
   const [toast, setToast] = useState({ msg: '', severity: 'success' });
   const [localKras, setLocalKras] = useState(emp.kras ?? []);
   const [kraSearch, setKraSearch] = useState('');
 
-  // Ref map for jump-to
   const kraRefs = useRef({});
 
-  // When employee switches, reset local state
   useEffect(() => {
     setLocalKras(emp.kras ?? []);
     setKraSearch('');
@@ -328,7 +841,6 @@ function EmployeeReviewPanel({ emp, allEmployees, ratings, currentCycleStageId, 
       {/* Fixed header */}
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 2, flexShrink: 0, bgcolor: '#f5f6fa' }}>
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
-          {/* Back button */}
           <IconButton onClick={onBack} size="small" sx={{ bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#e2e8f0' } }}>
             <ArrowBackIcon fontSize="small" />
           </IconButton>
@@ -337,13 +849,11 @@ function EmployeeReviewPanel({ emp, allEmployees, ratings, currentCycleStageId, 
             {initials(emp.full_name)}
           </Avatar>
 
-          {/* Employee name + dropdown switcher */}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>{emp.full_name}</Typography>
             <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>{emp.title || '—'}</Typography>
           </Box>
 
-          {/* Employee switcher dropdown — jump directly to another employee */}
           <Select
             value={emp.employee_id}
             onChange={e => {
@@ -374,7 +884,6 @@ function EmployeeReviewPanel({ emp, allEmployees, ratings, currentCycleStageId, 
             ))}
           </Select>
 
-          {/* KRAs reviewed counter */}
           <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, px: 2, py: 1, minWidth: 130, flexShrink: 0 }}>
             <Typography sx={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, mb: 0.3 }}>KRAs Reviewed</Typography>
             <Stack direction="row" alignItems="baseline" spacing={0.5}>
@@ -389,7 +898,15 @@ function EmployeeReviewPanel({ emp, allEmployees, ratings, currentCycleStageId, 
           </Paper>
         </Stack>
 
-        <CycleStageStepper currentStageId={currentCycleStageId} completedStageIds={completedStageIds} />
+        <InlineStageStepper
+          currentStageId={empStageId}
+          cycleId={cycleId}
+          employeeId={emp.employee_id}
+          ekcId={emp.employee_kra_cycle_id}
+          cycleStages={cycleStages}
+          isAdmin={isAdmin}
+          onStageChanged={newId => setEmpStageId(newId)}
+        />
         <Divider />
       </Box>
 
@@ -402,7 +919,6 @@ function EmployeeReviewPanel({ emp, allEmployees, ratings, currentCycleStageId, 
         )}
         {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
 
-        {/* KRA search bar */}
         {localKras.length > 0 && (
           <TextField size="small" fullWidth
             placeholder={`Search ${localKras.length} KRAs…`}
@@ -449,6 +965,23 @@ export default function TeamPerformancePage() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
+  const { isAdmin } = useRoleAccess();
+  const [expandedEmpId, setExpandedEmpId] = useState(null);
+  const [empStages, setEmpStages] = useState({});
+
+  function handleKraUpdated(employeeId, employeeKraLevelId, payload) {
+    setData(prev => ({
+      ...prev,
+      employees: (prev?.employees ?? []).map(e =>
+        e.employee_id !== employeeId ? e : {
+          ...e,
+          kras: e.kras.map(k =>
+            k.employee_kra_level_id === employeeKraLevelId ? { ...k, ...payload } : k
+          ),
+        }
+      ),
+    }));
+  }
 
   useEffect(() => {
     getCycles({ status: 'ACTIVE' }).then(res => {
@@ -494,11 +1027,13 @@ export default function TeamPerformancePage() {
   if (selected) {
     return (
       <EmployeeReviewPanel
+        cycleId={cycleId}
         emp={selected}
         allEmployees={employees}
         ratings={ratings}
         currentCycleStageId={currentCycleStageId}
         completedStageIds={completedStageIds}
+        cycleStages={data?.cycle_stages ?? []}
         onBack={() => { setSelected(null); refetchProgress(); }}
         onSwitchEmployee={emp => setSelected(emp)}
         onKraUpdated={handleKraUpdated}
@@ -571,14 +1106,16 @@ export default function TeamPerformancePage() {
                 </Paper>
 
                 {pending > 0 && (
-                  <Paper elevation={0} sx={{ flex: 1, border: '1.5px solid #fed7aa', borderRadius: 3, p: 2.5, bgcolor: '#fff7ed' }}>
+                  <Paper elevation={0} sx={{ flex: 1, border: '1.5px solid #bfdbfe', borderRadius: 3, p: 2.5, bgcolor: '#eff6ff' }}>
                     <Stack direction="row" alignItems="flex-start" spacing={1}>
-                      <WarningAmberIcon sx={{ color: '#f59e0b', mt: 0.3 }} />
+                      <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 0.3, flexShrink: 0 }}>
+                        <Typography sx={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>!</Typography>
+                      </Box>
                       <Box>
-                        <Typography sx={{ fontSize: 11, color: '#92400e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        <Typography sx={{ fontSize: 11, color: BLUE, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           Action Required
                         </Typography>
-                        <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#92400e', mt: 0.5 }}>
+                        <Typography sx={{ fontSize: 22, fontWeight: 800, color: BLUE, mt: 0.5 }}>
                           {pending} Pending Lead {pending === 1 ? 'Assessment' : 'Assessments'}
                         </Typography>
                       </Box>
@@ -609,7 +1146,7 @@ export default function TeamPerformancePage() {
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                      {['Employee', 'KRAs', 'Self-Assessment', 'Lead Review', 'Action'].map(h => (
+                      {['Employee', 'KRAs', 'Self-Assessment', 'Lead Review', 'Stage', 'Action'].map(h => (
                         <TableCell key={h} sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', py: 1.5, borderBottom: '1.5px solid #e2e8f0' }}>
                           {h}
                         </TableCell>
@@ -626,6 +1163,7 @@ export default function TeamPerformancePage() {
                           sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafbff', '&:hover': { bgcolor: '#eff6ff' }, cursor: 'pointer' }}
                           onClick={() => setSelected(emp)}
                         >
+                          {/* Employee */}
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
                             <Stack direction="row" alignItems="center" spacing={1.5}>
                               <Avatar sx={{ width: 34, height: 34, bgcolor: BLUE, fontSize: 12, fontWeight: 800 }}>
@@ -633,20 +1171,62 @@ export default function TeamPerformancePage() {
                               </Avatar>
                               <Box>
                                 <Typography sx={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{emp.full_name}</Typography>
-                                <Typography sx={{ fontSize: 11, color: '#94a3b8' }}>Stage {emp.current_stage_id}</Typography>
+                                <Typography sx={{ fontSize: 11, color: '#94a3b8' }}>
+                                  {CYCLE_STAGES.find(s => s.id === (empStages[emp.employee_id] ?? emp.current_stage_id))?.name ?? `Stage ${emp.current_stage_id}`}
+                                </Typography>
                               </Box>
                             </Stack>
                           </TableCell>
+
+                          {/* KRAs */}
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
                             <Chip label={kraCount} size="small"
                               sx={{ bgcolor: '#f1f5f9', color: BLUE, fontWeight: 700, fontSize: 12, minWidth: 32 }} />
                           </TableCell>
+
+                          {/* Self-Assessment */}
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
                             <StatusBadge statusKey={ss} />
                           </TableCell>
+
+                          {/* Lead Review */}
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
                             <StatusBadge statusKey={ls} />
                           </TableCell>
+
+                          {/* Stage */}
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 130 }} onClick={e => e.stopPropagation()}>
+                            <Stack spacing={0.5}>
+                              <Chip
+                                label={`Stage ${empStages[emp.employee_id] ?? emp.current_stage_id ?? '—'}`}
+                                size="small"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setExpandedEmpId(v => v === emp.employee_id ? null : emp.employee_id);
+                                }}
+                                sx={{
+                                  bgcolor: '#eff6ff', color: BLUE, fontWeight: 700,
+                                  fontSize: 11, cursor: 'pointer', height: 22,
+                                  '&:hover': { bgcolor: '#dbeafe' },
+                                }}
+                              />
+                              {expandedEmpId === emp.employee_id && (
+                                <Box sx={{ minWidth: 320, pt: 0.5 }} onClick={e => e.stopPropagation()}>
+                                  <InlineStageStepper
+                                    currentStageId={empStages[emp.employee_id] ?? emp.current_stage_id ?? 1}
+                                    cycleId={cycleId}
+                                    employeeId={emp.employee_id}
+                                    ekcId={emp.employee_kra_cycle_id}
+                                    cycleStages={data?.cycle_stages ?? []}
+                                    isAdmin={isAdmin}
+                                    onStageChanged={newId => setEmpStages(prev => ({ ...prev, [emp.employee_id]: newId }))}
+                                  />
+                                </Box>
+                              )}
+                            </Stack>
+                          </TableCell>
+
+                          {/* Action */}
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
                             {ss === 'locked' ? (
                               <Tooltip title="Waiting for self-assessment">
@@ -676,4 +1256,4 @@ export default function TeamPerformancePage() {
       </Box>
     </Box>
   );
-}
+} 

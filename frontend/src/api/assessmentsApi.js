@@ -52,3 +52,7 @@ export const getAssessmentProgress = (cycleId, employeeId = null, page = 1, perP
       per_page: perPage,
     },
   });
+
+
+export const saveEmployeeStageDates = (ekcId, stages) =>
+  axiosInstance.post(`/kra/employee-cycles/${ekcId}/stage-dates`, { stages });
