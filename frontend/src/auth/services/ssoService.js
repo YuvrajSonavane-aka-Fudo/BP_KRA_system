@@ -10,7 +10,8 @@ const ssoService = {
       provider,
       response_type: 'code',
     });
-    window.location.href = `http://localhost:8000/api/v1/auth/microsoft/login`;
+    // window.location.href = `http://localhost:8000/api/v1/auth/microsoft/login`;
+    window.location.href = `${env.API_BASE_URL}auth/microsoft/login`;
   },
 
  async getCurrentUser() {
