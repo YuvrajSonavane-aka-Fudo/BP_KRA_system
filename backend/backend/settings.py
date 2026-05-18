@@ -22,12 +22,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-zx^g98%-oedb*^l+*-&u3b0gffjn+sq6fdp4py8*(t^t^pp0#g'
+# SECRET_KEY = 'django-insecure-zx^g98%-oedb*^l+*-&u3b0gffjn+sq6fdp4py8*(t^t^pp0#g'
+SECRET_KEY = os.getenv('SECRET_KEY', 'local-dev-key-only')
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '.elasticbeanstalk.com',
+    os.getenv('EB_HOST', ''),
+]
 
 
 # Application definition
@@ -56,6 +65,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     #'django.middleware.csrf.CsrfViewMiddleware',
@@ -91,9 +101,14 @@ TEMPLATES = [
     },
 ]
 # With this:
+# CORS_ALLOWED_ORIGINS = [
+#     'http://localhost:3000',
+#     'https://krasystem.netlify.app',
+# ]
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'https://krasystem.netlify.app',
+    'https://dhanesh-01-bp-kra-system.vercel.app',   # ← your Vercel URL 
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -161,19 +176,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+# STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Session settings
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # store sessions in DB
 SESSION_COOKIE_NAME = 'sessionid'
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SECURE = False   # False for HTTP (local dev), True for HTTPS (prod)
+# SESSION_COOKIE_SAMESITE = 'Lax'
+# SESSION_COOKIE_SECURE = False   # False for HTTP (local dev), True for HTTPS (prod)
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SAMESITE = 'None'   # Required: Vercel and AWS are different domains
+
 SESSION_SAVE_EVERY_REQUEST = True  # refresh session on every request
 
 
-CELERY_BROKER_URL     = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+# CELERY_BROKER_URL     = 'redis://localhost:6379/0'
+# CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_BROKER_URL     = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_EAGER', 'True') == 'True'
+
 CELERY_TIMEZONE       = 'Asia/Kolkata'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
@@ -196,3 +219,5 @@ DEFAULT_FROM_EMAIL  = 'KRA System <moonmxn690@gmail.com>'
 #     recipient_list=['moonmxn690@gmail.com'],  # send to yourself first
 #     fail_silently=False,
 # )
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
