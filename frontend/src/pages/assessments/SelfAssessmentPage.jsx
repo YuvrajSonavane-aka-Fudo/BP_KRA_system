@@ -588,9 +588,9 @@ function ProgressSidebar({ kras, onJumpTo }) {
             >
               {k.self_rating_id
                 ? <CheckCircleIcon sx={{ fontSize: 14, color: '#22c55e', flexShrink: 0 }} />
-                : <RadioButtonUncheckedIcon sx={{ fontSize: 14, color: '#cbd5e1', flexShrink: 0 }} />
+                : <RadioButtonUncheckedIcon sx={{ fontSize: 14, color: '#141414', flexShrink: 0 }} />
               }
-              <Typography sx={{ fontSize: 12, color: k.self_rating_id ? '#1e293b' : '#94a3b8', fontWeight: k.self_rating_id ? 600 : 400, flex: 1 }} noWrap>
+              <Typography sx={{ fontSize: 12, color: k.self_rating_id ? '#1e293b' : '#010101', fontWeight: k.self_rating_id ? 600 : 400, flex: 1 }} noWrap>
                 {k.kra_name}
               </Typography>
             </Stack>
