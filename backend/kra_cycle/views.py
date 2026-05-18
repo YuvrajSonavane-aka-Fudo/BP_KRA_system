@@ -915,7 +915,8 @@ class KRACycleAdvanceStageView(APIView):
             cycle.stage = new_stage
             cycle.save()
             affected = EmployeeKRACycle.objects.filter(
-                kra_cycle_id=cycle.id
+                kra_cycle_id=cycle.id,
+                is_stage_overridden=False
             ).update(stage_id=new_stage_id)
 
         # AUDIT LOG
@@ -968,7 +969,19 @@ class KRACycleAdvanceStageView(APIView):
         old_cycle_stage_name = cycle.stage.name if cycle.stage else None
 
         with transaction.atomic():
-            affected = ekc_qs.update(stage_id=target_stage_id)
+            if employee_ids:
+                # Specific employee(s) manually moved → protect from bulk advance/rollback
+                affected = ekc_qs.update(
+                    stage_id=target_stage_id,
+                    is_stage_overridden=True
+                )
+            else:
+                # Bulk advance/rollback from dashboard → skip overridden employees
+                affected = ekc_qs.filter(
+                    is_stage_overridden=False
+                ).update(stage_id=target_stage_id)
+                cycle.stage = target_stage
+                cycle.save(update_fields=['stage'])
 
             # When rolling back ALL employees (no specific employee_ids),
             # also move the cycle's own current_stage pointer so the

@@ -359,7 +359,7 @@ class EmployeeKRACycle(models.Model):
         db_column = 'employee_level',
         related_name = 'employee_kra_cycles',
     )
-    
+    is_stage_overridden = models.BooleanField(default=False)
     class Meta:
         db_table = 'employee_kra_cycle'
     
