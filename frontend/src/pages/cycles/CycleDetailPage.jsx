@@ -19,19 +19,12 @@ import InfoOutlinedIcon     from '@mui/icons-material/InfoOutlined';
 import EditIcon             from '@mui/icons-material/Edit';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ROUTES from '../../config/routes';
-import { getCycles, createCycle, updateCycle, cloneCycle, advanceCycleStage } from '../../api/cyclesApi';
+import { getCycles, createCycle, updateCycle, cloneCycle, advanceCycleStage, getReferenceData  } from '../../api/cyclesApi';
 import { invalidateCyclesCache } from '../../hooks/useCycles';
 import useRoleAccess from '../../hooks/useRoleAccess';
 
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
-const STAGES = [
-  { id: 1, name: 'KRA Assignment By Lead' },
-  { id: 2, name: 'Self Assessment' },
-  { id: 3, name: 'Lead Assessment' },
-  { id: 4, name: 'HR Validation' },
-  { id: 5, name: 'Closure' },
-];
 const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const WEEK_DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
@@ -348,12 +341,12 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmCol
    FIX 2: Stepper no longer shows stage 1 as "completed" (green)
            when it IS the rollback target — it shows it as active.
    ───────────────────────────────────────────────────────────── */
-function StageStepper({ currentStageId, canAdvance, onAdvanceClick, rollbackTargetId }) {
+function StageStepper({ stages, currentStageId, canAdvance, onAdvanceClick, rollbackTargetId }) {
   return (
     <Box sx={{ px: 2.5, pb: 2 }}>
       {rollbackTargetId && (
         <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)', mb: 1 }}>
-          Rolling back to "{STAGES.find(s => s.id === rollbackTargetId)?.name}" — update dates below and save
+          Rolling back to "{stages.find(s => s.id === rollbackTargetId)?.name}" — update dates below and save
         </Typography>
       )}
       {!rollbackTargetId && canAdvance && (
@@ -364,7 +357,7 @@ function StageStepper({ currentStageId, canAdvance, onAdvanceClick, rollbackTarg
       <Box sx={{ position: 'relative' }}>
         <Box sx={{ position: 'absolute', top: 14, left: '4%', right: '4%', height: 2, bgcolor: 'rgba(255,255,255,0.15)', zIndex: 0 }} />
         <Stack direction="row" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
-          {STAGES.map((stage) => {
+          {stages.map((stage) => {
             // FIX: In rollback mode, the rollbackTarget stage is "active/selected",
             // stages BEFORE it are "done", stages AFTER are "future".
             // Without rollback: normal current/done/future logic.
@@ -441,6 +434,7 @@ export default function CycleDetailPage() {
   const [source, setSource]   = useState(null);
   const [allCycles, setAll]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stages, setStages] = useState([]);
   const [error, setError]     = useState('');
   const [successMsg, setMsg]  = useState('');
 
@@ -449,9 +443,7 @@ export default function CycleDetailPage() {
   const [editDesc, setEditDesc]         = useState('');
   const [editStart, setEditStart]       = useState('');
   const [editEnd, setEditEnd]           = useState('');
-  const [editStageDates, setEditStages] = useState(() => {
-    const i = {}; STAGES.forEach(s => { i[s.id] = { start_date: '', end_date: '' }; }); return i;
-  });
+  const [editStageDates, setEditStages] = useState({});
 
   /* ── Dirty tracking (for existing cycles) ── */
   const [isDirty, setIsDirty]   = useState(false);
@@ -492,7 +484,7 @@ export default function CycleDetailPage() {
     if (touched.start && !editStart) errors.cycleDates = 'Start date required.';
     if (touched.end   && !editEnd)   errors.cycleDates = 'End date required.';
     if (touched.end && editStart && editEnd && editEnd <= editStart) errors.cycleDates = 'End must be after start.';
-    STAGES.forEach(s => {
+    stages.forEach(s => {
       const d = editStageDates[s.id] ?? {};
       if (touched[`s${s.id}s`] && !d.start_date) errors[`s${s.id}`] = 'Required.';
       if (touched[`s${s.id}e`] && !d.end_date)   errors[`s${s.id}`] = 'Required.';
@@ -507,6 +499,9 @@ export default function CycleDetailPage() {
   const fetchData = useCallback(async () => {
     setLoading(true); setError('');
     try {
+      const refRes = await getReferenceData();
+      const fetchedStages = refRes.data.stages ?? [];
+      setStages(fetchedStages);
       const listRes = await getCycles();
       const cycles  = listRes.data?.cycles ?? listRes.data ?? [];
       setAll(cycles);
@@ -530,7 +525,7 @@ export default function CycleDetailPage() {
         setEditDesc(src.description || '');
         setEditStart(''); setEditEnd('');
         const sd = {};
-        STAGES.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
+        fetchedStages.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
         (src.cycle_stages ?? []).forEach(w => {
           const sid = w.stage_id ?? w.stage?.id;
           if (sid) sd[sid] = { start_date: toDateOnly(w.start_date), end_date: toDateOnly(w.end_date) };
@@ -546,7 +541,7 @@ export default function CycleDetailPage() {
         setEditStart(toDateOnly(found.start_date));
         setEditEnd(toDateOnly(found.end_date));
         const sd = {};
-        STAGES.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
+        fetchedStages.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
         (found.cycle_stages ?? []).forEach(w => {
           const sid = w.stage_id ?? w.stage?.id;
           if (sid) sd[sid] = { start_date: toDateOnly(w.start_date), end_date: toDateOnly(w.end_date) };
@@ -572,8 +567,8 @@ export default function CycleDetailPage() {
   const stageWindows   = cycle?.cycle_stages ?? [];
 
   const step0Valid = !!editName.trim() && !!editStart && !!editEnd && editEnd > editStart;
-  const step1Valid = STAGES.every(s => editStageDates[s.id]?.start_date && editStageDates[s.id]?.end_date);
-  const configuredCount = STAGES.filter(s => editStageDates[s.id]?.start_date && editStageDates[s.id]?.end_date).length;
+  const step1Valid = stages.length > 0 && stages.every(s => editStageDates[s.id]?.start_date && editStageDates[s.id]?.end_date);
+  const configuredCount = stages.filter(s => editStageDates[s.id]?.start_date && editStageDates[s.id]?.end_date).length;
   const durationDays = editStart && editEnd && editEnd > editStart
     ? Math.round((new Date(editEnd) - new Date(editStart)) / 86400000) : null;
 
@@ -606,10 +601,10 @@ export default function CycleDetailPage() {
   /* ── CREATE / CLONE submit ── */
   async function handleSubmit() {
     const allT = { name: true, start: true, end: true };
-    STAGES.forEach(s => { allT[`s${s.id}s`] = true; allT[`s${s.id}e`] = true; });
+    stages.forEach(s => { allT[`s${s.id}s`] = true; allT[`s${s.id}e`] = true; });
     setTouched(allT);
     if (!step0Valid || !step1Valid) { setSubmitError('Please fill in all required fields.'); return; }
-    const stageOutOfRange = STAGES.find(s => {
+    const stageOutOfRange = stages.find(s => {
       const d = editStageDates[s.id] ?? {};
       if (!d.start_date || !d.end_date) return false;
       if (editStart && d.start_date < editStart) return true;
@@ -627,7 +622,7 @@ export default function CycleDetailPage() {
         description: editDesc.trim() || undefined,
         start_date: editStart,
         end_date: editEnd,
-        stages: STAGES.map(s => ({ stage_id: s.id, start_date: editStageDates[s.id]?.start_date, end_date: editStageDates[s.id]?.end_date })),
+        stages: stages.map(s => ({ stage_id: s.id, start_date: editStageDates[s.id]?.start_date, end_date: editStageDates[s.id]?.end_date })),
       };
       let newCycle;
       if (isClone) {
@@ -664,7 +659,7 @@ export default function CycleDetailPage() {
         description: editDesc.trim() || null,
         start_date: editStart,
         end_date: editEnd,
-        stages: STAGES.map(s => ({
+        stages: stages.map(s => ({
           stage_id: s.id,
           start_date: editStageDates[s.id]?.start_date || null,
           end_date: editStageDates[s.id]?.end_date || null,
@@ -696,7 +691,7 @@ export default function CycleDetailPage() {
       setIsDirty(false);
 
       flash(rollbackTargetId
-        ? `Rolled back to "${STAGES.find(s => s.id === rollbackTargetId)?.name}" and saved.`
+        ? `Rolled back to "${stages.find(s => s.id === rollbackTargetId)?.name}" and saved.`
         : 'Changes saved.'
       );
     } catch (err) {
@@ -711,7 +706,7 @@ export default function CycleDetailPage() {
       setEditStart(toDateOnly(cycle.start_date));
       setEditEnd(toDateOnly(cycle.end_date));
       const sd = {};
-      STAGES.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
+      stages.forEach(s => { sd[s.id] = { start_date: '', end_date: '' }; });
       (cycle.cycle_stages ?? []).forEach(w => {
         const sid = w.stage_id ?? w.stage?.id;
         if (sid) sd[sid] = { start_date: toDateOnly(w.start_date), end_date: toDateOnly(w.end_date) };
@@ -957,6 +952,7 @@ export default function CycleDetailPage() {
             the correct stage when navigating from dashboard. */}
         {!isNew && (
           <StageStepper
+            stages={stages}
             currentStageId={currentStageId}
             canAdvance={canAdvance}
             rollbackTargetId={rollbackTargetId}
@@ -1088,7 +1084,7 @@ export default function CycleDetailPage() {
                               <Typography sx={{ fontSize: 9, fontWeight: 800, color: '#fff' }}>{cycle.current_stage.id}</Typography>
                             </Box>
                             <Typography fontSize={13} color="#374151">
-                              {STAGES.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name}
+                              {stages.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name}
                             </Typography>
                           </Stack>
                         ) : <Typography fontSize={13} color="#94a3b8">—</Typography>}
@@ -1163,7 +1159,7 @@ export default function CycleDetailPage() {
                   <Box sx={{ fontSize: 14 }}>⬅</Box>
                   <Box>
                     <Typography fontSize={12} fontWeight={700} color="#92400e">
-                      Rolling back to "{STAGES.find(s => s.id === rollbackTargetId)?.name}"
+                      Rolling back to "{stages.find(s => s.id === rollbackTargetId)?.name}"
                     </Typography>
                     <Typography fontSize={11} color="#b45309">
                       Update the highlighted stage dates below, then click Save.
@@ -1173,8 +1169,8 @@ export default function CycleDetailPage() {
               </Box>
             )}
 
-            {STAGES.map((stage, idx) => {
-              const isLast = idx === STAGES.length - 1;
+            {stages.map((stage, idx) => {
+              const isLast = idx === stages.length - 1;
               const win    = !isNew ? stageWindows.find(w => w.stage_id === stage.id || w.stage?.id === stage.id) : null;
               const done   = !isNew && currentStageId && stage.id < currentStageId;
               const active = !isNew && currentStageId === stage.id;
