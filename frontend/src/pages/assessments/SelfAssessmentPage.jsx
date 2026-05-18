@@ -664,7 +664,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
               )}
               <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#1e293b' }}>KRA Assessment</Typography>
             </Box>
-            {cycles.length > 1 && (
+            {cycles.length > 0 && (
               <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
                 size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
                 {cycles.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
@@ -686,6 +686,14 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
       )}
       {hideCycleHeader && (
         <Box sx={{ px: { xs: 2, md: 3 }, pt: 2, pb: 0, flexShrink: 0 }}>
+          {cycles.length > 0 && (
+            <Stack direction="row" justifyContent="flex-end" mb={1}>
+              <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
+                size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
+                {cycles.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
+              </Select>
+            </Stack>
+          )}
           <CycleStageStepper
             currentStageId={currentStageId}
             completedStageIds={completedStageIds}
@@ -1393,7 +1401,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
           </Box>
 
           <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
-            {cycles.length > 1 && (
+            {cycles.length > 0 && (
               <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
                 size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
                 {cycles.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
@@ -1566,7 +1574,7 @@ export default function KRAAssessmentPage() {
   const role = resolveRole(user);
 
   useEffect(() => {
-    getCycles({ status: 'ACTIVE' }).then(res => {
+    getCycles().then(res => {
       const list = res.data?.cycles ?? [];
       setCycles(list);
       if (list.length > 0) setCycleId(list[0].id);
