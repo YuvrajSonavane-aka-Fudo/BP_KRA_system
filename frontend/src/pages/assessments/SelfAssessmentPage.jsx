@@ -588,9 +588,9 @@ function ProgressSidebar({ kras, onJumpTo }) {
             >
               {k.self_rating_id
                 ? <CheckCircleIcon sx={{ fontSize: 14, color: '#22c55e', flexShrink: 0 }} />
-                : <RadioButtonUncheckedIcon sx={{ fontSize: 14, color: '#cbd5e1', flexShrink: 0 }} />
+                : <RadioButtonUncheckedIcon sx={{ fontSize: 14, color: '#141414', flexShrink: 0 }} />
               }
-              <Typography sx={{ fontSize: 12, color: k.self_rating_id ? '#1e293b' : '#94a3b8', fontWeight: k.self_rating_id ? 600 : 400, flex: 1 }} noWrap>
+              <Typography sx={{ fontSize: 12, color: k.self_rating_id ? '#1e293b' : '#010101', fontWeight: k.self_rating_id ? 600 : 400, flex: 1 }} noWrap>
                 {k.kra_name}
               </Typography>
             </Stack>
@@ -667,7 +667,16 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
             {cycles.length > 0 && (
               <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
                 size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
-                {cycles.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
+                {cycles.map(c => (
+                <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <span>{c.name}</span>
+                    {(c.status === 'ACTIVE') && (
+                      <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                    )}
+                  </Stack>
+                </MenuItem>
+              ))}
               </Select>
             )}
           </Stack>
@@ -690,7 +699,16 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
             <Stack direction="row" justifyContent="flex-end" mb={1}>
               <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
                 size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
-                {cycles.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
+                {cycles.map(c => (
+                <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <span>{c.name}</span>
+                    {(c.status === 'ACTIVE') && (
+                      <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                    )}
+                  </Stack>
+                </MenuItem>
+              ))}
               </Select>
             </Stack>
           )}
@@ -1404,7 +1422,16 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
             {cycles.length > 0 && (
               <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
                 size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
-                {cycles.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
+                {cycles.map(c => (
+                <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <span>{c.name}</span>
+                    {(c.status === 'ACTIVE') && (
+                      <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                    )}
+                  </Stack>
+                </MenuItem>
+              ))}
               </Select>
             )}
 
@@ -1577,7 +1604,10 @@ export default function KRAAssessmentPage() {
     getCycles().then(res => {
       const list = res.data?.cycles ?? [];
       setCycles(list);
-      if (list.length > 0) setCycleId(list[0].id);
+      if (list.length > 0) {
+        const active = list.find(c => c.status === 'ACTIVE');
+        setCycleId(active ? active.id : list[0].id);
+      }
     });
     getReferenceData().then(res => {
       setRatings(res.data?.ratings ?? []);
