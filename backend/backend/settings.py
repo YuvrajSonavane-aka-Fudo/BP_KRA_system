@@ -220,4 +220,4 @@ DEFAULT_FROM_EMAIL  = 'KRA System <moonmxn690@gmail.com>'
 #     fail_silently=False,
 # )
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
