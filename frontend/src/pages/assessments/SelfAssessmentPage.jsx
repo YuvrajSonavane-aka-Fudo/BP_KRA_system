@@ -5,6 +5,7 @@ import {
   InputAdornment, Avatar, Table, TableBody, TableCell, TableHead, TableRow,
   Autocomplete, IconButton,
 } from '@mui/material';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import SaveIcon from '@mui/icons-material/Save';
@@ -28,12 +29,12 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 
 /* ─── RangePicker (same as CycleDetailPage) ─── */
-const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const WEEK_DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-const gradient  = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEK_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
 function toDateOnly(s) { return s ? String(s).split('T')[0].split(' ')[0].trim() : ''; }
-function toISO(y, m, d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function toISO(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 function fmtShort(s) {
   if (!s) return null;
   const d = new Date(toDateOnly(s) + 'T00:00:00');
@@ -57,34 +58,34 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
   const [hover, setHover] = useState(null);
 
   const startD = startDate ? new Date(toDateOnly(startDate) + 'T00:00:00') : null;
-  const endD   = endDate   ? new Date(toDateOnly(endDate)   + 'T00:00:00') : null;
+  const endD = endDate ? new Date(toDateOnly(endDate) + 'T00:00:00') : null;
 
-  const totalDays = new Date(vy, vm+1, 0).getDate();
-  const firstDay  = new Date(vy, vm, 1).getDay();
-  const cells     = [...Array(firstDay).fill(null), ...Array.from({ length: totalDays }, (_, i) => i+1)];
+  const totalDays = new Date(vy, vm + 1, 0).getDate();
+  const firstDay = new Date(vy, vm, 1).getDay();
+  const cells = [...Array(firstDay).fill(null), ...Array.from({ length: totalDays }, (_, i) => i + 1)];
 
   function disabled(d) {
     if (!d) return true;
     if (picking === 'end' && startD) {
-      const s = new Date(startD); s.setHours(0,0,0,0);
+      const s = new Date(startD); s.setHours(0, 0, 0, 0);
       if (new Date(vy, vm, d) < s) return true;
     }
     return false;
   }
   function dayState(d) {
     if (!d) return {};
-    const dt = new Date(vy, vm, d); dt.setHours(0,0,0,0);
-    const st = startD ? new Date(startD).setHours(0,0,0,0) : null;
-    const et = endD   ? new Date(endD).setHours(0,0,0,0)   : null;
-    const ht = hover  ? new Date(vy, vm, hover).setHours(0,0,0,0) : null;
+    const dt = new Date(vy, vm, d); dt.setHours(0, 0, 0, 0);
+    const st = startD ? new Date(startD).setHours(0, 0, 0, 0) : null;
+    const et = endD ? new Date(endD).setHours(0, 0, 0, 0) : null;
+    const ht = hover ? new Date(vy, vm, hover).setHours(0, 0, 0, 0) : null;
     const dtt = dt.getTime();
     const isStart = st !== null && dtt === st;
-    const isEnd   = et !== null && dtt === et;
+    const isEnd = et !== null && dtt === et;
     const re = picking === 'end' && ht ? ht : et;
     const inRange = st !== null && re !== null && dtt > st && dtt < re;
     return { isStart, isEnd, inRange };
   }
-  function isToday(d) { const t = new Date(); return !!d && t.getFullYear()===vy && t.getMonth()===vm && t.getDate()===d; }
+  function isToday(d) { const t = new Date(); return !!d && t.getFullYear() === vy && t.getMonth() === vm && t.getDate() === d; }
   function selectDay(d) {
     const iso = toISO(vy, vm, d);
     if (picking === 'start') { onChange({ start_date: iso, end_date: '' }); setPicking('end'); }
@@ -100,17 +101,17 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
     }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between"
         sx={{ px: 1.25, py: 0.75, background: gradient }}>
-        <IconButton size="small" onClick={() => vm===0 ? (setVm(11),setVy(y=>y-1)) : setVm(m=>m-1)}
-          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
+        <IconButton size="small" onClick={() => vm === 0 ? (setVm(11), setVy(y => y - 1)) : setVm(m => m - 1)}
+          sx={{ color: '#fff', p: 0.2, '&:hover': { bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1 } }}>
           <ChevronLeftIcon sx={{ fontSize: 14 }} />
         </IconButton>
-        <Typography sx={{ fontWeight: 700, fontSize: 12, color: '#fff' }}>{MONTHS[vm].slice(0,3)} {vy}</Typography>
-        <IconButton size="small" onClick={() => vm===11 ? (setVm(0),setVy(y=>y+1)) : setVm(m=>m+1)}
-          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 12, color: '#fff' }}>{MONTHS[vm].slice(0, 3)} {vy}</Typography>
+        <IconButton size="small" onClick={() => vm === 11 ? (setVm(0), setVy(y => y + 1)) : setVm(m => m + 1)}
+          sx={{ color: '#fff', p: 0.2, '&:hover': { bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1 } }}>
           <ChevronRightIcon sx={{ fontSize: 14 }} />
         </IconButton>
         <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml: 0.5 }}>
-          {[{ key:'start', val: startDate }, { key:'end', val: endDate }].map(({ key, val }, i) => (
+          {[{ key: 'start', val: startDate }, { key: 'end', val: endDate }].map(({ key, val }, i) => (
             <React.Fragment key={key}>
               {i === 1 && <Typography sx={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>→</Typography>}
               <Box onClick={() => key === 'end' && !startDate ? null : setPicking(key)}
@@ -140,24 +141,24 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
       <Box sx={{ px: 1.25, pt: 0.75, pb: 0.75 }}>
         <Stack direction="row" mb={0.4}>
           {WEEK_DAYS.map(d => (
-            <Box key={d} sx={{ flex:1, textAlign:'center' }}>
+            <Box key={d} sx={{ flex: 1, textAlign: 'center' }}>
               <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', letterSpacing: '0.02em' }}>{d}</Typography>
             </Box>
           ))}
         </Stack>
-        {Array.from({ length: Math.ceil(cells.length/7) }, (_,ri) => (
+        {Array.from({ length: Math.ceil(cells.length / 7) }, (_, ri) => (
           <Stack key={ri} direction="row" sx={{ mb: 0.1 }}>
-            {cells.slice(ri*7, ri*7+7).map((d,ci) => {
+            {cells.slice(ri * 7, ri * 7 + 7).map((d, ci) => {
               const dis = disabled(d);
               const { isStart, isEnd, inRange } = dayState(d);
               const today = isToday(d);
               const hi = isStart || isEnd;
               return (
-                <Box key={ci} sx={{ flex:1, display:'flex', justifyContent:'center' }}>
+                <Box key={ci} sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
                   {d ? (
                     <Box
                       onClick={() => !dis && selectDay(d)}
-                      onMouseEnter={() => !dis && picking==='end' && setHover(d)}
+                      onMouseEnter={() => !dis && picking === 'end' && setHover(d)}
                       onMouseLeave={() => setHover(null)}
                       sx={{
                         width: 26, height: 26,
@@ -198,7 +199,7 @@ function InlineStageRow({ stageData, isTarget, onRangeChange }) {
     if (!open) return;
     function h(e) {
       if (ref.current && !ref.current.contains(e.target) &&
-          popupRef.current && !popupRef.current.contains(e.target)) setOpen(false);
+        popupRef.current && !popupRef.current.contains(e.target)) setOpen(false);
     }
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -251,8 +252,8 @@ function InlineStageRow({ stageData, isTarget, onRangeChange }) {
         <Typography sx={{ fontSize: 13, color: bothSet ? '#1e293b' : '#94a3b8', flex: 1, userSelect: 'none' }}>
           {bothSet ? (
             <><span style={{ fontWeight: 600 }}>{fmtShort(stageData.start_date)}</span>
-            {' '}<span style={{ color: '#94a3b8' }}>→</span>{' '}
-            <span style={{ fontWeight: 600 }}>{fmtShort(stageData.end_date)}</span></>
+              {' '}<span style={{ color: '#94a3b8' }}>→</span>{' '}
+              <span style={{ fontWeight: 600 }}>{fmtShort(stageData.end_date)}</span></>
           ) : 'Set date range…'}
         </Typography>
         {bothSet && (
@@ -311,7 +312,7 @@ function resolveRole(user) {
 }
 
 // ── Shared: Stage stepper ─────────────────────────────────────────────────────
-function CycleStageStepper({ currentStageId, completedStageIds, dbStages, isAdmin, onStageClick }) {
+function CycleStageStepper({ currentStageId, completedStageIds, dbStages, isAdmin, onStageClick, isActiveCycle = true }) {
   const stages = (dbStages && dbStages.length > 0) ? dbStages : CYCLE_STAGES;
   if (!currentStageId) return null;
   const states = stages.map(stage => {
@@ -326,7 +327,8 @@ function CycleStageStepper({ currentStageId, completedStageIds, dbStages, isAdmi
     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0, mt: 2 }}>
       {states.map((stage, i) => {
         const isLast = i === states.length - 1;
-        const clickable = isAdmin && onStageClick && !stage.isCurrent;
+        // Only clickable if admin AND active cycle AND not current stage
+        const clickable = isAdmin && isActiveCycle && onStageClick && !stage.isCurrent;
         return (
           <React.Fragment key={stage.id}>
             <Stack alignItems="center" spacing={0.5} sx={{ minWidth: 72 }}>
@@ -421,7 +423,11 @@ function LeadRatingPanel({ row, ratings }) {
   );
 }
 
-function KRACard({ row, ratings, onSave, saving, savedId, editable, showLeadRating, kraRef }) {
+function KRACard({ row, ratings, onSave, saving, savedId, ratingEditable, notesEditable, showLeadRating, kraRef, onDirtyChange }) {
+  // ratingEditable — self rating chips interactive (Stage 3+ AND active cycle only)
+  // notesEditable  — comments/progress/help editable (Stage 2+ AND active cycle only)
+  const editable = ratingEditable || notesEditable; // used for save button and bg
+
   const [selfRatingId, setSelfRatingId] = useState(row.self_rating_id ?? '');
   const [selfComment, setSelfComment] = useState(row.self_comment ?? '');
   const [progressNotes, setProgressNotes] = useState(row.progress_notes ?? '');
@@ -432,17 +438,27 @@ function KRACard({ row, ratings, onSave, saving, savedId, editable, showLeadRati
   const isSaving = saving && savedId === row.employee_kra_level_id;
   const isDone = !!selfRatingId && !!selfComment;
 
-  useEffect(() => { setDirty(false); }, [editable]);
-  function handleChange(setter) { return (val) => { setter(val); setDirty(true); }; }
+  useEffect(() => { setDirty(false); onDirtyChange?.(row.employee_kra_level_id, false); }, [ratingEditable, notesEditable]);
+  function handleChange(setter, field) {
+    return (val) => {
+      setter(val);
+      if (!dirty) { setDirty(true); onDirtyChange?.(row.employee_kra_level_id, true); }
+    };
+  }
+
+  // Expose current payload for parent Save All
+  KRACard._payloads = KRACard._payloads || {};
+  KRACard._payloads[row.employee_kra_level_id] = {
+    self_rating_id: selfRatingId || null,
+    self_comment: selfComment || null,
+    progress_notes: progressNotes || null,
+    help_and_assistance_required: help || null,
+  };
 
   function handleSave() {
-    onSave(row.employee_kra_level_id, {
-      self_rating_id: selfRatingId || null,
-      self_comment: selfComment || null,
-      progress_notes: progressNotes || null,
-      help_and_assistance_required: help || null,
-    });
+    onSave(row.employee_kra_level_id, KRACard._payloads[row.employee_kra_level_id]);
     setDirty(false);
+    onDirtyChange?.(row.employee_kra_level_id, false);
   }
 
   return (
@@ -475,30 +491,43 @@ function KRACard({ row, ratings, onSave, saving, savedId, editable, showLeadRati
         <Stack spacing={2.5}>
           <Box>
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', mb: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Self Rating</Typography>
-            <Stack direction="row" flexWrap="wrap" gap={1}>
-              {ratings.map(r => (
-                <RatingChip key={r.id} label={`${r.rating} – ${r.description}`}
-                  selected={selfRatingId === r.id}
-                  onClick={() => handleChange(setSelfRatingId)(r.id)}
-                  disabled={!editable}
-                />
-              ))}
-            </Stack>
+            {ratingEditable ? (
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                {ratings.map(r => (
+                  <RatingChip key={r.id} label={`${r.rating} – ${r.description}`}
+                    selected={selfRatingId === r.id}
+                    onClick={() => handleChange(setSelfRatingId, 'self_rating_id')(r.id)}
+                    disabled={false}
+                  />
+                ))}
+              </Stack>
+            ) : selfRatingId ? (
+              // Show existing rating as read-only chip
+              <Chip
+                label={`${ratings.find(r => r.id === selfRatingId)?.rating ?? ''} – ${ratings.find(r => r.id === selfRatingId)?.description ?? ''}`}
+                size="small"
+                sx={{ bgcolor: '#eff6ff', color: '#1E3A8A', fontWeight: 700, fontSize: 12, alignSelf: 'flex-start', border: '1px solid #1E3A8A20' }}
+              />
+            ) : (
+              <Typography sx={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>
+                Rating not yet submitted — available in Self Assessment stage.
+              </Typography>
+            )}
           </Box>
           <Box>
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', mb: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Comments & Evidence</Typography>
-            <TextField multiline minRows={3} fullWidth disabled={!editable}
+            <TextField multiline minRows={3} fullWidth disabled={!notesEditable}
               placeholder="Describe key achievements, evidence, or context..."
-              value={selfComment} onChange={e => handleChange(setSelfComment)(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { fontSize: 14, borderRadius: 2, '&:hover fieldset': { borderColor: editable ? ACCENT : undefined }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
+              value={selfComment} onChange={e => handleChange(setSelfComment, 'self_comment')(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { fontSize: 14, borderRadius: 2, '&:hover fieldset': { borderColor: notesEditable ? ACCENT : undefined }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
             />
           </Box>
           <Box>
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', mb: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progress Notes</Typography>
-            <TextField multiline minRows={2} fullWidth disabled={!editable}
+            <TextField multiline minRows={2} fullWidth disabled={!notesEditable}
               placeholder="Optional: note specific milestones or blockers..."
-              value={progressNotes} onChange={e => handleChange(setProgressNotes)(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { fontSize: 14, borderRadius: 2, '&:hover fieldset': { borderColor: editable ? ACCENT : undefined }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
+              value={progressNotes} onChange={e => handleChange(setProgressNotes, 'progress_notes')(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { fontSize: 14, borderRadius: 2, '&:hover fieldset': { borderColor: notesEditable ? ACCENT : undefined }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
             />
           </Box>
           <Box>
@@ -508,28 +537,13 @@ function KRACard({ row, ratings, onSave, saving, savedId, editable, showLeadRati
               {showHelp ? <ExpandLessIcon sx={{ fontSize: 15, color: '#94a3b8' }} /> : <ExpandMoreIcon sx={{ fontSize: 15, color: '#94a3b8' }} />}
             </Stack>
             <Collapse in={showHelp}>
-              <TextField multiline minRows={2} fullWidth disabled={!editable}
+              <TextField multiline minRows={2} fullWidth disabled={!notesEditable}
                 placeholder="Describe any support or resources you need..."
-                value={help} onChange={e => handleChange(setHelp)(e.target.value)}
-                sx={{ '& .MuiOutlinedInput-root': { fontSize: 14, borderRadius: 2, '&:hover fieldset': { borderColor: editable ? ACCENT : undefined }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
+                value={help} onChange={e => handleChange(setHelp, 'help')(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { fontSize: 14, borderRadius: 2, '&:hover fieldset': { borderColor: notesEditable ? ACCENT : undefined }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
               />
             </Collapse>
           </Box>
-          {editable && (
-            <Stack direction="row" justifyContent="flex-end">
-              <Box onClick={dirty ? handleSave : undefined} sx={{
-                display: 'inline-flex', alignItems: 'center', gap: 0.8,
-                px: 2.5, py: 0.9, borderRadius: 2,
-                cursor: dirty ? 'pointer' : 'default',
-                bgcolor: dirty ? BLUE : '#f1f5f9', color: dirty ? '#fff' : '#94a3b8',
-                fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
-                '&:hover': dirty ? { bgcolor: ACCENT } : {},
-              }}>
-                {isSaving ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <SaveIcon sx={{ fontSize: 16 }} />}
-                {isSaving ? 'Saving…' : 'Save'}
-              </Box>
-            </Stack>
-          )}
           {showLeadRating && <LeadRatingPanel row={row} ratings={ratings} />}
         </Stack>
       </Box>
@@ -601,14 +615,52 @@ function ProgressSidebar({ kras, onJumpTo }) {
   );
 }
 
-function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideCycleHeader = false }) {
+function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideCycleHeader = false, onDirtyCount }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState({ msg: '', severity: 'success' });
+  const [dirtyKras, setDirtyKras] = useState({});
   const kraRefs = useRef({});
+
+  const dirtyCount = Object.values(dirtyKras).filter(Boolean).length;
+
+  useEffect(() => { onDirtyCount?.(dirtyCount); }, [dirtyCount]);
+
+  useEffect(() => {
+    function onSaveAll() { handleSaveAll(); }
+    window.addEventListener('kra-save-all', onSaveAll);
+    return () => window.removeEventListener('kra-save-all', onSaveAll);
+  }, [dirtyKras]);
+
+  function handleDirtyChange(id, isDirty) {
+    setDirtyKras(prev => ({ ...prev, [id]: isDirty }));
+  }
+
+  async function handleSaveAll() {
+    const dirtyIds = Object.entries(dirtyKras).filter(([, v]) => v).map(([id]) => Number(id));
+    if (!dirtyIds.length) return;
+    setSaving(true);
+    let anyError = false;
+    for (const id of dirtyIds) {
+      setSavedId(id);
+      try {
+        const payload = KRACard._payloads?.[id];
+        if (payload) {
+          await saveSelfAssessmentRow(id, payload);
+          setData(prev => ({ ...prev, kras: prev.kras.map(k => k.employee_kra_level_id === id ? { ...k, ...payload } : k) }));
+          setDirtyKras(prev => ({ ...prev, [id]: false }));
+        }
+      } catch {
+        anyError = true;
+      }
+    }
+    setSaving(false); setSavedId(null);
+    setToast({ msg: anyError ? 'Some saves failed' : 'All changes saved', severity: anyError ? 'error' : 'success' });
+    setTimeout(() => setToast({ msg: '', severity: 'success' }), 3000);
+  }
 
   useEffect(() => {
     if (!cycleId) return;
@@ -619,20 +671,6 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
       .finally(() => setLoading(false));
   }, [cycleId]);
 
-  const handleSave = useCallback(async (employeeKraLevelId, payload) => {
-    setSaving(true); setSavedId(employeeKraLevelId);
-    try {
-      await saveSelfAssessmentRow(employeeKraLevelId, payload);
-      setData(prev => ({ ...prev, kras: prev.kras.map(k => k.employee_kra_level_id === employeeKraLevelId ? { ...k, ...payload } : k) }));
-      setToast({ msg: 'Saved successfully', severity: 'success' });
-    } catch (err) {
-      setToast({ msg: err?.response?.data?.error || 'Save failed', severity: 'error' });
-    } finally {
-      setSaving(false); setSavedId(null);
-      setTimeout(() => setToast({ msg: '', severity: 'success' }), 3000);
-    }
-  }, []);
-
   function handleJumpTo(id) {
     setTimeout(() => {
       const el = kraRefs.current[id];
@@ -642,10 +680,17 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
 
   const kras = data?.kras ?? [];
   const cycle = cycles.find(c => c.id === cycleId);
+  const isActiveCycle = cycle?.status === 'ACTIVE';
   const currentStageId = data?.employee_stage_id ?? data?.current_stage?.id ?? null;
   const completedStageIds = data?.completed_stage_ids ?? [];
-  const editable = canSelfAssess(currentStageId);
-  const lockReason = !editable && currentStageId ? getStageLockReason(currentStageId, 'employee') : null;
+  // Rating editable: only when cycle is ACTIVE and stage is Assessment (3) or above
+  const ratingEditable = isActiveCycle && currentStageId === STAGE.LEAD_ASSESSMENT;
+  // Notes editable: only when cycle is ACTIVE and stage is KRA Tracking (2) or above
+  const notesEditable = isActiveCycle && !!currentStageId && currentStageId >= (STAGE.KRA_TRACKING ?? 2);
+  const editable = ratingEditable || notesEditable;
+  const lockReason = !editable && currentStageId
+    ? (!isActiveCycle ? 'This cycle is not active. All data is read-only.' : getStageLockReason(currentStageId, 'employee'))
+    : null;
   const showLeadRating = currentStageId >= STAGE.LEAD_ASSESSMENT;
 
   const stageDeadline = data?.stage_end_date ?? null;
@@ -655,7 +700,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
       {!hideCycleHeader && (
         <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 0, flexShrink: 0 }}>
-          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" gap={2}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
             <Box>
               {cycle && (
                 <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
@@ -664,21 +709,37 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
               )}
               <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#1e293b' }}>KRA Assessment</Typography>
             </Box>
-            {cycles.length > 0 && (
-              <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
-                size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
-                {cycles.map(c => (
-                <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <span>{c.name}</span>
-                    {(c.status === 'ACTIVE') && (
-                      <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
-                    )}
-                  </Stack>
-                </MenuItem>
-              ))}
-              </Select>
-            )}
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              {cycles.length > 0 && (
+                <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
+                  size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
+                  {cycles.map(c => (
+                    <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <span>{c.name}</span>
+                        {c.status === 'ACTIVE' && (
+                          <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                        )}
+                      </Stack>
+                    </MenuItem>
+                  ))}
+                </Select>
+              )}
+              {editable && (
+                <Box onClick={dirtyCount > 0 && !saving ? handleSaveAll : undefined} sx={{
+                  display: 'inline-flex', alignItems: 'center', gap: 0.8,
+                  px: 2.5, py: 0.9, borderRadius: 2,
+                  cursor: dirtyCount > 0 ? 'pointer' : 'default',
+                  bgcolor: dirtyCount > 0 ? BLUE : '#e2e8f0',
+                  color: dirtyCount > 0 ? '#fff' : '#94a3b8',
+                  fontSize: 13, fontWeight: 700, transition: 'all 0.15s',
+                  '&:hover': dirtyCount > 0 ? { bgcolor: ACCENT } : {},
+                }}>
+                  {saving ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <SaveIcon sx={{ fontSize: 16 }} />}
+                  {saving ? 'Saving…' : `Save All${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
+                </Box>
+              )}
+            </Stack>
           </Stack>
           <CycleStageStepper
             currentStageId={currentStageId}
@@ -695,21 +756,20 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
       )}
       {hideCycleHeader && (
         <Box sx={{ px: { xs: 2, md: 3 }, pt: 2, pb: 0, flexShrink: 0 }}>
-          {cycles.length > 0 && (
+          {editable && (
             <Stack direction="row" justifyContent="flex-end" mb={1}>
-              <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
-                size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
-                {cycles.map(c => (
-                <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <span>{c.name}</span>
-                    {(c.status === 'ACTIVE') && (
-                      <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
-                    )}
-                  </Stack>
-                </MenuItem>
-              ))}
-              </Select>
+              <Box onClick={dirtyCount > 0 && !saving ? handleSaveAll : undefined} sx={{
+                display: 'inline-flex', alignItems: 'center', gap: 0.8,
+                px: 2.5, py: 0.9, borderRadius: 2,
+                cursor: dirtyCount > 0 ? 'pointer' : 'default',
+                bgcolor: dirtyCount > 0 ? BLUE : '#e2e8f0',
+                color: dirtyCount > 0 ? '#fff' : '#94a3b8',
+                fontSize: 13, fontWeight: 700, transition: 'all 0.15s',
+                '&:hover': dirtyCount > 0 ? { bgcolor: ACCENT } : {},
+              }}>
+                {saving ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <SaveIcon sx={{ fontSize: 16 }} />}
+                {saving ? 'Saving…' : `Save All${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
+              </Box>
             </Stack>
           )}
           <CycleStageStepper
@@ -746,8 +806,10 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
               <Stack spacing={2}>
                 {kras.map(row => (
                   <KRACard key={row.employee_kra_level_id} row={row} ratings={ratings}
-                    onSave={handleSave} saving={saving} savedId={savedId}
-                    editable={editable} showLeadRating={false}
+                    onSave={() => { }} saving={saving} savedId={savedId}
+                    ratingEditable={ratingEditable} notesEditable={notesEditable}
+                    showLeadRating={showLeadRating}
+                    onDirtyChange={handleDirtyChange}
                     kraRef={el => { kraRefs.current[row.employee_kra_level_id] = el; }}
                   />
                 ))}
@@ -771,7 +833,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
 // ══════════════════════════════════════════════════════════════════════════════
 // INLINE STAGE STEPPER — used inside Team Review per-employee rows
 // ══════════════════════════════════════════════════════════════════════════════
-function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleStages, isAdmin, dbStages, onStageChanged }) {
+function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleStages, isAdmin, dbStages, onStageChanged, isActiveCycle = true }) {
   const [stageChanging, setStageChanging] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, direction: null, toStage: null });
   const [toast, setToast] = useState('');
@@ -832,21 +894,32 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
 
   return (
     <Box sx={{ mt: 1.5 }}>
+      {/* Read-only badge for non-active cycles */}
+      {!isActiveCycle && (
+        <Chip
+          icon={<LockOutlinedIcon sx={{ fontSize: 12 }} />}
+          label="Stage changes locked — not an active cycle"
+          size="small"
+          sx={{ mb: 1, bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 11, border: '1px solid #fcd34d' }}
+        />
+      )}
       {/* Clickable dots stepper */}
       <Stack direction="row" alignItems="center" spacing={0}>
         {stages.map((stage, i) => {
           const isDone = stage.id < currentStageId;
           const isCurrent = stage.id === currentStageId;
           const isLast = i === stages.length - 1;
-          const clickable = isAdmin && !isCurrent;
+          // Only clickable if admin AND active cycle AND not current stage
+          const clickable = isAdmin && isActiveCycle && !isCurrent;
 
           return (
             <React.Fragment key={stage.id}>
               <Tooltip title={
-                !isAdmin ? stage.name
-                  : isCurrent ? `Current: ${stage.name}`
-                  : stage.id < currentStageId ? `Move back to: ${stage.name}`
-                  : `Advance to: ${stage.name}`
+                !isActiveCycle ? `${stage.name} — stage changes locked (inactive cycle)`
+                  : !isAdmin ? stage.name
+                    : isCurrent ? `Current: ${stage.name}`
+                      : stage.id < currentStageId ? `Move back to: ${stage.name}`
+                        : `Advance to: ${stage.name}`
               }>
                 <Stack alignItems="center" spacing={0.3} sx={{ minWidth: 52 }}
                   onClick={clickable ? e => { e.stopPropagation(); openStageDialog(stage); } : undefined}
@@ -974,7 +1047,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
             }}>
             {stageChanging ? <><CircularProgress size={13} sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />Moving…</>
               : dateSaving ? 'Saving dates…'
-              : confirmDialog.direction === 'back' ? 'Confirm & Save Dates' : 'Confirm Move Forward'}
+                : confirmDialog.direction === 'back' ? 'Confirm & Save Dates' : 'Confirm Move Forward'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -982,7 +1055,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
   );
 }
 
-function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, isAdmin, dbStages, dirtyMap, onFieldChange, sectionRef }) {
+function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, isAdmin, dbStages, dirtyMap, onFieldChange, sectionRef, isActiveCycle }) {
   const [collapsed, setCollapsed] = useState(true);
   const [empStageId, setEmpStageId] = useState(emp.current_stage_id ?? currentStageId);
 
@@ -990,7 +1063,10 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
   const reviewed = kras.filter(k => k.lead_rating_id || dirtyMap[k.employee_kra_level_id]?.lead_rating_id).length;
   const pct = kras.length ? Math.round((reviewed / kras.length) * 100) : 0;
 
-  const ratingEditable = canLeadReview(empStageId);
+  // Lead rating: only editable in Stage 3/4 AND active cycle
+  const ratingEditable = isActiveCycle && canLeadReview(empStageId);
+  // Lead comment/description: editable from Stage 2 onwards AND active cycle
+  const notesEditable = isActiveCycle && !!empStageId && empStageId >= 2;
 
   return (
     <Box ref={sectionRef} sx={{ mb: 3, scrollMarginTop: '80px' }}>
@@ -1031,7 +1107,7 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
           </Box>
           <LinearProgress variant="determinate" value={pct}
             sx={{
-              width: 80, height: 5, borderRadius: 3, bgcolor: '#ffffff80 ',border: '1.5px solid rgba(0,0,0,0.4)', borderColor : '#000000',
+              width: 80, height: 5, borderRadius: 3, bgcolor: '#ffffff80 ', border: '1.5px solid rgba(0,0,0,0.4)', borderColor: '#000000',
               '& .MuiLinearProgress-bar': { bgcolor: pct === 100 ? '#4ade80' : ACCENT }
             }} />
           {collapsed ? <ExpandMoreIcon sx={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: 20 }} /> : <ExpandLessIcon sx={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: 20 }} />}
@@ -1049,6 +1125,7 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
             cycleStages={cycleStages}
             isAdmin={isAdmin}
             dbStages={dbStages}
+            isActiveCycle={isActiveCycle}
             onStageChanged={newStageId => {
               emp.current_stage_id = newStageId;
               setEmpStageId(newStageId);
@@ -1094,113 +1171,121 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
                       ))}
                     </TableRow>
                   </TableHead>
-                <TableBody>
-                  {kras.map((kra, idx) => {
-                    const dirty = dirtyMap[kra.employee_kra_level_id] ?? {};
-                    const leadRating = dirty.lead_rating_id ?? kra.lead_rating_id ?? '';
-                    const leadComment = dirty.lead_comment ?? kra.lead_comment ?? '';
-                    const selfRatingLabel = ratings.find(r => r.id === kra.self_rating_id);
-                    const isDirty = !!dirtyMap[kra.employee_kra_level_id];
+                  <TableBody>
+                    {kras.map((kra, idx) => {
+                      const dirty = dirtyMap[kra.employee_kra_level_id] ?? {};
+                      const leadRating = dirty.lead_rating_id ?? kra.lead_rating_id ?? '';
+                      const leadComment = dirty.lead_comment ?? kra.lead_comment ?? '';
+                      const selfRatingLabel = ratings.find(r => r.id === kra.self_rating_id);
+                      const isDirty = !!dirtyMap[kra.employee_kra_level_id];
 
-                    return (
-                      <TableRow key={kra.employee_kra_level_id}
-                        sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafbff', verticalAlign: 'top' }}>
+                      return (
+                        <TableRow key={kra.employee_kra_level_id}
+                          sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafbff', verticalAlign: 'top' }}>
 
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 110 }}>
-                          {kra.category_name ? (
-                            <Chip label={kra.category_name} size="small"
-                              sx={{ bgcolor: `${categoryColor(kra.category_name)}15`, color: categoryColor(kra.category_name), fontWeight: 700, fontSize: 10, border: `1px solid ${categoryColor(kra.category_name)}30` }} />
-                          ) : '—'}
-                        </TableCell>
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 110 }}>
+                            {kra.category_name ? (
+                              <Chip label={kra.category_name} size="small"
+                                sx={{ bgcolor: `${categoryColor(kra.category_name)}15`, color: categoryColor(kra.category_name), fontWeight: 700, fontSize: 10, border: `1px solid ${categoryColor(kra.category_name)}30` }} />
+                            ) : '—'}
+                          </TableCell>
 
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
-                          <Typography sx={{ fontWeight: 600, fontSize: 12, color: '#1e293b' }}>{kra.kra_name}</Typography>
-                          {kra.weightage && <Typography sx={{ fontSize: 10, color: '#2b2c2d', mt: 0.3 }}>{kra.weightage}%</Typography>}
-                        </TableCell>
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
+                            <Typography sx={{ fontWeight: 600, fontSize: 12, color: '#1e293b' }}>{kra.kra_name}</Typography>
+                            {kra.weightage && <Typography sx={{ fontSize: 10, color: '#2b2c2d', mt: 0.3 }}>{kra.weightage}%</Typography>}
+                          </TableCell>
 
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
-                          <TextField multiline minRows={2} fullWidth size="small"
-                            placeholder="Add description…"
-                            defaultValue={kra.description_by_lead ?? ''}
-                            onBlur={e => {
-                              const val = e.target.value;
-                              if (val !== (kra.description_by_lead ?? '')) {
-                                onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'description_by_lead', val);
-                              }
-                            }}
-                            sx={{ '& .MuiOutlinedInput-root': { fontSize: 12, borderRadius: 1.5, '&:hover fieldset': { borderColor: ACCENT }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
-                          />
-                        </TableCell>
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
+                            <TextField multiline minRows={2} fullWidth size="small"
+                              placeholder="Add description…"
+                              disabled={!notesEditable}
+                              defaultValue={kra.description_by_lead ?? ''}
+                              onBlur={e => {
+                                if (!notesEditable) return;
+                                const val = e.target.value;
+                                if (val !== (kra.description_by_lead ?? '')) {
+                                  onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'description_by_lead', val);
+                                }
+                              }}
+                              sx={{ '& .MuiOutlinedInput-root': { fontSize: 12, borderRadius: 1.5, '&:hover fieldset': { borderColor: notesEditable ? ACCENT : undefined }, '&.Mui-focused fieldset': { borderColor: ACCENT } } }}
+                            />
+                          </TableCell>
 
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 100 }}>
-                          {kra.self_rating_id ? (
-                            <Chip label={selfRatingLabel ? `${kra.self_rating} – ${selfRatingLabel.description}` : kra.self_rating}
-                              size="small" sx={{ bgcolor: '#eff6ff', color: BLUE, fontWeight: 700, fontSize: 10 }} />
-                          ) : (
-                            <Typography sx={{ fontSize: 11, color: '#111112', fontStyle: 'italic' }}>Pending</Typography>
-                          )}
-                        </TableCell>
-
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.self_comment ? 'normal' : 'italic', color: kra.self_comment ? '#000000' : '#000000' }}>
-                            {kra.self_comment || 'No comment'}
-                          </Typography>
-                        </TableCell>
-
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.progress_notes ? 'normal' : 'italic', color: kra.progress_notes ? '#000000' : '#000000' }}>
-                            {kra.progress_notes || '—'}
-                          </Typography>
-                        </TableCell>
-
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
-                          <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.help_and_assistance_required ? 'normal' : 'italic', color: kra.help_and_assistance_required ? '#000000' : '#000000' }}>
-                            {kra.help_and_assistance_required || '—'}
-                          </Typography>
-                        </TableCell>
-
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 150 }}>
-                          {ratingEditable ? (
-                            <Select value={leadRating}
-                              onChange={e => onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'lead_rating_id', e.target.value)}
-                              displayEmpty size="small" fullWidth
-                              sx={{ fontSize: 12, borderRadius: 1.5, '& .MuiOutlinedInput-notchedOutline': { borderColor: leadRating ? '#22c55e' : '#e2e8f0' } }}>
-                              <MenuItem value="" sx={{ fontSize: 12, color: '#94a3b8' }}>Select…</MenuItem>
-                              {ratings.map(r => (
-                                <MenuItem key={r.id} value={r.id} sx={{ fontSize: 12 }}>{r.rating} – {r.description}</MenuItem>
-                              ))}
-                            </Select>
-                          ) : (
-                            kra.lead_rating_id ? (
-                              <Chip label={`${kra.lead_rating} – ${ratings.find(r => r.id === kra.lead_rating_id)?.description ?? ''}`}
-                                size="small" sx={{ bgcolor: '#dcfce7', color: '#16a34a', fontWeight: 700, fontSize: 10 }} />
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 100 }}>
+                            {kra.self_rating_id ? (
+                              <Chip label={selfRatingLabel ? `${kra.self_rating} – ${selfRatingLabel.description}` : kra.self_rating}
+                                size="small" sx={{ bgcolor: '#eff6ff', color: BLUE, fontWeight: 700, fontSize: 10 }} />
                             ) : (
-                              <Typography sx={{ fontSize: 11, color: '#191a1b', fontStyle: 'italic' }}>Not rated</Typography>
-                            )
-                          )}
-                        </TableCell>
+                              <Typography sx={{ fontSize: 11, color: '#111112', fontStyle: 'italic' }}>Pending</Typography>
+                            )}
+                          </TableCell>
 
-                        <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 220 }}>
-                          <TextField multiline minRows={2} fullWidth size="small"
-                            placeholder="Add comment…"
-                            value={leadComment}
-                            onChange={e => onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'lead_comment', e.target.value)}
-                            sx={{
-                              '& .MuiOutlinedInput-root': {
-                                fontSize: 12, borderRadius: 1.5,
-                                '&:hover fieldset': { borderColor: ACCENT },
-                                '&.Mui-focused fieldset': { borderColor: ACCENT },
-                                ...(isDirty ? { '& fieldset': { borderColor: '#93c5fd' } } : {}),
-                              }
-                            }}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              </Box>  
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 200 }}>
+                            <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.self_comment ? 'normal' : 'italic', color: kra.self_comment ? '#000000' : '#000000' }}>
+                              {kra.self_comment || 'No comment'}
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
+                            <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.progress_notes ? 'normal' : 'italic', color: kra.progress_notes ? '#000000' : '#000000' }}>
+                              {kra.progress_notes || '—'}
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 160 }}>
+                            <Typography sx={{ fontSize: 12, lineHeight: 1.5, fontStyle: kra.help_and_assistance_required ? 'normal' : 'italic', color: kra.help_and_assistance_required ? '#000000' : '#000000' }}>
+                              {kra.help_and_assistance_required || '—'}
+                            </Typography>
+                          </TableCell>
+
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 150 }}>
+                            {ratingEditable ? (
+                              <Select value={leadRating}
+                                onChange={e => onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'lead_rating_id', e.target.value)}
+                                displayEmpty size="small" fullWidth
+                                sx={{ fontSize: 12, borderRadius: 1.5, '& .MuiOutlinedInput-notchedOutline': { borderColor: leadRating ? '#22c55e' : '#e2e8f0' } }}>
+                                <MenuItem value="" sx={{ fontSize: 12, color: '#94a3b8' }}>Select…</MenuItem>
+                                {ratings.map(r => (
+                                  <MenuItem key={r.id} value={r.id} sx={{ fontSize: 12 }}>{r.rating} – {r.description}</MenuItem>
+                                ))}
+                              </Select>
+                            ) : (
+                              kra.lead_rating_id ? (
+                                <Chip label={`${kra.lead_rating} – ${ratings.find(r => r.id === kra.lead_rating_id)?.description ?? ''}`}
+                                  size="small" sx={{ bgcolor: '#dcfce7', color: '#16a34a', fontWeight: 700, fontSize: 10 }} />
+                              ) : (
+                                <Typography sx={{ fontSize: 11, color: '#191a1b', fontStyle: 'italic' }}>Not rated</Typography>
+                              )
+                            )}
+                          </TableCell>
+
+                          <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9', minWidth: 220 }}>
+                            {notesEditable ? (
+                              <TextField multiline minRows={2} fullWidth size="small"
+                                placeholder="Add comment…"
+                                value={leadComment}
+                                onChange={e => onFieldChange(emp.employee_id, kra.employee_kra_level_id, 'lead_comment', e.target.value)}
+                                sx={{
+                                  '& .MuiOutlinedInput-root': {
+                                    fontSize: 12, borderRadius: 1.5,
+                                    '&:hover fieldset': { borderColor: ACCENT },
+                                    '&.Mui-focused fieldset': { borderColor: ACCENT },
+                                    ...(isDirty ? { '& fieldset': { borderColor: '#93c5fd' } } : {}),
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <Typography sx={{ fontSize: 12, color: kra.lead_comment ? '#1e293b' : '#94a3b8', fontStyle: kra.lead_comment ? 'normal' : 'italic' }}>
+                                {kra.lead_comment || '—'}
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Box>
             </Box>  /* outer rotated box */
           )}
         </Paper>
@@ -1210,7 +1295,6 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
 }
 
 function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
-  const [tab, setTab] = useState('self');
   const { user } = useAuth();
   const isAdmin = HR_ROLES.some(r => user?.roles?.includes(r));
   const [data, setData] = useState(null);
@@ -1226,13 +1310,74 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
   const [allEmployees, setAllEmployees] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [allEmployeesList, setAllEmployeesList] = useState([]);
+  const [empSortDir, setEmpSortDir] = useState('asc');
+
+  // 'self' means the logged-in lead is viewing their own assessment
+  const [viewingSelf, setViewingSelf] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [unsavedDialog, setUnsavedDialog] = useState(false);
+  const [teamUnsavedDialog, setTeamUnsavedDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // { type: 'self' } | { type: 'cycle', id }
+  const selfDirtyCount = useRef(0);
+
+  function handleSelfDirtyCount(count) { selfDirtyCount.current = count; }
+
+  function interceptCycleChange(newCycleId) {
+    if (totalDirty > 0) { setPendingAction({ type: 'cycle', id: newCycleId }); setTeamUnsavedDialog(true); }
+    else { onCycleChange(newCycleId); }
+  }
+
+  function interceptViewSelf() {
+    if (totalDirty > 0) { setPendingAction({ type: 'self' }); setTeamUnsavedDialog(true); }
+    else { setViewingSelf(true); }
+  }
+
+  async function handleTeamSaveAndContinue() {
+    await handleSaveAll();
+    setTeamUnsavedDialog(false);
+    if (pendingAction?.type === 'cycle') onCycleChange(pendingAction.id);
+    if (pendingAction?.type === 'self') setViewingSelf(true);
+    setPendingAction(null);
+  }
+
+  function handleTeamDiscardAndContinue() {
+    setDirtyMap({});
+    setTeamUnsavedDialog(false);
+    if (pendingAction?.type === 'cycle') onCycleChange(pendingAction.id);
+    if (pendingAction?.type === 'self') setViewingSelf(true);
+    setPendingAction(null);
+  }
+
+  function handleBackToTeam() {
+    if (selfDirtyCount.current > 0) { setUnsavedDialog(true); }
+    else { setViewingSelf(false); setRefreshKey(k => k + 1); }
+  }
+
+  async function handleUnsavedSaveAndContinue() {
+    // Signal EmployeeView to save — we use a custom event
+    window.dispatchEvent(new CustomEvent('kra-save-all'));
+    setUnsavedDialog(false);
+    setViewingSelf(false);
+    setRefreshKey(k => k + 1);
+  }
+
+  function handleUnsavedContinue() {
+    setUnsavedDialog(false);
+    setViewingSelf(false);
+    setRefreshKey(k => k + 1);
+  }
+
+
 
   useEffect(() => {
     if (!cycleId) return;
     getAssessmentProgress(cycleId, null, 1, 200)
-      .then(res => setAllEmployeesList(res.data?.employees ?? []))
+      .then(res => {
+        const list = res.data?.employees ?? [];
+        setAllEmployeesList(list);
+      })
       .catch(() => { });
-  }, [cycleId]);
+  }, [cycleId, refreshKey]);
 
   useEffect(() => {
     if (!cycleId) return;
@@ -1244,11 +1389,19 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
         setAllEmployees(res.data?.employees ?? []);
         setHasMore(res.data?.pagination?.has_next ?? false);
         const emps = res.data?.employees ?? [];
-        if (emps.length > 0) setSelectedEmpId(emps[0].employee_id);
+
+        if (emps.length > 0) {
+          const firstNonSelf =
+            emps.find(e => e.employee_id !== user?.employee_id);
+
+          setSelectedEmpId(
+            firstNonSelf?.employee_id || emps[0].employee_id
+          );
+        }
       })
       .catch(err => setError(err?.response?.data?.error || 'Failed to load'))
       .finally(() => setLoading(false));
-  }, [cycleId]);
+  }, [cycleId, refreshKey]);
 
   async function loadMore() {
     const nextPage = page + 1;
@@ -1334,6 +1487,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
 
   const employees = allEmployees;
   const cycle = cycles.find(c => c.id === cycleId);
+  const isActiveCycle = cycle?.status === 'ACTIVE';
   const currentStageId = data?.current_stage_id ?? data?.current_stage?.id ?? cycle?.current_stage_id ?? null;
   const completedStageIds = data?.completed_stage_ids ?? [];
   const totalDirty = Object.values(dirtyMap).reduce((acc, kraMap) => acc + Object.keys(kraMap).length, 0);
@@ -1363,27 +1517,61 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
     return sortDir === 'asc' ? valA - valB : valB - valA;
   });
 
-  if (tab === 'self') {
+  if (viewingSelf) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
         <Box sx={{ px: { xs: 2, md: 3 }, pt: 2, pb: 0, flexShrink: 0 }}>
-          <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-            {[{ key: 'self', label: 'My Assessment' }, { key: 'team', label: 'Team Review' }].map(t => (
-              <Box key={t.key} onClick={() => setTab(t.key)} sx={{
-                px: 2.5, py: 0.8, borderRadius: 2, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                bgcolor: tab === t.key ? BLUE : '#fff',
-                color: tab === t.key ? '#fff' : '#64748b',
-                border: `1.5px solid ${tab === t.key ? BLUE : '#e2e8f0'}`,
-                transition: 'all 0.15s',
-                '&:hover': { borderColor: BLUE, color: tab === t.key ? '#fff' : BLUE },
-              }}>{t.label}</Box>
-            ))}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box onClick={handleBackToTeam} sx={{
+                px: 2, py: 0.6, borderRadius: 2, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                bgcolor: '#fff', color: '#64748b', border: '1.5px solid #e2e8f0',
+                transition: 'all 0.15s', '&:hover': { borderColor: BLUE, color: BLUE },
+              }}>← Team Review</Box>
+              <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>My Assessment</Typography>
+            </Stack>
+            {cycles.length > 0 && (
+              <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
+                size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
+                {cycles.map(c => (
+                  <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <span>{c.name}</span>
+                      {c.status === 'ACTIVE' && (
+                        <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                      )}
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
           </Stack>
           <Divider />
         </Box>
         <Box sx={{ flex: 1, overflow: 'hidden' }}>
-          <EmployeeView cycleId={cycleId} cycles={cycles} onCycleChange={onCycleChange} ratings={ratings} dbStages={dbStages} hideCycleHeader />
+          <EmployeeView cycleId={cycleId} cycles={cycles} onCycleChange={onCycleChange} ratings={ratings} dbStages={dbStages} hideCycleHeader onDirtyCount={handleSelfDirtyCount} />
         </Box>
+
+        {/* Unsaved changes dialog */}
+        <Dialog open={unsavedDialog} onClose={() => setUnsavedDialog(false)} PaperProps={{ sx: { borderRadius: 3, p: 1, minWidth: 360 } }}>
+          <DialogContent>
+            <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#1e293b', mb: 1 }}>Unsaved Changes</Typography>
+            <Typography sx={{ fontSize: 14, color: '#64748b' }}>
+              You have unsaved changes in My Assessment. What would you like to do?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+            <Button onClick={() => setUnsavedDialog(false)} sx={{ borderRadius: 2, textTransform: 'none', color: '#64748b' }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUnsavedContinue} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#e2e8f0', color: '#64748b' }}>
+              Discard & Continue
+            </Button>
+            <Button onClick={handleUnsavedSaveAndContinue} variant="contained" sx={{ borderRadius: 2, textTransform: 'none', bgcolor: BLUE, '&:hover': { bgcolor: ACCENT } }}>
+              Save & Continue
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   }
@@ -1394,76 +1582,180 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
       {/* Fixed header */}
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 0, flexShrink: 0 }}>
 
-        {/* Tab switcher */}
-        <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-          {[{ key: 'self', label: 'My Assessment' }, { key: 'team', label: 'Team Review' }].map(t => (
-            <Box key={t.key} onClick={() => setTab(t.key)} sx={{
-              px: 2.5, py: 0.8, borderRadius: 2, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-              bgcolor: tab === t.key ? BLUE : '#fff',
-              color: tab === t.key ? '#fff' : '#64748b',
-              border: `1.5px solid ${tab === t.key ? BLUE : '#e2e8f0'}`,
-              transition: 'all 0.15s',
-              '&:hover': { borderColor: BLUE, color: tab === t.key ? '#fff' : BLUE },
-            }}>{t.label}</Box>
-          ))}
-        </Stack>
-
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" gap={2}>
-          <Box>
-            {cycle && (
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
-                {cycle.name}
-              </Typography>
-            )}
-            <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#1e293b' }}>KRA Assessment</Typography>
-          </Box>
-
+        {/* Header */}
+        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2} mb={2}>
+          <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#1e293b' }}>Team Review</Typography>
           <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
             {cycles.length > 0 && (
-              <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
-                size="small" sx={{ minWidth: 180, fontSize: 13, borderRadius: 2, bgcolor: '#fff' }}>
+              <Select value={cycleId} onChange={e => interceptCycleChange(e.target.value)}
+                size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
                 {cycles.map(c => (
-                <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <span>{c.name}</span>
-                    {(c.status === 'ACTIVE') && (
-                      <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
-                    )}
-                  </Stack>
-                </MenuItem>
-              ))}
+                  <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <span>{c.name}</span>
+                      {(c.status === 'ACTIVE') && (
+                        <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                      )}
+                    </Stack>
+                  </MenuItem>
+                ))}
               </Select>
             )}
 
             {employees.length > 0 && (
-              <Autocomplete
-                value={allEmployeesList.find(e => e.employee_id === selectedEmpId) ?? null}
-                onChange={(_, newVal) => { if (newVal) handleJumpToEmployee(newVal.employee_id); }}
-                options={allEmployeesList}
-                getOptionLabel={e => e.full_name ?? ''}
-                isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
-                size="small"
-                disableClearable
-                sx={{ minWidth: 220 }}
-                renderInput={params => (
-                  <TextField {...params} placeholder="Jump to employee…"
-                    sx={{ '& .MuiOutlinedInput-root': { fontSize: 13, borderRadius: 2, bgcolor: '#fff' } }}
-                  />
-                )}
-                renderOption={(props, e) => (
-                  <Box component="li" {...props} key={e.employee_id}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Avatar sx={{ width: 22, height: 22, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>
-                        {initials(e.full_name)}
-                      </Avatar>
-                      <Typography sx={{ fontSize: 13 }}>{e.full_name}</Typography>
-                      {e.kras?.filter(k => k.lead_rating_id).length === e.kras?.length && e.kras?.length > 0 && (
-                        <CheckCircleIcon sx={{ fontSize: 13, color: '#22c55e', ml: 'auto !important' }} />
-                      )}
-                    </Stack>
-                  </Box>
-                )}
-              />
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Autocomplete
+                  value={allEmployeesList.find(e => e.employee_id === selectedEmpId) ?? null}
+                  onChange={(_, newVal) => {
+                    if (!newVal) return;
+
+                    setSelectedEmpId(newVal.employee_id);
+
+                    // ONLY jump inside Team Review
+                    handleJumpToEmployee(newVal.employee_id);
+                  }}
+                  options={[...allEmployeesList].sort((a, b) => {
+                    const cmp = (a.full_name ?? '').localeCompare(b.full_name ?? '');
+                    return empSortDir === 'asc' ? cmp : -cmp;
+                  })}
+                  getOptionLabel={e => e.full_name ?? ''}
+                  isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
+                  size="small"
+                  disableClearable
+                  sx={{ minWidth: 260 }}
+                  renderInput={params => (
+                    <TextField
+                      {...params}
+                      placeholder="Jump to employee…"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: 13,
+                          borderRadius: 2,
+                          bgcolor: '#fff',
+                        },
+                      }}
+                    />
+                  )}
+
+                  renderOption={(props, e) => {
+                    const isSelf = e.employee_id === user?.employee_id;
+
+                    return (
+                      <Box
+                        component="li"
+                        {...props}
+                        key={e.employee_id}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                        }}
+                      >
+                        {/* LEFT SIDE */}
+                        <Box
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+
+                            setSelectedEmpId(e.employee_id);
+                            handleJumpToEmployee(e.employee_id);
+                          }}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            flex: 1,
+                            cursor: 'pointer',
+                            py: 0.5,
+                          }}
+                        >
+                          <Avatar
+                            sx={{
+                              width: 22,
+                              height: 22,
+                              bgcolor: isSelf ? ACCENT : BLUE,
+                              fontSize: 9,
+                              fontWeight: 800,
+                            }}
+                          >
+                            {initials(e.full_name)}
+                          </Avatar>
+
+                          <Typography sx={{ fontSize: 13 }}>
+                            {e.full_name}
+                          </Typography>
+
+                          {isSelf && (
+                            <Box
+                              component="span"
+                              sx={{
+                                px: 0.75,
+                                py: 0.15,
+                                borderRadius: 1,
+                                bgcolor: '#eff6ff',
+                                color: BLUE,
+                                fontSize: 10,
+                                fontWeight: 700,
+                              }}
+                            >
+                              My Assessment
+                            </Box>
+                          )}
+
+                          {e.kras?.filter(k => k.lead_rating_id).length === e.kras?.length &&
+                            e.kras?.length > 0 && (
+                              <CheckCircleIcon
+                                sx={{
+                                  fontSize: 13,
+                                  color: '#22c55e',
+                                }}
+                              />
+                            )}
+                        </Box>
+
+                        {/* RIGHT ARROW */}
+                        {isSelf && (
+                          <Box
+                            onMouseDown={(ev) => {
+                              ev.preventDefault();
+                              ev.stopPropagation();
+                            }}
+                            onClick={(ev) => {
+                              ev.preventDefault();
+                              ev.stopPropagation();
+
+                              setSelectedEmpId(e.employee_id);
+                              interceptViewSelf();
+                            }}
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              ml: 1,
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: BLUE,
+                              '&:hover': {
+                                bgcolor: '#eff6ff',
+                              },
+                            }}
+                          >
+                            <ArrowForwardIosIcon sx={{ fontSize: 11 }} />
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  }}
+                />
+                <Tooltip title={empSortDir === 'asc' ? 'Sorted A→Z (click for Z→A)' : 'Sorted Z→A (click for A→Z)'}>
+                  <IconButton size="small" onClick={() => setEmpSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                    sx={{ bgcolor: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 1.5, fontSize: 12, fontWeight: 700, color: BLUE, px: 1, '&:hover': { borderColor: BLUE } }}>
+                    {empSortDir === 'asc' ? 'A→Z' : 'Z→A'}
+                  </IconButton>
+                </Tooltip>
+              </Stack>
             )}
 
             <Box onClick={totalDirty > 0 && !saving ? handleSaveAll : undefined} sx={{
@@ -1485,6 +1777,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
           currentStageId={currentStageId}
           completedStageIds={completedStageIds}
           dbStages={dbStages}
+          isActiveCycle={isActiveCycle}
         />
 
         {employees.length > 0 && (
@@ -1568,6 +1861,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                 dirtyMap={dirtyMap[emp.employee_id] ?? {}}
                 onFieldChange={handleFieldChange}
                 sectionRef={el => { sectionRefs.current[emp.employee_id] = el; }}
+                isActiveCycle={isActiveCycle}
               />
             ))}
             {hasMore && (
@@ -1584,6 +1878,27 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
           </>
         )}
       </Box>
+
+      {/* Team Review unsaved changes dialog */}
+      <Dialog open={teamUnsavedDialog} onClose={() => { setTeamUnsavedDialog(false); setPendingAction(null); }} PaperProps={{ sx: { borderRadius: 3, p: 1, minWidth: 360 } }}>
+        <DialogContent>
+          <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#1e293b', mb: 1 }}>Unsaved Changes</Typography>
+          <Typography sx={{ fontSize: 14, color: '#64748b' }}>
+            You have unsaved changes in Team Review. What would you like to do?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => { setTeamUnsavedDialog(false); setPendingAction(null); }} sx={{ borderRadius: 2, textTransform: 'none', color: '#64748b' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleTeamDiscardAndContinue} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none', borderColor: '#e2e8f0', color: '#64748b' }}>
+            Discard & Continue
+          </Button>
+          <Button onClick={handleTeamSaveAndContinue} variant="contained" sx={{ borderRadius: 2, textTransform: 'none', bgcolor: BLUE, '&:hover': { bgcolor: ACCENT } }}>
+            Save & Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -1603,10 +1918,15 @@ export default function KRAAssessmentPage() {
   useEffect(() => {
     getCycles().then(res => {
       const list = res.data?.cycles ?? [];
-      setCycles(list);
-      if (list.length > 0) {
-        const active = list.find(c => c.status === 'ACTIVE');
-        setCycleId(active ? active.id : list[0].id);
+      const sorted = [...list].sort((a, b) => {
+        if (a.status === 'ACTIVE') return -1;
+        if (b.status === 'ACTIVE') return 1;
+        return 0;
+      });
+      setCycles(sorted);
+      if (sorted.length > 0) {
+        const active = sorted.find(c => c.status === 'ACTIVE');
+        setCycleId(active ? active.id : sorted[0].id);
       }
     });
     getReferenceData().then(res => {
