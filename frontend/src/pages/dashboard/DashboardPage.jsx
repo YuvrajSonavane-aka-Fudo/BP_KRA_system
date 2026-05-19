@@ -28,9 +28,9 @@ import { Dialog, DialogContent, DialogActions } from '@mui/material';
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
 const STATUS_STYLES = {
-  ACTIVE:    { bgcolor: '#dbeafe', color: '#1d4ed8' },
+  ACTIVE:    { bgcolor: '#dbeafe', color: '#166534' },
   DRAFT:     { bgcolor: '#f1f5f9', color: '#475569' },
-  CLOSED:    { bgcolor: '#dcfce7', color: '#166534' },
+  CLOSED:    { bgcolor: '#dcfce7', color: '#1d4ed8' },
   ON_HOLD:   { bgcolor: '#fde8d8', color: '#9a3412' },
   CANCELLED: { bgcolor: '#fee2e2', color: '#991b1b' },
 };
@@ -45,9 +45,9 @@ const STATUS_ACTIONS = {
 };
 
 const ACTION_CONFIG = {
-  ACTIVE:    { label: 'Activate',    icon: <PlayArrowIcon fontSize="small" />,   confirmColor: '#1E3A8A' },
+  ACTIVE:    { label: 'Activate',    icon: <PlayArrowIcon fontSize="small" />,   confirmColor: '#15803d' },
   ON_HOLD:   { label: 'Put On Hold', icon: <PauseIcon fontSize="small" />,       confirmColor: '#9a3412' },
-  CLOSED:    { label: 'Close',       icon: <CheckCircleIcon fontSize="small" />, confirmColor: '#15803d' },
+  CLOSED:    { label: 'Close',       icon: <CheckCircleIcon fontSize="small" />, confirmColor: '#1E3A8A' },
   CANCELLED: { label: 'Cancel',      icon: <BlockIcon fontSize="small" />,       confirmColor: '#dc2626' },
 };
 
@@ -556,7 +556,7 @@ export default function DashboardPage() {
                 </TableCell>
 
                 {/* Static columns */}
-                {['Period', 'Duration', 'Stage', 'Status', ''].map(h => (
+                {['Period', 'Stage', 'Status', 'Actions'].map(h => (
                   <TableCell key={h} sx={{ fontWeight: 700, fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', bgcolor: '#f8fafc', py: 0.6, borderBottom: '1px solid #e2e8f0' }}>{h}</TableCell>
                 ))}
               </TableRow>
@@ -570,12 +570,6 @@ export default function DashboardPage() {
                   : (stages[0]?.name ?? '—');
                 const canDelete = cycle.status === 'DRAFT';
                 const isActive  = cycle.status === 'ACTIVE';
-
-                let duration = '—';
-                if (cycle.start_date && cycle.end_date) {
-                  const days = Math.round((new Date(String(cycle.end_date).split('T')[0]) - new Date(String(cycle.start_date).split('T')[0])) / 86400000);
-                  duration = days >= 0 ? `${days}d` : '—';
-                }
 
                 return (
                   <TableRow key={cycle.id} hover
@@ -602,10 +596,6 @@ export default function DashboardPage() {
                       {formatDate(cycle.start_date)} — {formatDate(cycle.end_date)}
                     </TableCell>
 
-                    <TableCell sx={{ color: '#94a3b8', fontSize: 12, whiteSpace: 'nowrap' }}>
-                      {duration}
-                    </TableCell>
-
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={0.75}>
                         <Box sx={{ width: 18, height: 18, borderRadius: '50%', bgcolor: '#dbeafe', color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>
@@ -621,7 +611,7 @@ export default function DashboardPage() {
                     </TableCell>
 
                     <TableCell onClick={e => e.stopPropagation()} sx={{ pr: 1.5 }}>
-                      <Stack direction="row" spacing={0} justifyContent="flex-end">
+                      <Stack direction="row" spacing={0} justifyContent="flex">
                         <Tooltip title="Open">
                           <IconButton size="small"
                             onClick={e => { e.stopPropagation(); navigate(ROUTES.CYCLE_DETAIL.replace(':id', cycle.id)); }}
