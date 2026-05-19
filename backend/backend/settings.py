@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -36,6 +36,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     '.elasticbeanstalk.com',
     os.getenv('EB_HOST', ''),
+    FRONTEND_URL,
 ]
 
 
@@ -106,9 +107,11 @@ TEMPLATES = [
 #     'https://krasystem.netlify.app',
 # ]
 CORS_ALLOWED_ORIGINS = [
+    FRONTEND_URL,
     'http://localhost:3000',
     'https://krasystem.netlify.app',
-    'https://dhanesh-01-bp-kra-system.vercel.app',   # ← your Vercel URL 
+    'https://dhanesh-01-bp-kra-system.vercel.app', 
+     # ← your Vercel URL 
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -139,7 +142,7 @@ AZURE_AD = {
     'SCOPE':         ['User.Read'],
 }
 
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
 
 
 # Password validation
@@ -186,7 +189,8 @@ SESSION_COOKIE_HTTPONLY = True
 # SESSION_COOKIE_SAMESITE = 'Lax'
 # SESSION_COOKIE_SECURE = False   # False for HTTP (local dev), True for HTTPS (prod)
 SESSION_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'   # Required: Vercel and AWS are different domains
+# SESSION_COOKIE_SAMESITE = 'None'   # Required: Vercel and AWS are different domains
+SESSION_COOKIE_SAMESITE = 'None' if not DEBUG else 'Lax'
 
 SESSION_SAVE_EVERY_REQUEST = True  # refresh session on every request
 
