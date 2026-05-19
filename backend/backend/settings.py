@@ -36,6 +36,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     '.elasticbeanstalk.com',
     os.getenv('EB_HOST', ''),
+    FRONTEND_URL,
 ]
 
 
@@ -106,9 +107,11 @@ TEMPLATES = [
 #     'https://krasystem.netlify.app',
 # ]
 CORS_ALLOWED_ORIGINS = [
+    FRONTEND_URL,
     'http://localhost:3000',
     'https://krasystem.netlify.app',
-    'https://dhanesh-01-bp-kra-system.vercel.app',   # ← your Vercel URL 
+    'https://dhanesh-01-bp-kra-system.vercel.app', 
+     # ← your Vercel URL 
 ]
 CORS_ALLOW_CREDENTIALS = True
 
