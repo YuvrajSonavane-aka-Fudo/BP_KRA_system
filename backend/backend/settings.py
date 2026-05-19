@@ -176,7 +176,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-# STATIC_URL = 'static/'
+STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Session settings
@@ -184,8 +184,8 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # store sessions in DB
 SESSION_COOKIE_NAME = 'sessionid'
 SESSION_COOKIE_HTTPONLY = True
 # SESSION_COOKIE_SAMESITE = 'Lax'
-# SESSION_COOKIE_SECURE = False   # False for HTTP (local dev), True for HTTPS (prod)
-SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = False   # False for HTTP (local dev), True for HTTPS (prod)
+# SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SAMESITE = 'None'   # Required: Vercel and AWS are different domains
 
 SESSION_SAVE_EVERY_REQUEST = True  # refresh session on every request
@@ -220,4 +220,4 @@ DEFAULT_FROM_EMAIL  = 'KRA System <moonmxn690@gmail.com>'
 #     fail_silently=False,
 # )
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
