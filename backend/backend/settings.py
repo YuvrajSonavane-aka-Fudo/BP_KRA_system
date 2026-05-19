@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -142,7 +142,7 @@ AZURE_AD = {
     'SCOPE':         ['User.Read'],
 }
 
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
 
 
 # Password validation
