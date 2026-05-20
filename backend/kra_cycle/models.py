@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class Stage(models.Model):
     """
     stage
@@ -52,6 +53,7 @@ class KRACategory(models.Model):
     name        = models.CharField(max_length=255, null=True, blank=True)
     description = models.CharField(max_length=255, null=True, blank=True)
     is_standard = models.BooleanField(null=True, blank=True)
+    
 
     class Meta:
         db_table = 'kra_category'
