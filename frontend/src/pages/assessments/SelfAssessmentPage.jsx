@@ -385,42 +385,7 @@ function RatingChip({ label, selected, onClick, disabled }) {
 }
 
 function LeadRatingPanel({ row, ratings }) {
-  const ratingLabel = ratings.find(r => r.id === row.lead_rating_id);
-  return (
-    <Box sx={{ mt: 2.5, pt: 2.5, borderTop: '1.5px dashed #e2e8f0' }}>
-      <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
-        <RateReviewIcon sx={{ fontSize: 15, color: BLUE }} />
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: BLUE, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Lead Assessment
-        </Typography>
-      </Stack>
-      {!row.lead_rating_id ? (
-        <Typography sx={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
-          Your lead has not yet rated this KRA.
-        </Typography>
-      ) : (
-        <Stack spacing={1.5}>
-          <Chip
-            label={ratingLabel ? `${row.lead_rating} – ${ratingLabel.description}` : `Rating: ${row.lead_rating}`}
-            size="small"
-            sx={{ bgcolor: '#eff6ff', color: BLUE, fontWeight: 700, fontSize: 12, alignSelf: 'flex-start', border: `1px solid ${BLUE}20` }}
-          />
-          {row.lead_comment && (
-            <Box sx={{ bgcolor: '#f0f7ff', borderRadius: 2, p: 1.5, border: '1px solid #dbeafe' }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mb: 0.5 }}>Lead Comment</Typography>
-              <Typography sx={{ fontSize: 13, color: '#1e293b', lineHeight: 1.6 }}>{row.lead_comment}</Typography>
-            </Box>
-          )}
-          {row.lead_progress_notes && (
-            <Box sx={{ bgcolor: '#f8fafc', borderRadius: 2, p: 1.5 }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mb: 0.5 }}>Lead Progress Notes</Typography>
-              <Typography sx={{ fontSize: 13, color: '#475569', lineHeight: 1.6 }}>{row.lead_progress_notes}</Typography>
-            </Box>
-          )}
-        </Stack>
-      )}
-    </Box>
-  );
+  
 }
 
 function KRACard({ row, ratings, onSave, saving, savedId, ratingEditable, notesEditable, showLeadRating, kraRef, onDirtyChange }) {
@@ -1698,7 +1663,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                                 fontWeight: 700,
                               }}
                             >
-                              My Assessment
+                              
                             </Box>
                           )}
 
