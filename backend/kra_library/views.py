@@ -43,7 +43,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from django.db import transaction
 from kra_cycle.models import (
     Employee,
     KRACycle,
@@ -272,34 +272,69 @@ class KRACategoryDetailView(APIView):
 
     def delete(self, request, category_id):
         caller = _get_caller(request)
+
         if not _is_hr(caller):
-            return Response({"error": "Only HR can delete categories"},
-                            status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"error": "Only HR can delete categories"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         cat = get_object_or_404(KRACategory, id=category_id)
 
-        # Guard: block if KRAs still use this category
-        kra_count = KRA.objects.filter(category=cat).count()
-        kra_level_count = KRALevel.objects.filter(category=cat).count()
+        try:
+            with transaction.atomic():
 
-        if kra_count or kra_level_count:
+                # Get KRAs under category
+                kras = KRA.objects.filter(category=cat)
+
+                # Get KRALevels linked to those KRAs
+                kra_levels = KRALevel.objects.filter(
+                    kra__in=kras
+                )
+
+                # Delete employee assignments FIRST
+                EmployeeKRALevel.objects.filter(
+                    kra_level__in=kra_levels
+                ).delete()
+
+                # Delete KRALevels
+                kra_levels.delete()
+
+                # Delete KRAs
+                kras.delete()
+
+                # Finally delete category
+                category_name = cat.name
+
+                _audit(
+                    request,
+                    "CATEGORY_DELETED",
+                    "KRACategory",
+                    cat.id,
+                    old_data=_category_dict(cat),
+                )
+
+                cat.delete()
+
             return Response(
                 {
-                    "error": "Cannot delete category — it is still referenced by existing KRAs or KRA levels",
-                    "kra_count":       kra_count,
-                    "kra_level_count": kra_level_count,
+                    "message": (
+                        f"Category '{category_name}' and all related "
+                        f"KRAs deleted successfully"
+                    )
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "error": str(e)
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        _audit(request, "CATEGORY_DELETED", "KRACategory", cat.id,
-               old_data=_category_dict(cat))
-        cat.delete()
-
-        return Response(
-            {"message": f"Category '{cat.name}' deleted successfully"},
-            status=status.HTTP_200_OK,
-        )
+        
 
 
 class KRACategoryCloneView(APIView):
