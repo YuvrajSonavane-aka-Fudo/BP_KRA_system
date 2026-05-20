@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.mail import send_mail
 from django.conf import settings
+import threading
 
 
 from kra_cycle.models import (
@@ -29,6 +30,7 @@ from kra_cycle.models import (
 HR_ROLES = {"Admin", "HR", "Vertical Lead"}
 LEAD_ROLES = {"Manager", "Team Lead"}
 EMPLOYEE_ROLE = "Employee"
+
 
 
 def _get_caller(request):
@@ -64,6 +66,65 @@ def _audit(request, action, entity, entity_id, old_data=None, new_data=None):
         ip_address=request.META.get("REMOTE_ADDR"),
     )
 
+def send_bulk_kra_emails(enrolled, employee_map, cycle):
+    ekc_ids = [e["employee_kra_cycle_id"] for e in enrolled]
+
+    ekcs = (
+        EmployeeKRACycle.objects
+        .filter(id__in=ekc_ids)
+        .prefetch_related(
+            "kra_level_rows__kra_level__kra"
+        )
+    )
+
+    ekc_map = {e.id: e for e in ekcs}
+
+    for enrol in enrolled:
+        employee_id = enrol["employee_id"]
+
+        emp = employee_map.get(employee_id)
+        if not emp or not emp.email:
+            continue
+
+        ekc = ekc_map.get(enrol["employee_kra_cycle_id"])
+        if not ekc:
+            continue
+
+        kra_names = [
+            row.kra_level.kra.name
+            for row in ekc.kra_level_rows.all()
+            if row.kra_level and row.kra_level.kra
+        ]
+
+        kras_text = "\n".join(f"- {k}" for k in kra_names)
+
+        subject = f"KRA Assignment - {cycle.name}"
+
+        message = f"""
+Hi {emp.first_name},
+
+You have been assigned KRAs for cycle:
+{cycle.name}
+
+Assigned KRAs:
+{kras_text}
+
+Please login to the portal.
+
+Regards,
+HR Team
+"""
+
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [emp.email],
+                fail_silently=True,
+            )
+        except Exception as e:
+            print(e)
 
 class EmployeeListView(APIView):
     """
@@ -523,67 +584,29 @@ class KRABulkAssignmentEnrolView(APIView):
             },
         )
 
+         # =========================================================
+        # BACKGROUND EMAIL THREAD
+        # =========================================================
+
+        if enrolled:
+            threading.Thread(
+                target=send_bulk_kra_emails,
+                args=(enrolled, employee_map, cycle),
+                daemon=True,
+            ).start()
+
+        # =========================================================
+        # Response status
+        # =========================================================
+
         if enrolled and (skipped or failed):
             http_status = status.HTTP_207_MULTI_STATUS
+
         elif not enrolled and failed:
             http_status = status.HTTP_400_BAD_REQUEST
+
         else:
             http_status = status.HTTP_201_CREATED
-            
-        # Send email notifications
-        for enrol in enrolled:
-            employee_id = enrol["employee_id"]
-
-            emp = employee_map.get(employee_id)
-            if not emp or not emp.email:
-                continue
-
-            # Fetch assigned KRAs for this employee
-            ekc = EmployeeKRACycle.objects.get(
-                id=enrol["employee_kra_cycle_id"]
-            )
-
-            assigned_kras = (
-                ekc.kra_level_rows
-                .select_related("kra_level__kra")
-            )
-
-            kra_names = [
-                row.kra_level.kra.name
-                for row in assigned_kras
-                if row.kra_level and row.kra_level.kra
-            ]
-
-            kras_text = "\n".join([f"- {k}" for k in kra_names])
-
-            subject = f"KRA Assignment - {cycle.name}"
-
-            message = f"""
-                Hi {emp.first_name},
-
-                You have been assigned KRAs for the cycle:
-
-                {cycle.name}
-
-                Assigned KRAs:
-                {kras_text}
-
-                Please login to the KRA portal to review them.
-
-                Regards,
-                HR Team
-            """
-
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[emp.email],
-                    fail_silently=False,
-                )
-            except Exception as e:
-                print(f"Failed to send email to {emp.email}: {str(e)}")
 
         return Response(
             {
