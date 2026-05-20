@@ -6,6 +6,8 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.core.mail import send_mail
+from django.conf import settings
 
 
 from kra_cycle.models import (
@@ -527,6 +529,61 @@ class KRABulkAssignmentEnrolView(APIView):
             http_status = status.HTTP_400_BAD_REQUEST
         else:
             http_status = status.HTTP_201_CREATED
+            
+        # Send email notifications
+        for enrol in enrolled:
+            employee_id = enrol["employee_id"]
+
+            emp = employee_map.get(employee_id)
+            if not emp or not emp.email:
+                continue
+
+            # Fetch assigned KRAs for this employee
+            ekc = EmployeeKRACycle.objects.get(
+                id=enrol["employee_kra_cycle_id"]
+            )
+
+            assigned_kras = (
+                ekc.kra_level_rows
+                .select_related("kra_level__kra")
+            )
+
+            kra_names = [
+                row.kra_level.kra.name
+                for row in assigned_kras
+                if row.kra_level and row.kra_level.kra
+            ]
+
+            kras_text = "\n".join([f"- {k}" for k in kra_names])
+
+            subject = f"KRA Assignment - {cycle.name}"
+
+            message = f"""
+                Hi {emp.first_name},
+
+                You have been assigned KRAs for the cycle:
+
+                {cycle.name}
+
+                Assigned KRAs:
+                {kras_text}
+
+                Please login to the KRA portal to review them.
+
+                Regards,
+                HR Team
+            """
+
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[emp.email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                print(f"Failed to send email to {emp.email}: {str(e)}")
 
         return Response(
             {
