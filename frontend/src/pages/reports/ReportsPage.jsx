@@ -14,6 +14,7 @@ import axiosInstance from '../../api/axiosInstance';
 import { getCycles } from '../../api/cyclesApi';
 import { getEmployees } from '../../api/employeesApi';
 import * as XLSX from 'xlsx';
+import Popover from '@mui/material/Popover';
 
 const NAVY = '#0f1b4c';
 const BLUE = '#1E3A8A';
@@ -91,189 +92,209 @@ function MultiSelect({
   getLabel = o => o.name,
   getValue = o => o.id,
   sortFn,
-  minWidth = 200,
+  minWidth = 220,
   renderOptionContent,
 }) {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const open = Boolean(anchorEl);
+
   const sorted = useMemo(() => {
     return sortFn
       ? [...options].sort(sortFn)
       : [...options].sort((a, b) =>
-        String(getLabel(a)).localeCompare(String(getLabel(b)))
-      );
+          String(getLabel(a)).localeCompare(
+            String(getLabel(b))
+          )
+        );
   }, [options, sortFn]);
 
-  const [inputValue, setInputValue] = useState('');
-
-  const selected = sorted.filter(o =>
-    value.includes(getValue(o))
-  );
+  const filtered = useMemo(() => {
+    return sorted.filter(o =>
+      String(getLabel(o))
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    );
+  }, [sorted, search]);
 
   const allSelected =
     sorted.length > 0 &&
-    sorted.every(o => value.includes(getValue(o)));
+    sorted.every(o =>
+      value.includes(getValue(o))
+    );
+
+  const summary =
+    value.length === 0
+      ? label
+      : value.length === 1
+      ? getLabel(
+          sorted.find(
+            o => getValue(o) === value[0]
+          )
+        )
+      : `${value.length} selected`;
 
   return (
-    <Autocomplete
-      multiple
-      disableCloseOnSelect
-      size="small"
-      options={sorted}
-      value={selected}
-      limitTags={1}
-      inputValue={inputValue}
-      onInputChange={(_, newValue) => {
-        setInputValue(newValue);
-      }}
-      onChange={(_, newVal, reason, detail) => {
-        if (detail?.option?.__selectAll) {
-          onChange(
-            allSelected
-              ? []
-              : sorted.map(getValue)
-          );
-          return;
+    <>
+      <TextField
+        size="small"
+        value={summary}
+        onClick={e =>
+          setAnchorEl(e.currentTarget)
         }
+        InputProps={{
+          readOnly: true,
+        }}
+        sx={{
+          minWidth,
 
-        onChange(newVal.map(getValue));
-      }}
-      getOptionLabel={o =>
-        o.__selectAll
-          ? 'Select All'
-          : String(getLabel(o))
-      }
-      isOptionEqualToValue={(o, v) =>
-        getValue(o) === getValue(v)
-      }
-      filterOptions={(opts, { inputValue }) => {
-        const real = opts.filter(
-          o => !o.__selectAll
-        );
+          '& .MuiOutlinedInput-root': {
+            fontSize: 13,
+            borderRadius: 2,
+            bgcolor: '#fff',
+            cursor: 'pointer',
+          },
 
-        const filtered = inputValue
-          ? real.filter(o =>
-            String(getLabel(o))
-              .toLowerCase()
-              .includes(inputValue.toLowerCase())
-          )
-          : real;
+          '& input': {
+            cursor: 'pointer',
+          },
+        }}
+      />
 
-        return [{ __selectAll: true }, ...filtered];
-      }}
-      renderTags={() => null}
-      renderOption={(
-        props,
-        option,
-        { selected: optSelected }
-      ) => {
-        if (option.__selectAll) {
-          const someSelected = sorted.some(o =>
-            value.includes(getValue(o))
-          );
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={() => {
+          setAnchorEl(null);
+          setSearch('');
+        }}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+      >
+        <Box
+          sx={{
+            width: minWidth + 40,
+            p: 1,
+          }}
+        >
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search..."
+            value={search}
+            onChange={e =>
+              setSearch(e.target.value)
+            }
+            sx={{ mb: 1 }}
+          />
 
-          return (
-            <li
-              {...props}
-              key="__selectAll"
-              style={{
+          <Box
+            sx={{
+              maxHeight: 320,
+              overflowY: 'auto',
+            }}
+          >
+            <Box
+              onClick={() => {
+                onChange(
+                  allSelected
+                    ? []
+                    : sorted.map(getValue)
+                );
+              }}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                px: 1,
+                py: 0.75,
+                cursor: 'pointer',
                 borderBottom:
                   '1px solid #f1f5f9',
+
+                '&:hover': {
+                  bgcolor: '#f8fafc',
+                },
               }}
             >
               <Checkbox
                 checked={allSelected}
                 indeterminate={
-                  !allSelected && someSelected
+                  !allSelected &&
+                  value.length > 0
                 }
                 size="small"
-                sx={{ mr: 1 }}
               />
 
-              <ListItemText
-                primary="Select All"
-                primaryTypographyProps={{
+              <Typography
+                sx={{
                   fontSize: 13,
                   fontWeight: 600,
                 }}
-              />
-            </li>
-          );
-        }
+              >
+                Select All
+              </Typography>
+            </Box>
 
-        return (
-          <li
-            {...props}
-            key={getValue(option)}
-          >
-            <Checkbox
-              checked={optSelected}
-              size="small"
-              sx={{ mr: 1 }}
-            />
+            {filtered.map(option => {
+              const val = getValue(option);
+              const checked =
+                value.includes(val);
 
-            {renderOptionContent ? (
-              renderOptionContent(option)
-            ) : (
-              <ListItemText
-                primary={getLabel(option)}
-                primaryTypographyProps={{
-                  fontSize: 13,
-                }}
-              />
-            )}
-          </li>
-        );
-      }}
-      renderInput={params => {
-        const summary =
-          selected.length === 0
-            ? ''
-            : selected.length === 1
-              ? getLabel(selected[0])
-              : `${getLabel(selected[0])} +${selected.length - 1
-              }`;
+              return (
+                <Box
+                  key={val}
+                  onClick={() => {
+                    if (checked) {
+                      onChange(
+                        value.filter(
+                          v => v !== val
+                        )
+                      );
+                    } else {
+                      onChange([
+                        ...value,
+                        val,
+                      ]);
+                    }
+                  }}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    px: 1,
+                    py: 0.75,
+                    cursor: 'pointer',
 
-        return (
-          <TextField
-            {...params}
-            label={label}
-            size="small"
-            InputLabelProps={{
-              shrink: true,
-            }}
-            inputProps={{
-              ...params.inputProps,
-              value: inputValue || summary,
-            }}
-          />
-        );
-      }}
-      sx={{
-        width: minWidth,
+                    '&:hover': {
+                      bgcolor: '#f8fafc',
+                    },
+                  }}
+                >
+                  <Checkbox
+                    checked={checked}
+                    size="small"
+                  />
 
-        '& .MuiOutlinedInput-root': {
-          fontSize: 13,
-          borderRadius: 2,
-          bgcolor: '#fff',
-          minHeight: 40,
-        },
-
-        '& .MuiAutocomplete-input': {
-          minWidth: '0 !important',
-        },
-
-        '& input::placeholder': {
-          opacity: 1,
-          color: '#111827',
-        },
-      }}
-      slotProps={{
-        paper: {
-          sx: {
-            maxHeight: 320,
-          },
-        },
-      }}
-    />
+                  {renderOptionContent ? (
+                    renderOptionContent(
+                      option
+                    )
+                  ) : (
+                    <Typography
+                      sx={{ fontSize: 13 }}
+                    >
+                      {getLabel(option)}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+      </Popover>
+    </>
   );
 }
 

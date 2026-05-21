@@ -146,7 +146,7 @@ class EmployeeListView(APIView):
         caller = _get_caller(request)
         cycle_id = request.query_params.get("cycle_id")
 
-        # ── 1. Base employee queryset ─────────────────────────────────────────
+        #  1. Base employee queryset 
         qs = (
             Employee.objects
             .filter(active=True)
@@ -165,7 +165,7 @@ class EmployeeListView(APIView):
         employees_list = list(qs)
         employee_ids = [e.id for e in employees_list]
 
-        # ── 2. Roles — one query for all employees, no per-row hit ───────────
+        # 2. Roles — one query for all employees, no per-row hit 
         # employee_roles is a bridge table; pull (employee_id, role name) in bulk
         from django.db.models import F
         roles_qs = (
@@ -180,7 +180,7 @@ class EmployeeListView(APIView):
             if role_name:
                 roles_map[emp_id].append(role_name)
 
-        # ── 3. Cycle data — all in bulk if cycle_id provided ─────────────────
+        #  3. Cycle data — all in bulk if cycle_id provided 
         cycle_map = {}     # employee_id → employee_kra_cycle_id
         kra_map = {}       # employee_id → [{kra_level_id, kra_id, name}, ...]
         category_map = {}  # employee_id → [{category_id, weightage}, ...]
@@ -227,7 +227,7 @@ class EmployeeListView(APIView):
                         "weightage":   ekc_cat["weightage"],
                     })
 
-        # ── 4. Build response — pure Python, zero DB hits ────────────────────
+        #  4. Build response — pure Python, zero DB hits 
         result = []
         for e in employees_list:
             result.append({
@@ -340,7 +340,7 @@ class KRABulkAssignmentEnrolView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # ── Pre-resolve ALL KRALevel lookups in one query ─────────────────
+            #  Pre-resolve ALL KRALevel lookups in one query 
             # Previously this was one query per selection per employee (N*M queries).
             # Now: collect all (kra_id, level_id) pairs, fetch in bulk, build a map.
             if shared_kra_selections:
@@ -584,9 +584,7 @@ class KRABulkAssignmentEnrolView(APIView):
             },
         )
 
-         # =========================================================
-        # BACKGROUND EMAIL THREAD
-        # =========================================================
+         
 
         if enrolled:
             threading.Thread(
@@ -595,9 +593,7 @@ class KRABulkAssignmentEnrolView(APIView):
                 daemon=True,
             ).start()
 
-        # =========================================================
-        # Response status
-        # =========================================================
+        
 
         if enrolled and (skipped or failed):
             http_status = status.HTTP_207_MULTI_STATUS
