@@ -96,7 +96,7 @@ def _build_row(emp, ekc, kra_row, columns):
     return row
 
 
-# ── Report 1: Single cycle report ─────────────────────────────────────────────
+#Report 1: Single cycle report 
 class CycleReportView(APIView):
     """
     GET /api/v1/reports/cycle/<cycle_id>
@@ -164,7 +164,7 @@ class CycleReportView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-# ── Report 2: Multi-cycle comparison report ────────────────────────────────────
+# Report 2: Multi-cycle comparison report 
 class MultiCycleReportView(APIView):
     """
     GET /api/v1/reports/multi-cycle
