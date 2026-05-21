@@ -18,6 +18,7 @@ import BulkAssignmentPage   from './pages/assignments/BulkAssignmentPage';
 // ── New assessment pages ──────────────────────────────────────────────────────
 import SelfAssessmentPage   from './pages/assessments/SelfAssessmentPage';
 import TeamPerformancePage  from './pages/assessments/TeamPerformancePage';
+import ReportsPage from './pages/reports/ReportsPage';
 
 import ROUTES from './config/routes';
 import './assets/styles/global.css';
@@ -61,6 +62,9 @@ function AppRoutes() {
       {/* Assessment pages */}
       <Route path={ROUTES.ASSESSMENTS_SELF} element={<Protected><SelfAssessmentPage /></Protected>} />
       <Route path={ROUTES.TEAM_PERFORMANCE} element={<Protected><TeamPerformancePage /></Protected>} />
+
+      {/*Reports*/ }
+      <Route path={ROUTES.REPORTS} element={<Protected><ReportsPage /></Protected>} />
 
       {/* Catch-all */}
       <Route path="/"  element={<Navigate to={ROUTES.DASHBOARD} replace />} />

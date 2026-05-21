@@ -1,11 +1,7 @@
 from django.urls import path
-from .views import (
-    ReportView,
-    ReportExportView,
-)
+from .views import CycleReportView, MultiCycleReportView
 
 urlpatterns = [
-    path('kra/cycles/<int:cycle_id>/export',ReportExportView.as_view()), 
-    path('kra/cycles/<int:cycle_id>/report',ReportView.as_view()),
-     
+    path('reports/cycle/<int:cycle_id>', CycleReportView.as_view()),
+    path('reports/multi-cycle',          MultiCycleReportView.as_view()),
 ]
