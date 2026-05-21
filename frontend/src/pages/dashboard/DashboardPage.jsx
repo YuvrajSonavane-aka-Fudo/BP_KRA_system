@@ -4,7 +4,7 @@ import {
   CircularProgress, Alert, Tabs, Tab, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TablePagination, Tooltip, InputAdornment, TextField, Menu, MenuItem, ListItemIcon,
-  TableSortLabel,
+  TableSortLabel, Stepper, Step, StepLabel,
 } from '@mui/material';
 import AddIcon              from '@mui/icons-material/Add';
 import ContentCopyIcon      from '@mui/icons-material/ContentCopy';
@@ -28,11 +28,11 @@ import { Dialog, DialogContent, DialogActions } from '@mui/material';
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
 const STATUS_STYLES = {
-  ACTIVE:    { bgcolor: '#dbeafe', color: '#166534' },
+  ACTIVE:    { bgcolor: '#dcfce7', color: '#166534' },
   DRAFT:     { bgcolor: '#f1f5f9', color: '#475569' },
-  CLOSED:    { bgcolor: '#dcfce7', color: '#1d4ed8' },
-  ON_HOLD:   { bgcolor: '#fde8d8', color: '#9a3412' },
-  CANCELLED: { bgcolor: '#fee2e2', color: '#991b1b' },
+  CLOSED:    { bgcolor: '#f1f5f9', color: '#475569' },
+  ON_HOLD:   { bgcolor: '#f1f5f9', color: '#475569' },
+  CANCELLED: { bgcolor: '#f1f5f9', color: '#475569' },
 };
 
 
@@ -53,7 +53,20 @@ const ACTION_CONFIG = {
 
 const TAB_FILTERS = [null, 'DRAFT', 'CLOSED', 'ON_HOLD', 'CANCELLED'];
 const TAB_LABELS  = ['All', 'Draft', 'Closed', 'On Hold', 'Cancelled'];
-const ROWS_PER_PAGE = 7;
+
+function useRowsPerPage(rowHeightPx = 40, reservedPx = 370) {
+  const [rows, setRows] = useState(7);
+  useEffect(() => {
+    function calc() {
+      const available = window.innerHeight - reservedPx;
+      setRows(Math.max(3, Math.floor(available / rowHeightPx)));
+    }
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, [rowHeightPx, reservedPx]);
+  return rows;
+}
 
 /* ─── Calendar helpers ─── */
 const MONTHS    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -154,69 +167,155 @@ function formatDate(dateStr) {
 }
 
 /* ── Stage stepper for active cycle banner ── */
-function BannerStepper({ stages, currentStageId, canAdvance, canRollback, onAdvanceClick, onRollbackClick }) {
+function BannerStepper({
+  stages,
+  currentStageId,
+  canAdvance,
+  canRollback,
+  onAdvanceClick,
+  onRollbackClick,
+}) {
+
   return (
-    <Box sx={{ position: 'relative', mt: 1.5 }}>
-      <Box sx={{ position: 'absolute', top: 12, left: '5%', right: '5%', height: 2, bgcolor: 'rgba(255,255,255,0.2)', zIndex: 0 }} />
-      <Stack direction="row" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
+    <Box sx={{ mt: 2 }}>
+
+      <Stepper
+        activeStep={(currentStageId ?? 1) - 1}
+        alternativeLabel
+        sx={{
+
+        '& .MuiStepConnector-line': {
+          borderColor: 'rgba(255,255,255,0.14)',
+          borderTopWidth: 2,
+          borderRadius: 99,
+          transition: '0.2s ease',
+        },
+
+        '& .MuiStepLabel-label': {
+          color: 'rgba(255,255,255,0.48)',
+          fontSize: 11,
+          fontWeight: 500,
+          mt: 0.9,
+          transition: 'all 0.2s ease',
+          letterSpacing: '0.01em',
+        },
+
+        '& .MuiStepLabel-label.Mui-active': {
+          color: '#ffffff !important',
+          fontWeight: '800 !important',
+          opacity: 1,
+        },
+
+        '& .MuiStepLabel-label.Mui-completed': {
+          color: '#86efac !important',
+          fontWeight: '600 !important',
+        },
+
+        '& .MuiStepIcon-root': {
+          color: 'rgba(255,255,255,0.18)',
+          fontSize: 30,
+          transition: 'all 0.22s ease',
+        },
+
+        '& .MuiStepIcon-text': {
+          fill: '#dbeafe',
+          fontWeight: 700,
+          fontSize: 12,
+        },
+
+        /* ACTIVE STEP */
+        '& .Mui-active .MuiStepIcon-root': {
+          color: '#ffffff',
+
+          border: '2px solid rgba(255,255,255,0.72)',
+          borderRadius: '50%',
+          padding: '2px',
+          boxSizing: 'content-box',
+
+          filter: 'drop-shadow(0 2px 10px rgba(255,255,255,0.12))',
+        },
+
+        '& .Mui-active .MuiStepIcon-text': {
+          fill: '#1E3A8A',
+          fontWeight: 800,
+        },
+
+        /* COMPLETED STEP */
+        '& .Mui-completed .MuiStepIcon-root': {
+          color: '#22c55e',
+        },
+
+        '& .Mui-completed .MuiStepIcon-text': {
+          fill: '#ffffff',
+        },
+
+        /* HOVER */
+        '& .MuiStepLabel-root:hover .MuiStepIcon-root': {
+          transform: 'scale(1.05)',
+        },
+      }}
+      >
+
         {stages.map((stage) => {
-          const done   = stage.id < currentStageId;
-          const active = stage.id === currentStageId;
-          const isNext = canAdvance && stage.id === currentStageId + 1;
-          const isBack = canRollback && done;
+
+          const isNext =
+            canAdvance &&
+            stage.id === currentStageId + 1;
+
+          const isBack =
+            canRollback &&
+            stage.id < currentStageId;
+
           const clickable = isNext || isBack;
-          const tooltipTitle = active ? stage.name
-            : isNext ? `Advance to "${stage.name}"`
-            : isBack ? `Roll back to "${stage.name}"`
-            : stage.name;
+
           return (
-            <Tooltip key={stage.id} title={tooltipTitle}>
-              <Stack alignItems="center" spacing={0.5} sx={{
-                width: '18%',
-                cursor: clickable ? 'pointer' : 'default',
-                '&:hover .sdot': clickable ? { opacity: 0.8, transform: 'scale(1.1)' } : {},
-              }}
-                onClick={clickable ? () => {
-                  if (isNext) onAdvanceClick(stage);
-                  else if (isBack) onRollbackClick(stage);
-                } : undefined}>
-                <Box className="sdot" sx={{
-                  width: active ? 36 : 28, height: active ? 36 : 28, borderRadius: '50%',
-                  bgcolor: done ? '#10b981' : active ? '#fff' : 'rgba(255,255,255,0.15)',
-                  border: `2px solid ${isNext ? 'rgba(255,255,255,0.5)' : active ? 'rgba(255,255,255,0.5)' : done ? 'rgba(255,255,255,0.3)' : 'transparent'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  outline: active ? '4px solid rgba(255,255,255,0.12)' : 'none',
-                  transition: 'all 0.2s', flexShrink: 0,
-                }}>
-                  {done   && <CheckCircleIcon sx={{ color: '#fff', fontSize: 16 }} />}
-                  {active && <Typography sx={{ fontSize: 12, color: '#1E3A8A', fontWeight: 800 }}>{stage.id}</Typography>}
-                  {!done && !active && (
-                    <Typography sx={{ fontSize: 9, color: isNext ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
-                      {stage.id}
-                    </Typography>
-                  )}
-                </Box>
-                <Typography sx={{
-                  fontSize: 11, fontWeight: active ? 700 : 500, textAlign: 'center', lineHeight: 1.2,
-                  color: active ? '#fff' : done ? '#86efac' : isNext ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)',
-                  maxWidth: 72,
-                }}>
-                  {stage.name}
-                </Typography>
-                {isNext && <Typography sx={{ fontSize: 8, color: 'rgba(147,197,253,0.9)', fontWeight: 700 }}>tap →</Typography>}
-                {isBack && <Typography sx={{ fontSize: 8, color: 'rgba(253,186,116,0.9)', fontWeight: 700 }}>← back</Typography>}
-              </Stack>
-            </Tooltip>
+            <Step
+              key={stage.id}
+              completed={stage.id < currentStageId}
+            >
+
+              <StepLabel
+                onClick={() => {
+
+                  if (isNext) {
+                    onAdvanceClick(stage);
+                  }
+
+                  if (isBack) {
+                    onRollbackClick(stage);
+                  }
+
+                }}
+                sx={{
+                  cursor: clickable ? 'pointer' : 'default',
+                }}
+              >
+                {stage.name}
+              </StepLabel>
+
+            </Step>
           );
         })}
-      </Stack>
+
+      </Stepper>
+
       {(canAdvance || canRollback) && (
-        <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', mt: 0.75, textAlign: 'center' }}>
-          {canAdvance && canRollback ? 'Click next stage to advance · Click past stage to roll back'
-            : canAdvance ? 'Click next stage to advance'
-            : 'Click a past stage to roll back'}
+        <Typography
+          sx={{
+            fontSize: 10,
+            color: 'rgba(255,255,255,0.45)',
+            textAlign: 'center',
+            mt: 1,
+          }}
+        >
+          {canAdvance && canRollback
+            ? 'Click next stage to advance · Click completed stage to roll back'
+            : canAdvance
+              ? 'Click next stage to advance'
+              : 'Click completed stage to roll back'}
         </Typography>
       )}
+
     </Box>
   );
 }
@@ -272,7 +371,33 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('');
 
   /* ── Sort state ── */
-  const [sortDir, setSortDir] = useState('asc'); // 'asc' | 'desc'
+  const [sortConfig, setSortConfig] = useState({
+  key: 'name',
+  direction: 'asc',
+});
+
+const handleSort = (key) => {
+  setSortConfig((prev) => ({
+    key,
+    direction:
+      prev.key === key && prev.direction === 'asc'
+        ? 'desc'
+        : 'asc',
+  }));
+
+  setPage(0);
+};
+
+const headerSx = {
+  fontWeight: 700,
+  fontSize: 10,
+  color: '#94a3b8',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  bgcolor: '#f8fafc',
+  py: 0.6,
+  borderBottom: '1px solid #e2e8f0',
+};
 
   const [successMsg, setSuccessMsg] = useState('');
   const [actionsAnchor, setActionsAnchor] = useState(null);
@@ -284,6 +409,7 @@ export default function DashboardPage() {
   const [advanceConfirm, setAdvanceConfirm] = useState({ open: false, toStage: null, cycle: null });
   const [advanceLoading, setAdvanceLoading] = useState(false);
   const [advanceError, setAdvanceError]     = useState('');
+  const [rollbackConfirm, setRollbackConfirm] = useState({ open: false, stage: null });
 
   // Rollback now navigates to CycleDetailPage with ?rollback=STAGE_ID
 
@@ -303,29 +429,73 @@ export default function DashboardPage() {
 
   /* ── Filter → sort pipeline ── */
   const filteredAndSorted = useMemo(() => {
-    const sf   = TAB_FILTERS[tab];
-    let base   = sf ? (allCycles ?? []).filter(c => c.status === sf) : (allCycles ?? []);
+  const sf = TAB_FILTERS[tab];
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      base = base.filter(c =>
-        c.name?.toLowerCase().includes(q) ||
-        c.description?.toLowerCase().includes(q)
-      );
+  let base = sf
+    ? (allCycles ?? []).filter(c => c.status === sf)
+    : (allCycles ?? []);
+
+  if (search.trim()) {
+    const q = search.toLowerCase();
+
+    base = base.filter(c =>
+      c.name?.toLowerCase().includes(q) ||
+      c.description?.toLowerCase().includes(q)
+    );
+  }
+
+  return [...base].sort((a, b) => {
+
+    // ALWAYS keep ACTIVE cycle on top
+    if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') {
+      return -1;
     }
 
-    // Alphabetical sort using localeCompare (MUI TableSortLabel drives the direction)
-    return [...base].sort((a, b) =>
-      sortDir === 'asc'
-        ? a.name.localeCompare(b.name)
-        : b.name.localeCompare(a.name)
-    );
-  }, [allCycles, tab, search, sortDir]);
+    if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') {
+      return 1;
+    }
+    let aValue;
+    let bValue;
 
-  function handleSortToggle() {
-    setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    setPage(0); // reset to first page on sort change
-  }
+    switch (sortConfig.key) {
+      case 'name':
+        aValue = a.name || '';
+        bValue = b.name || '';
+        break;
+
+      case 'period':
+        aValue = new Date(a.start_date);
+        bValue = new Date(b.start_date);
+        break;
+
+      case 'stage':
+        aValue = a.current_stage?.id || 0;
+        bValue = b.current_stage?.id || 0;
+        break;
+
+      case 'status':
+        aValue = a.status || '';
+        bValue = b.status || '';
+        break;
+
+      default:
+        return 0;
+    }
+
+    if (aValue < bValue) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+
+    if (aValue > bValue) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+
+    return 0;
+  });
+
+}, [allCycles, tab, search, sortConfig]);
+
+
 
   function openConfirm(cycle, action) {
     setConfirmError('');
@@ -381,6 +551,7 @@ export default function DashboardPage() {
     } finally { setDeleteLoading(false); }
   }
 
+  const ROWS_PER_PAGE = useRowsPerPage(40, activeCycle ? 390 : 260);
   if (loading) return (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
       <CircularProgress sx={{ color: '#1E3A8A' }} />
@@ -414,7 +585,7 @@ export default function DashboardPage() {
             sx={{ px: 2.5, background: gradient, borderRadius: 2, fontWeight: 700, boxShadow: '0 4px 12px rgba(30,58,138,0.3)', '&:hover': { background: gradient, opacity: 0.9 } }}>
             New Cycle
           </Button>
-        )}
+        )}  
       </Stack>
 
       {successMsg && (
@@ -430,9 +601,43 @@ export default function DashboardPage() {
                 <Stack direction="row" alignItems="center" spacing={1} mb={0.5} flexWrap="wrap" gap={0.5}>
                   <Chip label="LIVE" size="small" sx={{ bgcolor: '#10b981', color: '#fff', fontSize: 9, fontWeight: 800, height: 17 }} />
                   <Typography fontWeight={800} sx={{ fontSize: '1rem' }} noWrap>{activeCycle.name}</Typography>
-                  <Typography fontSize={11} sx={{ opacity: 0.65 }}>
+                  <Typography fontSize={11} sx={{ opacity: 0.85 }}>
                     {formatDate(activeCycle.start_date)} — {formatDate(activeCycle.end_date)}
                   </Typography>
+                  {activeCycle.end_date && (() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    const end = new Date(
+                      toDateOnly(activeCycle.end_date) + 'T00:00:00'
+                    );
+
+                    const days = Math.ceil(
+                      (end - today) / (1000 * 60 * 60 * 24)
+                    );
+
+                    return (
+                      <Typography
+                        sx={{
+                          fontSize: 10,
+                          fontWeight: 500,
+                          color:
+                            days > 7
+                              ? 'rgba(255,255,255,0.68)'
+                              : days >= 0
+                                ? '#fcd34d'
+                                : '#fca5a5',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {days > 0
+                          ? `(${days} days remaining)`
+                          : days === 0
+                            ? '(Ends today)'
+                            : '(Overdue)'}
+                      </Typography>
+                    );
+                  })()}
                 </Stack>
               </Box>
 
@@ -489,7 +694,7 @@ export default function DashboardPage() {
                 setAdvanceConfirm({ open: true, toStage: stage, cycle: activeCycle });
               }}
               onRollbackClick={(stage) => {
-                navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id)}?rollback=${stage.id}`);
+                setRollbackConfirm({ open: true, stage });
               }}
             />
           </Box>
@@ -535,30 +740,50 @@ export default function DashboardPage() {
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                {/* ── Cycle Name header with MUI TableSortLabel for A→Z / Z→A ── */}
-                <TableCell
-                  sx={{ fontWeight: 700, fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', bgcolor: '#f8fafc', py: 0.6, borderBottom: '1px solid #e2e8f0' }}>
+                <TableCell sx={headerSx}>
                   <TableSortLabel
-                    active={true}
-                    direction={sortDir}
-                    onClick={handleSortToggle}
-                    sx={{
-                      color: '#94a3b8 !important',
-                      fontWeight: 700,
-                      fontSize: 10,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      '&.Mui-active': { color: '#1E3A8A !important' },
-                      '& .MuiTableSortLabel-icon': { color: '#1E3A8A !important', fontSize: 14 },
-                    }}>
+                    active={sortConfig.key === 'name'}
+                    direction={sortConfig.key === 'name' ? sortConfig.direction : 'asc'}
+                    onClick={() => handleSort('name')}
+                  >
                     Cycle Name
                   </TableSortLabel>
                 </TableCell>
 
-                {/* Static columns */}
-                {['Period', 'Stage', 'Status', 'Actions'].map(h => (
-                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', bgcolor: '#f8fafc', py: 0.6, borderBottom: '1px solid #e2e8f0' }}>{h}</TableCell>
-                ))}
+                <TableCell sx={headerSx}>
+                  <TableSortLabel
+                    active={sortConfig.key === 'period'}
+                    direction={sortConfig.key === 'period' ? sortConfig.direction : 'asc'}
+                    onClick={() => handleSort('period')}
+                  >
+                    Period
+                  </TableSortLabel>
+                </TableCell>
+
+                <TableCell sx={headerSx}>
+                  <TableSortLabel
+                    active={sortConfig.key === 'stage'}
+                    direction={sortConfig.key === 'stage' ? sortConfig.direction : 'asc'}
+                    onClick={() => handleSort('stage')}
+                  >
+                    Stage
+                  </TableSortLabel>
+                </TableCell>
+
+                <TableCell sx={headerSx}>
+                  <TableSortLabel
+                    active={sortConfig.key === 'status'}
+                    direction={sortConfig.key === 'status' ? sortConfig.direction : 'asc'}
+                    onClick={() => handleSort('status')}
+                  >
+                    Status
+                  </TableSortLabel>
+                </TableCell>
+
+                <TableCell sx={headerSx}>
+                  Actions
+                </TableCell>
+
               </TableRow>
             </TableHead>
 
@@ -723,7 +948,21 @@ export default function DashboardPage() {
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDelete}
       />
-      {/* Rollback now handled via CycleDetailPage navigation */}
+      <ConfirmDialog
+        open={rollbackConfirm.open}
+        title="Roll Back Stage"
+        message={`Roll back "${activeCycle?.name}" to Stage ${rollbackConfirm.stage?.id}: "${rollbackConfirm.stage?.name}"?`}
+        warning="All employees will be moved back to this stage. You will set new dates on the next page."
+        confirmLabel="Roll Back"
+        confirmColor="#9a3412"
+        loading={false}
+        error=""
+        onClose={() => setRollbackConfirm({ open: false, stage: null })}
+        onConfirm={() => {
+          navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id)}?rollback=${rollbackConfirm.stage.id}`);
+          setRollbackConfirm({ open: false, stage: null });
+        }}
+      />
     </Box>
   );
 }
