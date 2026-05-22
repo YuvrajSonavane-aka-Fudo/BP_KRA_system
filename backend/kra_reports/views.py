@@ -41,6 +41,7 @@ def _base_ekc_qs(caller, cycle_ids):
     ).select_related(
         'employee',
         'employee__manager',
+        'employee__previous_manager',
         'employee__department',
         'employee__level',
         'kra_cycle',
@@ -75,6 +76,8 @@ def _build_row(emp, ekc, kra_row, columns):
         row['level'] = emp.level.name if emp.level else None
     if 'manager' in columns:
         row['manager'] = f'{emp.manager.first_name} {emp.manager.last_name}' if emp.manager else None
+    if 'previous_manager' in columns:
+        row['previous_manager'] = f'{emp.previous_manager.first_name} {emp.previous_manager.last_name}' if emp.previous_manager else None
     if 'kra_name' in columns:
         row['kra_name'] = getattr(kra_row.kra_level, 'name', None)
     if 'category' in columns:
@@ -238,14 +241,15 @@ class MultiCycleReportView(APIView):
 
                 if key not in aggregated:
                     aggregated[key] = {
-                        'employee_id':   emp.id,
-                        'employee_name': f'{emp.first_name} {emp.last_name}',
-                        'department':    emp.department.department_name if emp.department else None,
-                        'level':         emp.level.name if emp.level else None,
-                        'manager':       f'{emp.manager.first_name} {emp.manager.last_name}' if emp.manager else None,
-                        'kra_name':      getattr(kra_row.kra_level, 'name', None),
-                        'category':      getattr(kra_row.kra_level.category, 'name', None) if kra_row.kra_level else None,
-                        'cycles':        {str(c): None for c in cycle_ids},
+                        'employee_id':      emp.id,
+                        'employee_name':    f'{emp.first_name} {emp.last_name}',
+                        'department':       emp.department.department_name if emp.department else None,
+                        'level':            emp.level.name if emp.level else None,
+                        'manager':          f'{emp.manager.first_name} {emp.manager.last_name}' if emp.manager else None,
+                        'previous_manager': f'{emp.previous_manager.first_name} {emp.previous_manager.last_name}' if emp.previous_manager else None,
+                        'kra_name':         getattr(kra_row.kra_level, 'name', None),
+                        'category':         getattr(kra_row.kra_level.category, 'name', None) if kra_row.kra_level else None,
+                        'cycles':           {str(c): None for c in cycle_ids},
                     }
 
                 cycle_data = {}

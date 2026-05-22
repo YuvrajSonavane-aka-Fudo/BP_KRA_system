@@ -26,7 +26,8 @@ const REPORT1_COLUMNS = [
   { key: 'employee_name', label: 'Name' },
   { key: 'department', label: 'Department' },
   { key: 'level', label: 'Level' },
-  { key: 'manager', label: 'Manager' },
+  { key: 'manager', label: 'Current Manager' },
+  { key: 'previous_manager', label: 'Previous Manager' },
   { key: 'kra_name', label: 'KRA' },
   { key: 'category', label: 'Category' },
   { key: 'self_rating', label: 'Self Rating' },
@@ -47,8 +48,25 @@ const REPORT2_PER_CYCLE_COLUMNS = [
   { key: 'description_by_lead', label: 'Description by Lead' },
 ];
 
-const DEFAULT_R1_COLS = ['employee_id', 'employee_name', 'kra_name', 'category', 'self_rating', 'self_comment', 'lead_rating', 'lead_comment'];
+const DEFAULT_R1_COLS = ['employee_id', 'employee_name', 'manager', 'previous_manager', 'kra_name', 'category', 'self_rating', 'self_comment', 'lead_rating', 'lead_comment'];
 const DEFAULT_R2_COLS = ['self_rating', 'lead_rating', 'self_comment', 'lead_comment'];
+
+// ── Sticky left column config for Report 2 ────────────────────────────────────
+const R2_BASE_COLS = [
+  { key: 'employee_id',   label: 'Emp ID', width: 80  },
+  { key: 'employee_name', label: 'Name',   width: 150 },
+  { key: 'kra_name',      label: 'KRA',    width: 160 },
+];
+// Non-sticky base columns shown after the sticky block in Report 2
+const R2_MANAGER_COLS = [
+  { key: 'manager',          label: 'Current Manager' },
+  { key: 'previous_manager', label: 'Previous Manager' },
+];
+const R2_BASE_LEFTS = R2_BASE_COLS.reduce((acc, col, i) => {
+  acc.push(i === 0 ? 0 : acc[i - 1] + R2_BASE_COLS[i - 1].width);
+  return acc;
+}, []);
+const R2_BASE_TOTAL_WIDTH = R2_BASE_COLS.reduce((s, c) => s + c.width, 0);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function SortIcon({ col, sortCol, sortDir }) {
@@ -58,15 +76,20 @@ function SortIcon({ col, sortCol, sortDir }) {
     : <ArrowDownwardIcon sx={{ fontSize: 14, color: ACCENT }} />;
 }
 
-function HeaderCell({ label, colKey, sortCol, sortDir, onSort, top = 0 }) {
+function HeaderCell({ label, colKey, sortCol, sortDir, onSort, top = 0, left = undefined, width = undefined }) {
+  const isSticky = left !== undefined;
   return (
     <TableCell
       onClick={() => onSort(colKey)}
       sx={{
         fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase',
         letterSpacing: '0.07em', py: 1.2, whiteSpace: 'nowrap', cursor: 'pointer',
-        position: 'sticky', top, bgcolor: '#f8fafc', zIndex: 2,
+        position: 'sticky', top,
+        ...(isSticky && { left, minWidth: width, maxWidth: width }),
+        bgcolor: '#f8fafc',
+        zIndex: isSticky ? 4 : 2,
         borderBottom: '1.5px solid #e2e8f0', userSelect: 'none',
+        ...(isSticky && { boxShadow: 'inset -2px 0 0 #e2e8f0' }),
         '&:hover': { color: BLUE },
       }}
     >
@@ -148,14 +171,12 @@ function MultiSelect({
         }}
         sx={{
           minWidth,
-
           '& .MuiOutlinedInput-root': {
             fontSize: 13,
             borderRadius: 2,
             bgcolor: '#fff',
             cursor: 'pointer',
           },
-
           '& input': {
             cursor: 'pointer',
           },
@@ -174,119 +195,49 @@ function MultiSelect({
           horizontal: 'left',
         }}
       >
-        <Box
-          sx={{
-            width: minWidth + 40,
-            p: 1,
-          }}
-        >
+        <Box sx={{ width: minWidth + 40, p: 1 }}>
           <TextField
             fullWidth
             size="small"
             placeholder="Search..."
             value={search}
-            onChange={e =>
-              setSearch(e.target.value)
-            }
+            onChange={e => setSearch(e.target.value)}
             sx={{ mb: 1 }}
           />
-
-          <Box
-            sx={{
-              maxHeight: 320,
-              overflowY: 'auto',
-            }}
-          >
+          <Box sx={{ maxHeight: 320, overflowY: 'auto' }}>
             <Box
               onClick={() => {
-                onChange(
-                  allSelected
-                    ? []
-                    : sorted.map(getValue)
-                );
+                onChange(allSelected ? [] : sorted.map(getValue));
               }}
               sx={{
-                display: 'flex',
-                alignItems: 'center',
-                px: 1,
-                py: 0.75,
-                cursor: 'pointer',
-                borderBottom:
-                  '1px solid #f1f5f9',
-
-                '&:hover': {
-                  bgcolor: '#f8fafc',
-                },
+                display: 'flex', alignItems: 'center', px: 1, py: 0.75,
+                cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+                '&:hover': { bgcolor: '#f8fafc' },
               }}
             >
-              <Checkbox
-                checked={allSelected}
-                indeterminate={
-                  !allSelected &&
-                  value.length > 0
-                }
-                size="small"
-              />
-
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                Select All
-              </Typography>
+              <Checkbox checked={allSelected} indeterminate={!allSelected && value.length > 0} size="small" />
+              <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Select All</Typography>
             </Box>
-
             {filtered.map(option => {
               const val = getValue(option);
-              const checked =
-                value.includes(val);
-
+              const checked = value.includes(val);
               return (
                 <Box
                   key={val}
                   onClick={() => {
-                    if (checked) {
-                      onChange(
-                        value.filter(
-                          v => v !== val
-                        )
-                      );
-                    } else {
-                      onChange([
-                        ...value,
-                        val,
-                      ]);
-                    }
+                    if (checked) onChange(value.filter(v => v !== val));
+                    else onChange([...value, val]);
                   }}
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 1,
-                    py: 0.75,
-                    cursor: 'pointer',
-
-                    '&:hover': {
-                      bgcolor: '#f8fafc',
-                    },
+                    display: 'flex', alignItems: 'center', px: 1, py: 0.75,
+                    cursor: 'pointer', '&:hover': { bgcolor: '#f8fafc' },
                   }}
                 >
-                  <Checkbox
-                    checked={checked}
-                    size="small"
-                  />
-
+                  <Checkbox checked={checked} size="small" />
                   {renderOptionContent ? (
-                    renderOptionContent(
-                      option
-                    )
+                    renderOptionContent(option)
                   ) : (
-                    <Typography
-                      sx={{ fontSize: 13 }}
-                    >
-                      {getLabel(option)}
-                    </Typography>
+                    <Typography sx={{ fontSize: 13 }}>{getLabel(option)}</Typography>
                   )}
                 </Box>
               );
@@ -427,43 +378,33 @@ function Report1({ cycles, employees }) {
   return (
     <Box>
       {/* Filters */}
-      <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, p: 2.5, mb: 2 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 2 }}>
-          Configuration
-        </Typography>
-        <Stack direction="row" flexWrap="wrap" gap={2} alignItems="flex-end">
-          {/* Cycle */}
+      <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, p: 1.5, mb: 1.5 }}>
+        <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
           <CycleSelect cycles={cycles} value={cycleId} onChange={setCycleId} />
-
-          {/* Employees */}
           <MultiSelect label="Employees (all)" options={employees} value={empFilter}
             onChange={setEmpFilter}
             getLabel={e => e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
             getValue={e => e.employee_id ?? e.id}
             sortFn={(a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '')}
-            minWidth={260}
+            minWidth={220}
           />
           <MultiSelect label="Columns" options={REPORT1_COLUMNS} value={columns}
-            onChange={setColumns} getLabel={c => c.label} getValue={c => c.key} />
-
-          {/* Run */}
+            onChange={setColumns} getLabel={c => c.label} getValue={c => c.key} minWidth={180} />
           <Box onClick={fetchReport} sx={{
-            px: 2.5, py: 1, borderRadius: 2, cursor: cycleId ? 'pointer' : 'not-allowed',
+            px: 2, py: 0.7, borderRadius: 2, cursor: cycleId ? 'pointer' : 'not-allowed',
             bgcolor: cycleId ? BLUE : '#e2e8f0', color: cycleId ? '#fff' : '#94a3b8',
-            fontSize: 13, fontWeight: 700, '&:hover': cycleId ? { bgcolor: ACCENT } : {},
+            fontSize: 12, fontWeight: 700, '&:hover': cycleId ? { bgcolor: ACCENT } : {},
           }}>
-            {loading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Run Report'}
+            {loading ? <CircularProgress size={12} sx={{ color: '#fff' }} /> : 'Run Report'}
           </Box>
-
-          {/* Export */}
           {rows.length > 0 && (
             <Box onClick={() => exportReport1(displayed, columns, cycleName)} sx={{
-              display: 'inline-flex', alignItems: 'center', gap: 0.6,
-              px: 2.5, py: 1, borderRadius: 2, cursor: 'pointer',
-              bgcolor: '#f0fdf4', color: '#16a34a', fontSize: 13, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', gap: 0.5,
+              px: 2, py: 0.7, borderRadius: 2, cursor: 'pointer',
+              bgcolor: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700,
               border: '1.5px solid #16a34a40', '&:hover': { bgcolor: '#dcfce7' },
             }}>
-              <DownloadIcon sx={{ fontSize: 16 }} /> Export Excel
+              <DownloadIcon sx={{ fontSize: 14 }} /> Export
             </Box>
           )}
         </Stack>
@@ -471,7 +412,6 @@ function Report1({ cycles, employees }) {
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
-      {/* Search + summary */}
       {rows.length > 0 && (
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
           <Typography sx={{ fontSize: 13, color: '#64748b' }}>
@@ -486,7 +426,6 @@ function Report1({ cycles, employees }) {
         </Stack>
       )}
 
-      {/* Table */}
       {rows.length > 0 && (
         <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
           <Box sx={{ overflowX: 'auto', maxHeight: 520, overflowY: 'auto' }}>
@@ -573,7 +512,6 @@ function Report2({ cycles, employees }) {
     return [...filtered].sort((a, b) => {
       let va = a[sortCol] ?? '';
       let vb = b[sortCol] ?? '';
-      // Handle cycle-specific sort key like "cycle_123_self_rating"
       if (sortCol.startsWith('cycle_')) {
         const [, cid, ...rest] = sortCol.split('_');
         const field = rest.join('_');
@@ -587,11 +525,8 @@ function Report2({ cycles, employees }) {
   return (
     <Box>
       {/* Filters */}
-      <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 3, p: 2.5, mb: 2 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 2 }}>
-          Configuration
-        </Typography>
-        <Stack direction="row" flexWrap="wrap" gap={2} alignItems="flex-end">
+      <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, p: 1.5, mb: 1.5 }}>
+        <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
           <MultiSelect
             label="Cycles *"
             options={cycles}
@@ -613,35 +548,31 @@ function Report2({ cycles, employees }) {
               </Stack>
             )}
           />
-
           <MultiSelect label="Employees (all)" options={employees} value={empFilter}
             onChange={setEmpFilter}
             getLabel={e => e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
             getValue={e => e.employee_id ?? e.id}
             sortFn={(a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '')}
-            minWidth={260}
+            minWidth={220}
           />
-
           <MultiSelect label="Columns per Cycle" options={REPORT2_PER_CYCLE_COLUMNS}
             value={perCycleCols} onChange={setPerCycleCols}
-            getLabel={c => c.label} getValue={c => c.key} minWidth={220} />
-
+            getLabel={c => c.label} getValue={c => c.key} minWidth={190} />
           <Box onClick={fetchReport} sx={{
-            px: 2.5, py: 1, borderRadius: 2, cursor: cycleIds.length ? 'pointer' : 'not-allowed',
+            px: 2, py: 0.7, borderRadius: 2, cursor: cycleIds.length ? 'pointer' : 'not-allowed',
             bgcolor: cycleIds.length ? BLUE : '#e2e8f0', color: cycleIds.length ? '#fff' : '#94a3b8',
-            fontSize: 13, fontWeight: 700, '&:hover': cycleIds.length ? { bgcolor: ACCENT } : {},
+            fontSize: 12, fontWeight: 700, '&:hover': cycleIds.length ? { bgcolor: ACCENT } : {},
           }}>
-            {loading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Run Report'}
+            {loading ? <CircularProgress size={12} sx={{ color: '#fff' }} /> : 'Run Report'}
           </Box>
-
           {rows.length > 0 && (
             <Box onClick={() => exportReport2(displayed, resultCycles, perCycleCols)} sx={{
-              display: 'inline-flex', alignItems: 'center', gap: 0.6,
-              px: 2.5, py: 1, borderRadius: 2, cursor: 'pointer',
-              bgcolor: '#f0fdf4', color: '#16a34a', fontSize: 13, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', gap: 0.5,
+              px: 2, py: 0.7, borderRadius: 2, cursor: 'pointer',
+              bgcolor: '#f0fdf4', color: '#16a34a', fontSize: 12, fontWeight: 700,
               border: '1.5px solid #16a34a40', '&:hover': { bgcolor: '#dcfce7' },
             }}>
-              <DownloadIcon sx={{ fontSize: 16 }} /> Export Excel
+              <DownloadIcon sx={{ fontSize: 14 }} /> Export
             </Box>
           )}
         </Stack>
@@ -668,26 +599,52 @@ function Report2({ cycles, employees }) {
           <Box sx={{ overflowX: 'auto', maxHeight: 520, overflowY: 'auto' }}>
             <Table size="small" sx={{ minWidth: 800 }}>
               <TableHead>
-                {/* Cycle group headers */}
+                {/* ── Row 1: Cycle group headers ── */}
                 <TableRow sx={{ bgcolor: NAVY }}>
-                  <TableCell colSpan={5} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', py: 0.8, borderBottom: 'none', position: 'sticky', top: 0, bgcolor: NAVY, zIndex: 3 }} />
+                  {/* Sticky placeholder spanning base cols */}
+                  <TableCell
+                    colSpan={R2_BASE_COLS.length}
+                    sx={{
+                      borderBottom: 'none', py: 0.8,
+                      position: 'sticky', top: 0, left: 0,
+                      bgcolor: NAVY, zIndex: 5,
+                      minWidth: R2_BASE_TOTAL_WIDTH,
+                    }}
+                  />
+                  {/* Non-sticky manager col placeholders */}
+                  {R2_MANAGER_COLS.map(c => (
+                    <TableCell key={c.key} sx={{ borderBottom: 'none', py: 0.8, bgcolor: NAVY, position: 'sticky', top: 0, zIndex: 3 }} />
+                  ))}
                   {resultCycles.map(c => (
                     <TableCell key={c.id} colSpan={visPerCycle.length}
                       sx={{
                         color: '#fff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
                         letterSpacing: '0.06em', py: 0.8, borderBottom: 'none',
                         borderLeft: '2px solid rgba(255,255,255,0.15)', textAlign: 'center',
-                        position: 'sticky', top: 0, bgcolor: NAVY, zIndex: 3
+                        position: 'sticky', top: 0, bgcolor: NAVY, zIndex: 3,
                       }}>
                       {c.name}
                     </TableCell>
                   ))}
                 </TableRow>
-                {/* Column headers */}
+
+                {/* ── Row 2: Column headers ── */}
                 <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                  {['Emp ID', 'Name', 'Department', 'Level', 'KRA'].map((h, i) => (
-                    <HeaderCell key={i} label={h}
-                      colKey={['employee_id', 'employee_name', 'department', 'level', 'kra_name'][i]}
+                  {R2_BASE_COLS.map((col, i) => (
+                    <HeaderCell
+                      key={col.key}
+                      label={col.label}
+                      colKey={col.key}
+                      sortCol={sortCol}
+                      sortDir={sortDir}
+                      onSort={handleSort}
+                      top={34}
+                      left={R2_BASE_LEFTS[i]}
+                      width={col.width}
+                    />
+                  ))}
+                  {R2_MANAGER_COLS.map(col => (
+                    <HeaderCell key={col.key} label={col.label} colKey={col.key}
                       sortCol={sortCol} sortDir={sortDir} onSort={handleSort} top={34} />
                   ))}
                   {resultCycles.map(c => visPerCycle.map(col => (
@@ -697,26 +654,55 @@ function Report2({ cycles, employees }) {
                   )))}
                 </TableRow>
               </TableHead>
+
               <TableBody>
-                {displayed.map((row, idx) => (
-                  <TableRow key={idx} sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafbff', '&:hover': { bgcolor: '#eff6ff' } }}>
-                    <TableCell sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9' }}><CellValue value={row.employee_id} /></TableCell>
-                    <TableCell sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9', fontWeight: 600, whiteSpace: 'nowrap' }}><CellValue value={row.employee_name} /></TableCell>
-                    <TableCell sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9' }}><CellValue value={row.department} /></TableCell>
-                    <TableCell sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9' }}><CellValue value={row.level} /></TableCell>
-                    <TableCell sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}><CellValue value={row.kra_name} /></TableCell>
-                    {resultCycles.map(c => visPerCycle.map(col => (
-                      <TableCell key={`${c.id}_${col.key}`}
-                        sx={{
-                          fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9',
-                          borderLeft: col === visPerCycle[0] ? '2px solid #e2e8f0' : 'none',
-                          maxWidth: 180
-                        }}>
-                        <CellValue value={row.cycles?.[String(c.id)]?.[col.key]} />
-                      </TableCell>
-                    )))}
-                  </TableRow>
-                ))}
+                {displayed.map((row, idx) => {
+                  const rowBg = idx % 2 === 0 ? '#fff' : '#fafbff';
+                  const hoverBg = '#eff6ff';
+                  const stickyCell = (key, i, content, extraSx = {}) => (
+                    <TableCell
+                      key={key}
+                      sx={{
+                        fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9',
+                        position: 'sticky', left: R2_BASE_LEFTS[i],
+                        minWidth: R2_BASE_COLS[i].width, maxWidth: R2_BASE_COLS[i].width,
+                        bgcolor: rowBg, zIndex: 1,
+                        boxShadow: i === R2_BASE_COLS.length - 1 ? 'inset -2px 0 0 #e2e8f0' : 'none',
+                        ...extraSx,
+                      }}
+                    >
+                      {content}
+                    </TableCell>
+                  );
+
+                  return (
+                    <TableRow
+                      key={idx}
+                      sx={{ bgcolor: rowBg, '&:hover': { bgcolor: hoverBg, '& td': { bgcolor: hoverBg } } }}
+                    >
+                      {stickyCell('emp_id',   0, <CellValue value={row.employee_id} />)}
+                      {stickyCell('emp_name', 1, <CellValue value={row.employee_name} />, { fontWeight: 600, whiteSpace: 'nowrap' })}
+                      {stickyCell('kra',      2, <CellValue value={row.kra_name} />, { whiteSpace: 'nowrap' })}
+
+                      {R2_MANAGER_COLS.map(col => (
+                        <TableCell key={col.key} sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                          <CellValue value={row[col.key]} />
+                        </TableCell>
+                      ))}
+
+                      {resultCycles.map(c => visPerCycle.map(col => (
+                        <TableCell key={`${c.id}_${col.key}`}
+                          sx={{
+                            fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9',
+                            borderLeft: col === visPerCycle[0] ? '2px solid #e2e8f0' : 'none',
+                            maxWidth: 180,
+                          }}>
+                          <CellValue value={row.cycles?.[String(c.id)]?.[col.key]} />
+                        </TableCell>
+                      )))}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Box>
@@ -749,10 +735,7 @@ export default function ReportsPage() {
         const cycleList = cycleRes.data?.cycles ?? [];
         setCycles(cycleList);
 
-        // Try to get employees from the response directly
         let emps = empRes.data?.employees ?? [];
-
-        // If empty (because cycle_id is required), fetch using the first available cycle
         if (!emps.length && cycleList.length) {
           const fallback = await axiosInstance.get(`/employees?cycle_id=${cycleList[0].id}`);
           emps = fallback.data?.employees ?? [];
@@ -788,7 +771,6 @@ export default function ReportsPage() {
             <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#1e293b', lineHeight: 1.2 }}>Reports</Typography>
             <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>Generate, filter, sort and export KRA assessment reports.</Typography>
           </Box>
-          {/* Tab switcher */}
           <Stack direction="row" spacing={1}>
             {[
               { key: 'report1', label: 'Single Cycle Report' },
@@ -812,10 +794,12 @@ export default function ReportsPage() {
 
       {/* Content */}
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
-        {tab === 'report1'
-          ? <Report1 cycles={cycles} employees={employees} />
-          : <Report2 cycles={cycles} employees={employees} />
-        }
+        <Box sx={{ display: tab === 'report1' ? 'block' : 'none' }}>
+          <Report1 cycles={cycles} employees={employees} />
+        </Box>
+        <Box sx={{ display: tab === 'report2' ? 'block' : 'none' }}>
+          <Report2 cycles={cycles} employees={employees} />
+        </Box>
       </Box>
     </Box>
   );
