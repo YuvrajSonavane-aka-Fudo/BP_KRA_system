@@ -509,33 +509,14 @@ class KRACycleListCreateView(APIView):
         caller = _get_caller(request)
         data = request.data
 
-        for field in ("name", "start_date", "end_date", "stages"):
+        for field in ("name", "start_date", "end_date"):
             if field not in data:
                 return Response(
                     {"error": f"Missing required field: {field}"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        stages_data = data["stages"]
-
-        if not stages_data:
-            return Response(
-                {"error": "stages cannot be empty"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        stage_ids = [s["stage_id"] for s in stages_data]
-        existing_stages = Stage.objects.filter(id__in=stage_ids)
-
-        if existing_stages.count() != len(stage_ids):
-            found_ids = set(existing_stages.values_list("id", flat=True))
-            missing_ids = set(stage_ids) - found_ids
-            return Response(
-                {"error": f"Invalid stage_id(s): {list(missing_ids)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        stage_map = {s.id: s for s in existing_stages}
+        stages_data = data.get("stages", [])  # fix: was data["stages",[]]
 
         try:
             cycle_start = _parse_date(data["start_date"])
@@ -546,16 +527,29 @@ class KRACycleListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        with transaction.atomic():
-            first_stage = stage_map[stages_data[0]["stage_id"]]
+        stage_map = {}
+        if stages_data:
+            stage_ids = [s["stage_id"] for s in stages_data]
+            existing_stages = Stage.objects.filter(id__in=stage_ids)
 
+            if existing_stages.count() != len(stage_ids):
+                found_ids = set(existing_stages.values_list("id", flat=True))
+                missing_ids = set(stage_ids) - found_ids
+                return Response(
+                    {"error": f"Invalid stage_id(s): {list(missing_ids)}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            stage_map = {s.id: s for s in existing_stages}
+
+        with transaction.atomic():
             cycle = KRACycle.objects.create(
                 name=data["name"],
                 description=data.get("description", ""),
                 start_date=cycle_start,
                 end_date=cycle_end,
                 status="DRAFT",
-                stage=first_stage,
+                stage=None,
                 is_deleted=False,
             )
 
@@ -589,7 +583,7 @@ class KRACycleListCreateView(APIView):
                 "start_date": str(cycle.start_date),
                 "end_date": str(cycle.end_date),
                 "status": cycle.status,
-                "stages": stage_ids,
+                "stages": [s["stage_id"] for s in stages_data],
                 "created_by": caller.email,
             },
         )
@@ -599,12 +593,11 @@ class KRACycleListCreateView(APIView):
                 "id": cycle.id,
                 "name": cycle.name,
                 "status": cycle.status,
-                "stage": {"id": first_stage.id, "name": first_stage.name},
+                "stage": None,  # no stage set on draft without stages
                 "stages_count": len(stages_data),
             },
             status=status.HTTP_201_CREATED,
         )
-
 
 # 4. KRA Cycle — Update Status / Soft Delete
 
@@ -696,6 +689,16 @@ class KRACycleUpdateView(APIView):
             cycle.name = request.data["name"]
         if "description" in request.data:
             cycle.description = request.data.get("description") or ""
+        if "start_date" in request.data:
+            try:
+                cycle.start_date = _parse_date(request.data["start_date"])
+            except (ValueError, AttributeError):
+                pass
+        if "end_date" in request.data:
+            try:
+                cycle.end_date = _parse_date(request.data["end_date"])
+            except (ValueError, AttributeError):
+                pass
 
         # ── Save stage dates if provided ──
         stages_data = request.data.get("stages")

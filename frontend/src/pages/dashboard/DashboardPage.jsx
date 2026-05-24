@@ -599,42 +599,45 @@ const headerSx = {
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
               <Box flex={1} minWidth={0} pr={2}>
                 <Stack direction="row" alignItems="center" spacing={1} mb={0.5} flexWrap="wrap" gap={0.5}>
-                  <Chip label="LIVE" size="small" sx={{ bgcolor: '#10b981', color: '#fff', fontSize: 9, fontWeight: 800, height: 17 }} />
+                  <Chip
+                    label={activeCycle.status === 'ACTIVE' ? 'LIVE' : activeCycle.status === 'DRAFT' ? 'DRAFT' : activeCycle.status.replace('_', ' ')}
+                    size="small"
+                    sx={{
+                      bgcolor: activeCycle.status === 'ACTIVE' ? '#10b981' : activeCycle.status === 'DRAFT' ? '#64748b' : activeCycle.status === 'CLOSED' ? '#166534' : '#92400e',
+                      color: '#fff', fontSize: 9, fontWeight: 800, height: 17
+                    }}
+                  />
                   <Typography fontWeight={800} sx={{ fontSize: '1rem' }} noWrap>{activeCycle.name}</Typography>
                   <Typography fontSize={11} sx={{ opacity: 0.85 }}>
                     {formatDate(activeCycle.start_date)} — {formatDate(activeCycle.end_date)}
                   </Typography>
-                  {activeCycle.end_date && (() => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
+                  {(() => {
+                    const today = new Date(); today.setHours(0, 0, 0, 0);
 
-                    const end = new Date(
-                      toDateOnly(activeCycle.end_date) + 'T00:00:00'
+                    // find current stage's end date from cycle_stages
+                    const currentStage = activeCycle.cycle_stages?.find(
+                      cs => cs.stage_id === currentStageId
                     );
+                    const stageEndDate = currentStage?.end_date
+                      ? new Date(toDateOnly(currentStage.end_date) + 'T00:00:00')
+                      : null;
 
-                    const days = Math.ceil(
-                      (end - today) / (1000 * 60 * 60 * 24)
-                    );
+                    if (!stageEndDate) return null;
+
+                    const days = Math.ceil((stageEndDate - today) / (1000 * 60 * 60 * 24));
 
                     return (
                       <Typography
                         sx={{
                           fontSize: 10,
                           fontWeight: 500,
-                          color:
-                            days > 7
-                              ? 'rgba(255,255,255,0.68)'
-                              : days >= 0
-                                ? '#fcd34d'
-                                : '#fca5a5',
+                          color: days > 7 ? 'rgba(255,255,255,0.68)' : days >= 0 ? '#fcd34d' : '#fca5a5',
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {days > 0
-                          ? `(${days} days remaining)`
-                          : days === 0
-                            ? '(Ends today)'
-                            : '(Overdue)'}
+                        {`( Stage Duration: ${formatDate(currentStage.start_date)} -> ${formatDate(currentStage.end_date)}  ·  ${
+                          days > 0 ? `${days} days left )` : days === 0 ? 'Ends today' : `Overdue by ${Math.abs(days)} days`
+                        }`}
                       </Typography>
                     );
                   })()}
@@ -653,7 +656,7 @@ const headerSx = {
                 )}
                 <Tooltip title="Edit cycle details">
                   <Button size="small" startIcon={<EditIcon sx={{ fontSize: 13 }} />}
-                    onClick={() => navigate(ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id))}
+                    onClick={() => navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id)}?edit=true`)}
                     sx={{ bgcolor: '#fff', color: '#1E3A8A', borderRadius: 99, fontSize: 11, fontWeight: 700, px: 1.25, py: 0.4, textTransform: 'none', minWidth: 0, '&:hover': { bgcolor: '#f0f6ff' } }}>
                     Edit
                   </Button>
