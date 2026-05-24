@@ -78,7 +78,7 @@ def _clone_assignments(source_cycle, new_cycle, caller):
     Returns a dict with enrolled / skipped / needs_review lists and a summary.
     """
 
-    # ── Fetch all source enrolments with related data in as few queries as possible
+    #  Fetch all source enrolments with related data in as few queries as possible
     source_ekcs = list(
         EmployeeKRACycle.objects.filter(kra_cycle=source_cycle).select_related(
             "employee__manager", "employee__level", "employee__role"
@@ -684,7 +684,7 @@ class KRACycleUpdateView(APIView):
         if is_deleted is not None:
             cycle.is_deleted = is_deleted
 
-        # ── Save name / description if provided ──
+        #  Save name / description if provided 
         if "name" in request.data:
             cycle.name = request.data["name"]
         if "description" in request.data:
@@ -700,7 +700,7 @@ class KRACycleUpdateView(APIView):
             except (ValueError, AttributeError):
                 pass
 
-        # ── Save stage dates if provided ──
+        #  Save stage dates if provided 
         stages_data = request.data.get("stages")
         if stages_data:
             for s in stages_data:
@@ -880,7 +880,7 @@ class KRACycleCloneView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # ── Step 1: Clone the cycle shell + stage windows ─────────────────────
+        # Step 1: Clone the cycle shell + stage windows 
         with transaction.atomic():
             new_cycle = KRACycle.objects.create(
                 name=data["name"],
@@ -902,7 +902,7 @@ class KRACycleCloneView(APIView):
 
         assignment_result = None
 
-        # ── Step 2: Clone assignments if requested ────────────────────────────
+        #  Step 2: Clone assignments if requested 
         if clone_assignments:
             assignment_result = _clone_assignments(
                 source_cycle=source,
