@@ -101,9 +101,19 @@ function HeaderCell({ label, colKey, sortCol, sortDir, onSort, top = 0, left = u
   );
 }
 
-function CellValue({ value }) {
+function CellValue({ value, maxWidth }) {
   if (value == null || value === '') return <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>—</span>;
-  return <span>{value}</span>;
+  return (
+    <Box
+      title={String(value)}
+      sx={{
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        ...(maxWidth ? { maxWidth } : {}),
+      }}
+    >
+      {value}
+    </Box>
+  );
 }
 
 // ── Multi-select with search (Autocomplete) ───────────────────────────────────
@@ -324,6 +334,24 @@ function exportReport2(rows, cycles, perCycleCols) {
   XLSX.writeFile(wb, `KRA_Comparison_Report.xlsx`);
 }
 
+// ── Report 1 column widths (px) ───────────────────────────────────────────────
+const R1_COL_WIDTHS = {
+  employee_id:        80,
+  employee_name:     140,
+  department:        120,
+  level:              80,
+  manager:           140,
+  previous_manager:  140,
+  kra_name:          160,
+  category:          110,
+  self_rating:        80,
+  self_comment:      200,
+  lead_rating:        80,
+  lead_comment:      200,
+  progress_notes:    180,
+  description_by_lead: 180,
+};
+
 // ── Report 1 ──────────────────────────────────────────────────────────────────
 function Report1({ cycles, employees }) {
   const [cycleId, setCycleId] = useState('');
@@ -442,8 +470,8 @@ function Report1({ cycles, employees }) {
                 {displayed.map((row, idx) => (
                   <TableRow key={idx} sx={{ bgcolor: idx % 2 === 0 ? '#fff' : '#fafbff', '&:hover': { bgcolor: '#eff6ff' } }}>
                     {visibleCols.map(c => (
-                      <TableCell key={c.key} sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9', maxWidth: 280 }}>
-                        <CellValue value={row[c.key]} />
+                      <TableCell key={c.key} sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9' }}>
+                        <CellValue value={row[c.key]} maxWidth={R1_COL_WIDTHS[c.key] ?? 160} />
                       </TableCell>
                     ))}
                   </TableRow>
@@ -680,13 +708,13 @@ function Report2({ cycles, employees }) {
                       key={idx}
                       sx={{ bgcolor: rowBg, '&:hover': { bgcolor: hoverBg, '& td': { bgcolor: hoverBg } } }}
                     >
-                      {stickyCell('emp_id',   0, <CellValue value={row.employee_id} />)}
-                      {stickyCell('emp_name', 1, <CellValue value={row.employee_name} />, { fontWeight: 600, whiteSpace: 'nowrap' })}
-                      {stickyCell('kra',      2, <CellValue value={row.kra_name} />, { whiteSpace: 'nowrap' })}
+                      {stickyCell('emp_id',   0, <CellValue value={row.employee_id} maxWidth={R2_BASE_COLS[0].width} />)}
+                      {stickyCell('emp_name', 1, <CellValue value={row.employee_name} maxWidth={R2_BASE_COLS[1].width} />, { fontWeight: 600 })}
+                      {stickyCell('kra',      2, <CellValue value={row.kra_name} maxWidth={R2_BASE_COLS[2].width} />)}
 
                       {R2_MANAGER_COLS.map(col => (
-                        <TableCell key={col.key} sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
-                          <CellValue value={row[col.key]} />
+                        <TableCell key={col.key} sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9' }}>
+                          <CellValue value={row[col.key]} maxWidth={140} />
                         </TableCell>
                       ))}
 
@@ -695,9 +723,8 @@ function Report2({ cycles, employees }) {
                           sx={{
                             fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9',
                             borderLeft: col === visPerCycle[0] ? '2px solid #e2e8f0' : 'none',
-                            maxWidth: 180,
                           }}>
-                          <CellValue value={row.cycles?.[String(c.id)]?.[col.key]} />
+                          <CellValue value={row.cycles?.[String(c.id)]?.[col.key]} maxWidth={180} />
                         </TableCell>
                       )))}
                     </TableRow>
