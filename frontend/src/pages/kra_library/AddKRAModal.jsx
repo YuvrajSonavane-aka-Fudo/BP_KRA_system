@@ -133,7 +133,7 @@ export default function AddKRAModal({
     ? 'Saving…'
     : isClone ? 'Save Clone'
     : isEdit  ? 'Save Changes'
-    : 'Add KRA';
+    : 'Save';
 
   return (
     <Dialog
@@ -248,7 +248,7 @@ export default function AddKRAModal({
 
           {/* KRA Name */}
           <TextField
-            label="KRA Name" value={name} fullWidth size="small"
+            label={<>KRA Name <Box component="span" sx={{ color: '#ef4444' }}>*</Box></>} value={name} fullWidth size="small"
             placeholder="e.g., Code Review Efficiency"
             onChange={e => { setName(e.target.value); setErrors(v => ({ ...v, name: undefined })); }}
             error={Boolean(errors.name)} helperText={errors.name}
@@ -270,7 +270,7 @@ export default function AddKRAModal({
             <Select
               multiple
               value={selectedLevels}
-              label="Applicable Levels *"
+              label={<>Applicable Levels <Box component="span" sx={{ color: '#ef4444' }}>*</Box></>}
               onChange={e => {
                 setSelectedLevels(e.target.value);
                 setErrors(v => ({ ...v, levels: undefined }));

@@ -130,8 +130,45 @@ export default function AddCategoryModal({ open, onClose, onSaved, category }) {
             <Alert severity="error" sx={{ borderRadius: 1.5, fontSize: 13 }}>{errors.submit}</Alert>
           )}
 
+          {/* Category Type — FIRST */}
+          <Box>
+            <Typography fontSize={12} fontWeight={700} color="text.secondary" mb={1}>
+              Category Type
+            </Typography>
+            <Stack direction="row" spacing={2.5}>
+              {[
+                { value: true,  label: 'Org Level',     icon: <StarIcon sx={{ fontSize: 13 }} />, color: '#16a34a' },
+                { value: false, label: 'Project Level', icon: <TuneIcon sx={{ fontSize: 13 }} />, color: '#1d4ed8' },
+              ].map(opt => {
+                const isSelected = isStandard === opt.value;
+                return (
+                  <Stack key={String(opt.value)} direction="row" alignItems="center" spacing={0.75}
+                    onClick={() => setStandard(opt.value)}
+                    sx={{ cursor: 'pointer', userSelect: 'none' }}>
+                    {/* Radio */}
+                    <Box sx={{
+                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                      border: `2px solid ${isSelected ? opt.color : '#cbd5e1'}`,
+                      bgcolor: isSelected ? opt.color : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.15s',
+                    }}>
+                      {isSelected && <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#fff' }} />}
+                    </Box>
+                    <Box sx={{ color: isSelected ? opt.color : '#94a3b8', display: 'flex' }}>{opt.icon}</Box>
+                    <Typography fontSize={13} fontWeight={isSelected ? 700 : 500}
+                      color={isSelected ? opt.color : '#64748b'}>
+                      {opt.label}
+                    </Typography>
+                  </Stack>
+                );
+              })}
+            </Stack>
+          </Box>
+
+          {/* Category Name — SECOND */}
           <TextField
-            label="Category Name"
+            label={<>Category Name <Box component="span" sx={{ color: '#ef4444' }}>*</Box></>}
             value={name}
             fullWidth
             size="small"
@@ -142,60 +179,6 @@ export default function AddCategoryModal({ open, onClose, onSaved, category }) {
             autoFocus
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
           />
-
-          {/* Type toggle */}
-          <Box>
-            <Typography fontSize={12} fontWeight={700} color="text.secondary" mb={1}>
-              Category Type
-            </Typography>
-            <Stack direction="row" spacing={1.5}>
-              {[
-                {
-                  value: true,
-                  label: 'Org Level',
-                  icon: <StarIcon sx={{ fontSize: 14 }} />,
-                  desc: 'Core org-wide KRA category',
-                },
-                {
-                  value: false,
-                  label: 'Project Level',
-                  icon: <TuneIcon sx={{ fontSize: 14 }} />,
-                  desc: 'Project or team specific',
-                },
-              ].map(opt => (
-                <Box
-                  key={String(opt.value)}
-                  onClick={() => setStandard(opt.value)}
-                  sx={{
-                    flex: 1, px: 2, py: 1.5, borderRadius: 2, cursor: 'pointer',
-                    border: `2px solid ${
-                      isStandard === opt.value
-                        ? (opt.value ? '#16a34a' : '#1d4ed8')
-                        : '#e2e8f0'
-                    }`,
-                    bgcolor: isStandard === opt.value
-                      ? (opt.value ? '#f0fdf4' : '#eff6ff')
-                      : '#fafafa',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" spacing={0.75} mb={0.4}>
-                    <Box sx={{ color: isStandard === opt.value ? (opt.value ? '#16a34a' : '#1d4ed8') : '#94a3b8' }}>
-                      {opt.icon}
-                    </Box>
-                    <Typography
-                      fontSize={13}
-                      fontWeight={700}
-                      color={isStandard === opt.value ? (opt.value ? '#166534' : '#1d4ed8') : '#475569'}
-                    >
-                      {opt.label}
-                    </Typography>
-                  </Stack>
-                  <Typography fontSize={11} color="#94a3b8">{opt.desc}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
         </Stack>
       </DialogContent>
 
@@ -212,7 +195,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category }) {
             '&:hover': { background: gradient, opacity: 0.9 },
           }}
         >
-          {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Category'}
+          {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>
