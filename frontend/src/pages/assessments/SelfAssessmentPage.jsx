@@ -4,7 +4,9 @@ import {
   LinearProgress, Alert, CircularProgress, Divider, Collapse,
   InputAdornment, Avatar, Table, TableBody, TableCell, TableHead, TableRow,
   Autocomplete, IconButton,
+  Stepper, Step, StepLabel, StepConnector, stepConnectorClasses,
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -795,6 +797,46 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
   );
 }
 
+// ── MUI Stepper styled connector ──────────────────────────────────────────
+const InlineConnector = styled(StepConnector)(() => ({
+  [`&.${stepConnectorClasses.alternativeLabel}`]: { top: 11 },
+  [`& .${stepConnectorClasses.line}`]: {
+    height: 2,
+    border: 0,
+    borderRadius: 1,
+    backgroundColor: '#e2e8f0',
+    transition: 'background-color 0.3s',
+  },
+  [`&.${stepConnectorClasses.completed} .${stepConnectorClasses.line}`]: {
+    backgroundColor: '#22c55e',
+  },
+  [`&.${stepConnectorClasses.active} .${stepConnectorClasses.line}`]: {
+    backgroundColor: '#22c55e',
+  },
+}));
+
+// ── Custom step icon for InlineStageStepper ────────────────────────────────
+function InlineStepIconWidget({ stage, isCurrent, isDone, clickable }) {
+  return (
+    <Box sx={{
+      width: 26, height: 26, borderRadius: '50%',
+      bgcolor: isDone ? '#22c55e' : isCurrent ? BLUE : '#e2e8f0',
+      border: isCurrent ? `2.5px solid ${ACCENT}` : isDone ? '2.5px solid #22c55e' : '2.5px solid #e2e8f0',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: isCurrent ? `0 0 0 3px rgba(59,130,246,0.18)` : 'none',
+      cursor: clickable ? 'pointer' : 'default',
+      transition: 'all 0.2s',
+      flexShrink: 0,
+      '&:hover': clickable ? { opacity: 0.78, transform: 'scale(1.1)' } : {},
+    }}>
+      {isDone
+        ? <CheckCircleIcon sx={{ fontSize: 13, color: '#fff' }} />
+        : <Typography sx={{ fontSize: 9, fontWeight: 800, color: isCurrent ? '#fff' : '#94a3b8', lineHeight: 1 }}>{stage.id}</Typography>
+      }
+    </Box>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // INLINE STAGE STEPPER — used inside Team Review per-employee rows
 // ══════════════════════════════════════════════════════════════════════════════
@@ -858,7 +900,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
   }
 
   return (
-    <Box sx={{ mt: 1.5 }}>
+    <Box sx={{ mt: 1 }}>
       {/* Read-only badge for non-active cycles */}
       {!isActiveCycle && (
         <Chip
@@ -868,62 +910,67 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
           sx={{ mb: 1, bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, fontSize: 11, border: '1px solid #fcd34d' }}
         />
       )}
-      {/* Clickable dots stepper */}
-      <Stack direction="row" alignItems="center" spacing={0}>
+
+      {/* MUI Stepper */}
+      <Stepper
+        alternativeLabel
+        nonLinear
+        activeStep={currentIdx}
+        connector={<InlineConnector />}
+        sx={{ px: 0, py: 0.5 }}
+      >
         {stages.map((stage, i) => {
           const isDone = stage.id < currentStageId;
           const isCurrent = stage.id === currentStageId;
-          const isLast = i === stages.length - 1;
-          // Only clickable if admin AND active cycle AND not current stage
           const clickable = isAdmin && isActiveCycle && !isCurrent;
+          const tooltipTitle = !isActiveCycle
+            ? `${stage.name} — stage changes locked (inactive cycle)`
+            : !isAdmin ? stage.name
+              : isCurrent ? `Current: ${stage.name}`
+                : stage.id < currentStageId ? `Move back to: ${stage.name}`
+                  : `Advance to: ${stage.name}`;
 
           return (
-            <React.Fragment key={stage.id}>
-              <Tooltip title={
-                !isActiveCycle ? `${stage.name} — stage changes locked (inactive cycle)`
-                  : !isAdmin ? stage.name
-                    : isCurrent ? `Current: ${stage.name}`
-                      : stage.id < currentStageId ? `Move back to: ${stage.name}`
-                        : `Advance to: ${stage.name}`
-              }>
-                <Stack alignItems="center" spacing={0.3} sx={{ minWidth: 52 }}
-                  onClick={clickable ? e => { e.stopPropagation(); openStageDialog(stage); } : undefined}
-                  style={{ cursor: clickable ? 'pointer' : 'default' }}
+            <Step
+              key={stage.id}
+              completed={isDone}
+              active={isCurrent}
+              onClick={clickable ? e => { e.stopPropagation(); openStageDialog(stage); } : undefined}
+              sx={{ cursor: clickable ? 'pointer' : 'default', px: 0.5 }}
+            >
+              <Tooltip title={tooltipTitle} arrow>
+                <StepLabel
+                  StepIconComponent={() => (
+                    <InlineStepIconWidget
+                      stage={stage}
+                      isCurrent={isCurrent}
+                      isDone={isDone}
+                      clickable={clickable}
+                    />
+                  )}
+                  sx={{
+                    '& .MuiStepLabel-label': {
+                      fontSize: 9,
+                      fontWeight: isCurrent ? 700 : 500,
+                      color: `${isCurrent ? BLUE : isDone ? '#22c55e' : '#94a3b8'} !important`,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      lineHeight: 1.3,
+                      mt: 0.5,
+                    },
+                  }}
                 >
-                  <Box sx={{
-                    width: isCurrent ? 26 : 20, height: isCurrent ? 26 : 20,
-                    borderRadius: '50%',
-                    bgcolor: isDone ? '#22c55e' : isCurrent ? BLUE : '#e2e8f0',
-                    border: isCurrent ? `2.5px solid ${ACCENT}` : isDone ? '2px solid #22c55e' : '2px solid #e2e8f0',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: isCurrent ? `0 0 0 3px rgba(59,130,246,0.15)` : 'none',
-                    transition: 'all 0.2s', flexShrink: 0,
-                    '&:hover': clickable ? { opacity: 0.75, transform: 'scale(1.1)' } : {},
-                  }}>
-                    {isDone
-                      ? <CheckCircleIcon sx={{ fontSize: 12, color: '#fff' }} />
-                      : <Typography sx={{ fontSize: 8, fontWeight: 800, color: isCurrent ? '#fff' : '#94a3b8' }}>{stage.id}</Typography>
-                    }
-                  </Box>
-                  <Typography sx={{
-                    fontSize: 8, fontWeight: isCurrent ? 700 : 400,
-                    color: isCurrent ? BLUE : isDone ? '#22c55e' : '#94a3b8',
-                    textAlign: 'center', lineHeight: 1.2, maxWidth: 48,
-                    textTransform: 'uppercase', letterSpacing: '0.03em',
-                  }}>{stage.name}</Typography>
-                </Stack>
+                  {stage.name}
+                </StepLabel>
               </Tooltip>
-              {!isLast && (
-                <Box sx={{ flex: 1, height: 1.5, bgcolor: isDone ? '#22c55e' : '#e2e8f0', mt: '-10px', mx: 0.3, transition: 'background 0.3s', minWidth: 8 }} />
-              )}
-            </React.Fragment>
+            </Step>
           );
         })}
-      </Stack>
+      </Stepper>
 
       {isAdmin && (
-        <Typography sx={{ fontSize: 10, color: '#94a3b8', mt: 0.75, textAlign: 'center' }}>
-          {stageChanging ? 'Updating…' : 'Click a stage dot to move employee'}
+        <Typography sx={{ fontSize: 10, color: '#94a3b8', mt: 0.5, textAlign: 'center' }}>
+          {stageChanging ? 'Updating…' : 'Click a stage to move employee'}
         </Typography>
       )}
 
