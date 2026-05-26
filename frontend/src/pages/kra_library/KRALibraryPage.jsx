@@ -158,6 +158,40 @@ function DeleteConfirmDialog({ open, title, message, onClose, onConfirm, deletin
   );
 }
 
+// ─── Blocked Delete Dialog (item is assigned to employees) ───────────────────
+function BlockedDeleteDialog({ open, title, message, onClose }) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
+      <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5 }}>
+        <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Box sx={{
+            width: 28, height: 28, borderRadius: '50%',
+            bgcolor: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Typography fontSize={14} lineHeight={1}>⚠️</Typography>
+          </Box>
+          <Typography fontWeight={700} fontSize={14} color="#92400e">{title}</Typography>
+        </Stack>
+      </Box>
+      <DialogContent sx={{ pt: 2, pb: 1 }}>
+        <Alert severity="warning" sx={{ borderRadius: 1.5, fontSize: 13, mb: 0 }}>
+          {message}
+        </Alert>
+      </DialogContent>
+      <DialogActions sx={{ px: 2.5, pb: 2 }}>
+        <Button onClick={onClose} variant="contained"
+          sx={{
+            textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
+            bgcolor: '#1E3A8A', '&:hover': { bgcolor: '#1d4ed8' },
+          }}>
+          OK
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ─── Sort Toggle Button ───────────────────────────────────────────────────────
 function SortToggle({ sortDir, onToggle }) {
   return (
@@ -1108,6 +1142,7 @@ const [projSortDir, setProjSortDir] = useState('asc');
   const [catModal,     setCatModal]     = useState({ open: false, cat: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, item: null });
   const [deleting,     setDeleting]     = useState(false);
+  const [blockedDialog, setBlockedDialog] = useState({ open: false, title: '', message: '' });
   const [toast,        setToast]        = useState({ open: false, message: '', severity: 'success' });
   const [highlightKRAId, setHighlightKRAId] = useState(null);
 
@@ -1196,8 +1231,18 @@ const [projSortDir, setProjSortDir] = useState('asc');
       refresh();
     } catch (err) {
       setDeleteDialog({ open: false, type: null, item: null });
-      showToast('KRA removed');
-      refresh();
+      const status = err?.response?.status;
+      const serverMsg = err?.response?.data?.error || '';
+      if (status === 409) {
+        const count = err?.response?.data?.assigned_kra_level_count ?? '';
+        setBlockedDialog({
+          open: true,
+          title: 'Cannot Delete KRA',
+          message: `"${deleteDialog.item?.name}" is currently assigned to ${count} employee${count !== 1 ? 's' : ''}. Unassign it from all active cycles before deleting.`,
+        });
+      } else {
+        showToast(serverMsg || 'Failed to delete KRA', 'error');
+      }
     } finally { setDeleting(false); }
   }
 
@@ -1233,8 +1278,19 @@ const [projSortDir, setProjSortDir] = useState('asc');
       refresh();
     } catch (err) {
       setDeleteDialog({ open: false, type: null, item: null });
-      showToast('Category deleted');
-      refresh();
+      const status = err?.response?.status;
+      const serverMsg = err?.response?.data?.error || '';
+      if (status === 409) {
+        const kraCount   = err?.response?.data?.assigned_kra_count ?? '';
+        const levelCount = err?.response?.data?.assigned_kra_level_count ?? '';
+        setBlockedDialog({
+          open: true,
+          title: 'Cannot Delete Category',
+          message: `"${cat?.name}" contains ${kraCount} KRA${kraCount !== 1 ? 's' : ''} (${levelCount} level variant${levelCount !== 1 ? 's' : ''}) that are currently assigned to employees. Unassign all related KRAs from active cycles before deleting this category.`,
+        });
+      } else {
+        showToast(serverMsg || 'Failed to delete category', 'error');
+      }
     } finally { setDeleting(false); }
   }
 
@@ -1243,31 +1299,46 @@ const [projSortDir, setProjSortDir] = useState('asc');
     if (deleteDialog.type === 'category') return handleCatDelete();
   }
 
-  // Bulk delete handler
   async function handleBulkDelete() {
     if (!selectedKRAIds.size && !selectedCatIds.size) return;
     setBulkDeleting(true);
     const total = selectedKRAIds.size + selectedCatIds.size;
-    try {
-      await Promise.all([
-        ...[...selectedKRAIds].map(id => deleteKRA(id)),
-        ...[...selectedCatIds].map(id => deleteCategory(id)),
-      ]);
-      if (_cache.data) {
-        _cache.data.kras = _cache.data.kras.filter(k => !selectedKRAIds.has(k.id));
-        _cache.data.categories = _cache.data.categories.filter(c => !selectedCatIds.has(c.id));
-        _cache.data.kras = _cache.data.kras.filter(k => !selectedCatIds.has(k.category_id));
-      }
-      setSelectedKRAIds(new Set());
-      setSelectedCatIds(new Set());
-      showToast(`Deleted ${total} item${total !== 1 ? 's' : ''} successfully`);
+    const errors = [];
+    const results = await Promise.allSettled([
+      ...[...selectedKRAIds].map(id => deleteKRA(id).then(() => ({ type: 'kra', id, ok: true })).catch(err => ({ type: 'kra', id, ok: false, err }))),
+      ...[...selectedCatIds].map(id => deleteCategory(id).then(() => ({ type: 'cat', id, ok: true })).catch(err => ({ type: 'cat', id, ok: false, err }))),
+    ]);
+
+    const succeeded = results.filter(r => r.value?.ok).map(r => r.value);
+    const failed    = results.filter(r => !r.value?.ok).map(r => r.value);
+    const blocked   = failed.filter(r => r?.err?.response?.status === 409);
+
+    if (_cache.data) {
+      const deletedKRAIds = new Set(succeeded.filter(r => r.type === 'kra').map(r => r.id));
+      const deletedCatIds = new Set(succeeded.filter(r => r.type === 'cat').map(r => r.id));
+      _cache.data.kras = _cache.data.kras.filter(k => !deletedKRAIds.has(k.id) && !deletedCatIds.has(k.category_id));
+      _cache.data.categories = _cache.data.categories.filter(c => !deletedCatIds.has(c.id));
+    }
+
+    setSelectedKRAIds(new Set());
+    setSelectedCatIds(new Set());
+
+    if (succeeded.length > 0) {
+      showToast(`Deleted ${succeeded.length} item${succeeded.length !== 1 ? 's' : ''} successfully`);
       refresh();
-    } catch (err) {
-      setSelectedKRAIds(new Set());
-      setSelectedCatIds(new Set());
-      showToast(`Deleted ${total} item${total !== 1 ? 's' : ''} successfully`);
-      refresh();
-    } finally { setBulkDeleting(false); }
+    }
+
+    if (blocked.length > 0) {
+      setBlockedDialog({
+        open: true,
+        title: `${blocked.length} Item${blocked.length !== 1 ? 's' : ''} Could Not Be Deleted`,
+        message: `${blocked.length} item${blocked.length !== 1 ? 's are' : ' is'} assigned to employees in active cycles and cannot be deleted. Unassign them first.`,
+      });
+    } else if (failed.length > 0 && succeeded.length === 0) {
+      showToast('Failed to delete selected items', 'error');
+    }
+
+    setBulkDeleting(false);
   }
 
   const deleteMessages = {
@@ -1394,6 +1465,13 @@ const [projSortDir, setProjSortDir] = useState('asc');
         deleting={deleting}
         onClose={() => setDeleteDialog({ open: false, type: null, item: null })}
         onConfirm={handleDelete} />
+
+      <BlockedDeleteDialog
+        open={blockedDialog.open}
+        title={blockedDialog.title}
+        message={blockedDialog.message}
+        onClose={() => setBlockedDialog({ open: false, title: '', message: '' })}
+      />
 
       <Toast open={toast.open} message={toast.message} severity={toast.severity}
         onClose={() => setToast(t => ({ ...t, open: false }))} />
