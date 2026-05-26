@@ -42,6 +42,7 @@ import EmployeeKRAView from './EmployeeKRAView';
 const G = 'linear-gradient(135deg, #1E3A8A 0%, #1e40af 60%, #1d4ed8 100%)';
 const ORG_COLOR  = { bg: '#f0fdf4', border: '#86efac', text: '#15803d', chip: '#dcfce7', icon: '#16a34a' };
 const PROJ_COLOR = { bg: '#eff6ff', border: '#93c5fd', text: '#1d4ed8', chip: '#dbeafe', icon: '#2563eb' };
+
 const WRITE_STAGES = ['ACTIVE', 'DRAFT'];
 
 const typeColor = (isStd) => (isStd ? ORG_COLOR : PROJ_COLOR);
@@ -172,15 +173,39 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
         (k.levels ?? []).some(l => l.level_name?.toLowerCase().includes(q))
       );
     }
+
+    // Seed map from categories so empty ones still appear
     const map = {};
+    categories.forEach(cat => {
+      const matchesTypeFilter =
+        typeFilter === 'all' ||
+        (typeFilter === 'org'     && cat.is_standard === true) ||
+        (typeFilter === 'project' && cat.is_standard === false);
+      if (!matchesTypeFilter) return;
+      map[cat.id] = {
+        cid: cat.id,
+        name: cat.name,
+        isStd: cat.is_standard,
+        kras: [],
+      };
+    });
+
+    // Fill in KRAs
     list.forEach(kra => {
       const cid = kra.category_id ?? '__uncategorized__';
       if (!map[cid]) {
-        const catFromProp = categories.find(c => c.id === cid);
-        map[cid] = { cid, name: catFromProp?.name ?? kra.category_name ?? `Category ${cid}`, isStd: kra.is_standard, kras: [] };
+        // fallback for KRAs whose category isn't in categories list
+        const catFromProp = categories.find(c => String(c.id) === String(cid));
+        map[cid] = {
+          cid,
+          name: catFromProp?.name ?? kra.category_name ?? `Category ${cid}`,
+          isStd: catFromProp?.is_standard ?? kra.is_standard,
+          kras: [],
+        };
       }
       map[cid].kras.push(kra);
     });
+
     return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
   }, [kras, typeFilter, levelFilter, search, categories]);
 
@@ -229,10 +254,10 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
   );
 
   const [orgCount, projectCount, totalKraLevelCount] = useMemo(() => [
-    kras.filter(k => k.is_standard === true).length,
-    kras.filter(k => k.is_standard === false).length,
+    categories.filter(c => c.is_standard === true).length,
+    categories.filter(c => c.is_standard === false).length,
     kras.reduce((sum, k) => sum + (k.levels?.length ?? 0), 0),
-  ], [kras]);
+  ], [kras, categories]);
   const toggleExpand = useCallback((cid) => { setExpanded(p => ({ ...p, [cid]: !p[cid] })); }, []);
 
   return (
@@ -240,7 +265,9 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
         <Stack direction="row" alignItems="center" gap={1}>
           <Typography fontWeight={800} fontSize={13} color="#0f172a">KRA Library</Typography>
-          <Chip label={`${kras.length}`} size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#e0e7ff', color: '#3730a3', borderRadius: 1 }} />
+          <Box component="span" color="#3730a3" fontSize={13} fontWeight={700}>
+            ({categories.length})
+          </Box>
         </Stack>
         <Stack direction="row" gap={1} alignItems="center">
           <Chip icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ORG_COLOR.icon, ml: '6px !important' }} />} label="Org" size="small" sx={{ height: 20, fontSize: 9.5, fontWeight: 700, bgcolor: ORG_COLOR.chip, color: ORG_COLOR.text, cursor: 'default' }} />
@@ -259,15 +286,9 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
       <Stack direction="row" gap={1} mb={1.5} alignItems="center">
         <Stack direction="row" sx={{ border: '1px solid #e2e8f0', borderRadius: 1.5, overflow: 'hidden', flexShrink: 0, height: 30 }}>
           {[{ v: 'all', l: 'All' }, { v: 'org', l: `Org (${orgCount})` }, { v: 'project', l: `Proj (${projectCount})` }].map(t => (
-            <Box key={t.v} onClick={() => setTypeFilter(t.v)} sx={{ px: 1.25, display: 'flex', alignItems: 'center', fontSize: 10.5, fontWeight: 700, cursor: 'pointer', userSelect: 'none', bgcolor: typeFilter === t.v ? '#1E3A8A' : 'transparent', color: typeFilter === t.v ? '#fff' : '#64748b', '&:hover': { bgcolor: typeFilter === t.v ? '#1E3A8A' : '#f1f5f9' } }}>{t.l}</Box>
+            <Box key={t.v} onClick={() => setTypeFilter(t.v)} sx={{ px: 2, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, cursor: 'pointer', userSelect: 'none', bgcolor: typeFilter === t.v ? '#1E3A8A' : 'transparent', color: typeFilter === t.v ? '#fff' : '#64748b', '&:hover': { bgcolor: typeFilter === t.v ? '#1E3A8A' : '#f1f5f9' } }}>{t.l}</Box>
           ))}
         </Stack>
-        <FormControl size="small" sx={{ flex: 1 }}>
-          <Select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} displayEmpty sx={{ fontSize: 11, height: 30, borderRadius: 1.5, bgcolor: '#f8fafc' }}>
-            <MenuItem value="" sx={{ fontSize: 11 }}>All Levels</MenuItem>
-            {allLevels.map(l => <MenuItem key={l.name} value={l.name} sx={{ fontSize: 11 }}>{l.name}</MenuItem>)}
-          </Select>
-        </FormControl>
       </Stack>
 
       <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, mb: 0.5, borderRadius: 1.5, bgcolor: someSelected ? '#f0f9ff' : '#fafafa', border: `1px solid ${someSelected ? '#bae6fd' : '#f1f5f9'}` }}>
@@ -296,8 +317,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
                 <Checkbox size="small" disabled={isReadOnly} indeterminate={catSome && !catAll} checked={catAll && catLevelIds.length > 0} onChange={() => {}} onClick={e => { e.stopPropagation(); if (isReadOnly) return; onToggleKRA(catLevelIds, catAll ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5, mr: 0.5, flexShrink: 0, color: tc.text, '&.Mui-checked': { color: tc.text } }} />
                 <Box flex={1} minWidth={0} onClick={() => toggleExpand(group.cid)} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', userSelect: 'none' }}>
                   <Typography fontSize={12} fontWeight={800} color={tc.text} noWrap>{group.name}</Typography>
-                  <Chip label={typeLabel(group.isStd)} size="small" sx={{ height: 15, fontSize: 8, fontWeight: 800, bgcolor: tc.chip, color: tc.text, borderRadius: 0.75 }} />
-                  <Chip label={`${group.kras.length} KRA${group.kras.length !== 1 ? 's' : ''}`} size="small" sx={{ height: 15, fontSize: 8, fontWeight: 600, bgcolor: 'rgba(0,0,0,0.06)', color: '#475569', borderRadius: 0.75 }} />
+                  <Typography fontSize={11} fontWeight={600} color={tc.text} sx={{ opacity: 0.7 }}>({group.rows.length})</Typography>
                   {selCount > 0 && <Chip label={`${selCount} ✓`} size="small" sx={{ height: 15, fontSize: 8, fontWeight: 800, bgcolor: '#fef3c7', color: '#92400e', borderRadius: 0.75 }} />}
                   <Box flex={1} />
                   <Box sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center', flexShrink: 0 }}>{isOpen ? <ExpandLessIcon sx={{ fontSize: 15 }} /> : <ExpandMoreIcon sx={{ fontSize: 15 }} />}</Box>
@@ -321,17 +341,20 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
                       }}>
                         <Checkbox size="small" checked={isSelected} disabled={isReadOnly} onChange={() => {}} onClick={e => { e.stopPropagation(); toggle(); }} sx={{ p: 0, mr: 1.25, flexShrink: 0 }} />
                         <Box flex={1} minWidth={0}>
-                          <Stack direction="row" alignItems="center" gap={0.5} flexWrap="wrap">
-                            <Typography fontSize={12} fontWeight={isSelected ? 700 : 500} color="#1e293b" noWrap>{kra.name}</Typography>
+                          <Stack direction="row" alignItems="center" gap={1}>
+                            <Typography fontSize={12} fontWeight={isSelected ? 700 : 500} color="#1e293b" noWrap>
+                              {kra.name}
+                            </Typography>
+                            <Typography fontSize={10.5} fontWeight={600} color="#94a3b8" noWrap flexShrink={0}>
+                              {level.level_name}
+                            </Typography>
                             {hasDup && (
                               <Tooltip title={`${dupCount} selected employee${dupCount > 1 ? 's' : ''} already have this KRA`}>
                                 <Chip label={`${dupCount} assigned`} size="small" icon={<WarningAmberIcon sx={{ fontSize: '10px !important', color: '#b45309 !important' }} />} sx={{ height: 15, fontSize: 8, fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e', cursor: 'help' }} />
                               </Tooltip>
                             )}
                           </Stack>
-                          <Typography fontSize={10} color="#94a3b8" noWrap>{level.level_name}{level.description ? ` · ${level.description}` : ''}</Typography>
                         </Box>
-                        <Chip label={typeLabel(kra.is_standard)} size="small" sx={{ height: 15, fontSize: 8, ml: 0.75, flexShrink: 0, fontWeight: 700, bgcolor: ktc.chip, color: ktc.text, borderRadius: 0.75 }} />
                       </Box>
                     );
                   })}
@@ -546,7 +569,7 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
         </Stack>
         <Stack direction="row" gap={0.5}>
           {[{ l: 'All', c: employees.length, v: 0 }, { l: 'Assigned', c: assigned, v: 1 }, { l: 'Unassigned', c: unassigned, v: 2 }].map(t => (
-            <Chip key={t.v} label={`${t.l} ${t.c}`} size="small" onClick={() => setTab(t.v)}
+            <Chip key={t.v} label={`${t.l} (${t.c})`} size="small" onClick={() => setTab(t.v)}
               sx={{ height: 22, fontSize: 10, fontWeight: 700, cursor: 'pointer', borderRadius: 1.5, bgcolor: tab === t.v ? '#1E3A8A' : '#f1f5f9', color: tab === t.v ? '#fff' : '#64748b' }} />
           ))}
         </Stack>
@@ -863,9 +886,29 @@ export default function BulkAssignmentPage() {
   const [viewEmployee, setViewEmployee]   = useState(null);
   const [cloneDefault, setCloneDefault]   = useState(false);
   const hasMounted = useRef(false);
+  const [leftPct, setLeftPct] = useState(50);
+  const containerRef = useRef(null);
+  const dragging = useRef(false);
 
   const isReadOnly = !WRITE_STAGES.includes(activeCycle?.status);
   const canEdit    = !isReadOnly;
+  const onMouseDown = useCallback((e) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMouseMove = (e) => {
+      if (!dragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setLeftPct(Math.min(Math.max(pct, 25), 75));
+    };
+    const onMouseUp = () => {
+      dragging.current = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   const selectedKraLevelIds = useMemo(() => [...selectedKraSet], [selectedKraSet]);
   const selectedEmployeeIds = useMemo(() => [...selectedEmpSet], [selectedEmpSet]);
@@ -969,7 +1012,14 @@ export default function BulkAssignmentPage() {
     setActiveCycle(found);
     setSelectedKraSet(new Set());
     setSelectedEmpSet(new Set());
-    await handleRefresh(cycleId, { includeKraLibrary: true });
+    setGlobalLoading(true);
+    setGlobalLoadingMsg('Loading cycle data…');
+    try {
+      await handleRefresh(cycleId, { includeKraLibrary: true });
+    } finally {
+      setGlobalLoading(false);
+      setGlobalLoadingMsg('');
+    }
   };
 
   const handleToggleKRA = useCallback((ids, mode) => {
@@ -993,6 +1043,8 @@ export default function BulkAssignmentPage() {
   const doAssign = useCallback(async ({ localEmpIds, kraLevelIds, kraSelections, kraLevelToKraId, categories: cats, kra_level_ids }) => {
     setAssigning(true);
     setPreviewOpen(false);
+    setGlobalLoading(true);
+    setGlobalLoadingMsg('Assigning KRAs…');
     try {
       const selEmps = localEmpIds.map(id => employeeIndexMap.get(id)).filter(Boolean); // O(1) lookup
       const payload = {
@@ -1038,9 +1090,10 @@ export default function BulkAssignmentPage() {
       } else {
         showToast(enrolled.length > 0 ? `${enrolled.length} assigned, ${failed.length} failed.` : 'Assignment failed.', enrolled.length > 0 ? 'warning' : 'error');
       }
+      await handleRefresh();
     } catch (e) { showToast(e?.response?.data?.message || 'Assignment failed.', 'error'); }
-    finally { setAssigning(false); }
-  }, [activeCycle, employeeIndexMap, showToast]);
+    finally { setAssigning(false); setGlobalLoading(false); setGlobalLoadingMsg(''); }
+  }, [activeCycle, employeeIndexMap, showToast, handleRefresh]);
 
   const handleDirectAssign = useCallback(async () => {
     const kraLevelIds = [];
@@ -1125,6 +1178,7 @@ export default function BulkAssignmentPage() {
         ));
       }
       showToast(`${kraKeys.length} KRA${kraKeys.length !== 1 ? 's' : ''} deleted.`, 'success');
+      handleRefresh(); 
     } catch (e) { showToast(e?.response?.data?.message || 'Delete failed.', 'error'); }
   };
 
@@ -1137,10 +1191,15 @@ export default function BulkAssignmentPage() {
       ));
       setAssignedKRAMap(prev => { const next = { ...prev }; delete next[emp.employee_kra_cycle_id]; return next; });
       showToast(`${emp.full_name} removed.`, 'success');
+      handleRefresh();  // ← add this
     } catch (e) { showToast(e?.response?.data?.message || 'Remove failed.', 'error'); }
   };
 
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalLoadingMsg, setGlobalLoadingMsg] = useState('');
   const handleBulkDelete = async () => {
+    setGlobalLoading(true);
+    setGlobalLoadingMsg('Unassigning KRAs from employees...');
     const toDelete = employees.filter(e => selectedEmpSet.has(e.employee_id) && e.assigned_to_cycle && e.employee_kra_cycle_id);
     if (!toDelete.length) { showToast('None of the selected employees have assignments to remove.', 'info'); return; }
     try {
@@ -1154,7 +1213,10 @@ export default function BulkAssignmentPage() {
       setAssignedKRAMap(prev => { const next = { ...prev }; removedEkIds.forEach(id => delete next[id]); return next; });
       setSelectedEmpSet(new Set());
       showToast(`${toDelete.length} employee${toDelete.length !== 1 ? 's' : ''} removed.`, 'success');
-    } catch { showToast('Bulk remove failed.', 'error'); }
+      handleRefresh(); 
+    } catch { showToast('Bulk remove failed.', 'error'); } 
+    finally { setGlobalLoading(false); setGlobalLoadingMsg(''); }
+    
   };
 
   const handleCloneEmployee = (emp) => { setCloneDefault(true);  setViewEmployee(emp); };
@@ -1217,7 +1279,7 @@ export default function BulkAssignmentPage() {
             {selectedAssigned.length > 0 && canEdit && (
               <Button size="small" startIcon={<DeleteOutlineIcon sx={{ fontSize: 13 }} />} onClick={handleBulkDelete}
                 sx={{ fontSize: 11, fontWeight: 700, color: '#ef4444', border: '1px solid #fecaca', borderRadius: 1.5, height: 32, px: 1.5, '&:hover': { bgcolor: '#fef2f2', border: '1px solid #f87171' } }}>
-                Remove {selectedAssigned.length} Selected
+                Unassign {selectedAssigned.length} Selected
               </Button>
             )}
             <Tooltip title="Refresh KRAs and employees">
@@ -1236,8 +1298,8 @@ export default function BulkAssignmentPage() {
         {refetching && <LinearProgress sx={{ borderRadius: 1, height: 2 }} />}
 
         {activeCycle ? (
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, flex: 1, minHeight: 0 }}>
-            <Paper elevation={0} sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', p: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: '#fff' }}>
+          <Box ref={containerRef} sx={{ display: 'flex', flex: 1, minHeight: 0, gap: 0 }}>
+            <Paper elevation={0} sx={{ width: `${leftPct}%`, flexShrink: 0, borderRadius: 2.5, border: '1px solid #e2e8f0', p: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: '#fff' }}>
               <KRAPanel
                 kras={kraLibrary}
                 categories={categories}
@@ -1247,7 +1309,20 @@ export default function BulkAssignmentPage() {
                 employeeDuplicateMap={employeeDuplicateMap}
               />
             </Paper>
-            <Paper elevation={0} sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', p: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: '#fff' }}>
+
+            {/* Drag handle */}
+            <Box onMouseDown={onMouseDown} sx={{
+              width: 12, flexShrink: 0, cursor: 'col-resize',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              '&:hover .hdl': { bgcolor: '#1E3A8A', height: 56 },
+            }}>
+              <Box className="hdl" sx={{
+                width: 3, height: 40, borderRadius: 2,
+                bgcolor: '#e2e8f0', transition: 'all 0.15s',
+              }} />
+            </Box>
+
+            <Paper elevation={0} sx={{ flex: 1, minWidth: 0, borderRadius: 2.5, border: '1px solid #e2e8f0', p: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: '#fff' }}>
               <EmployeePanel
                 employees={employees}
                 selectedEmpSet={selectedEmpSet}
@@ -1257,6 +1332,7 @@ export default function BulkAssignmentPage() {
               />
             </Paper>
           </Box>
+          
         ) : (
           <Paper elevation={0} sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', p: 6, textAlign: 'center', bgcolor: '#fff' }}>
             <Box sx={{ width: 64, height: 64, borderRadius: 2.5, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}><AssignmentIcon sx={{ fontSize: 32, color: '#cbd5e1' }} /></Box>
@@ -1309,6 +1385,28 @@ export default function BulkAssignmentPage() {
           />
         );
       })()}
+
+      {/* Global loading overlay */}
+      {globalLoading && (
+        <Box sx={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          bgcolor: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(2px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Paper elevation={0} sx={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 2, px: 4, py: 3.5, borderRadius: 3,
+            border: '1px solid #e2e8f0', bgcolor: '#fff',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }}>
+            <CircularProgress size={36} sx={{ color: '#1E3A8A' }} />
+            <Typography fontSize={13.5} fontWeight={600} color="#1e293b">
+              {globalLoadingMsg || 'Processing…'}
+            </Typography>
+          </Paper>
+        </Box>
+      )}
 
       <ToastStack toasts={toasts} />
     </Box>

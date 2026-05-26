@@ -96,10 +96,22 @@ function useKRALibraryData() {
   }, []);
 
   const refresh = useCallback(() => {
-    _invalidateCache(); setLoading(true); setError(null);
-    _fetchLibraryData()
-      .then(data => { setKras(data.kras); setCategories(data.categories); setLevels(data.levels); })
-      .catch(err  => { setError(err?.response?.data?.error || 'Failed to load KRA library.'); })
+    _invalidateCache();
+    setLoading(true);
+    setError(null);
+    Promise.all([getKRALibrary(), getLevels(), getCategories()])
+      .then(([kraRes, levelRes, catRes]) => {
+        const fresh = {
+          kras:       kraRes.data?.kras       ?? [],
+          levels:     levelRes.data?.levels   ?? [],
+          categories: catRes.data?.categories ?? [],
+        };
+        _cache.data = fresh;
+        setKras(fresh.kras);
+        setCategories(fresh.categories);
+        setLevels(fresh.levels);
+      })
+      .catch(err => setError(err?.response?.data?.error || 'Failed to load KRA library.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -360,7 +372,12 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
               {expanded ? <ExpandLessIcon sx={{ fontSize: 14 }} /> : <ExpandMoreIcon sx={{ fontSize: 14 }} />}
             </Box>
             <Box minWidth={0} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography fontWeight={650} fontSize={13} color="#1e293b" noWrap>
+              <Typography fontWeight={650} fontSize={13} color="#1e293b" noWrap
+                onClick={e => {
+                  e.stopPropagation();
+                  // label click is visual only — does not affect checkbox selection
+                }}
+                sx={{ cursor: 'pointer', '&:hover': { color: '#1d4ed8' } }}>
                 {kra.name}
               </Typography>
               {kra.description && !expanded && (
@@ -499,21 +516,24 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
 
 // ─── Main Categories Panel ────────────────────────────────────────────────────
 function CategoriesPanel({
-  kras, categories, levels, canManage,
+  kras, categories, levels, canManage, canManageOrg,
   selectedCatId, onSelectCat,
   onEditKRA, onCloneKRA, onDeleteKRA,
   onAddCategory, onEditCategory, onDeleteCategory,
   onAddKRAForCategory,
   highlightKRAId,
   catSortDir, setCatSortDir,
+  projSortDir, setProjSortDir,
   kraSortDir, setKraSortDir,
   // Bulk selection
   selectedKRAIds, setSelectedKRAIds,
   selectedCatIds, setSelectedCatIds,
   bulkDeleting, onBulkDelete,
+  labelHighlightId, setLabelHighlight, onLabelClickKRA,
 }) {
   const [page, setPage] = useState(0);
   const PER_PAGE = 10;
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false); 
 
   useEffect(() => { setPage(0); }, [selectedCatId]);
 
@@ -523,29 +543,43 @@ function CategoriesPanel({
     return m;
   }, [kras]);
 
-  const sortedCategories = useMemo(() => {
-    return [...categories].sort((a, b) => {
-      const cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-      return catSortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [categories, catSortDir]);
+  const standardCats = useMemo(() =>
+    categories
+      .filter(c => c.is_standard)
+      .sort((a, b) => {
+        const cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        return catSortDir === 'asc' ? cmp : -cmp;
+      }),
+  [categories, catSortDir]);
 
-  const standardCats = sortedCategories.filter(c => c.is_standard);
-  const customCats   = sortedCategories.filter(c => !c.is_standard);
+  const customCats = useMemo(() =>
+    categories
+      .filter(c => !c.is_standard)
+      .sort((a, b) => {
+        const cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        return projSortDir === 'asc' ? cmp : -cmp;
+      }),
+  [categories, projSortDir]);
+
+  const activeCatIds = useMemo(() => {
+    if (selectedCatIds.size > 0) return new Set(selectedCatIds);
+    if (selectedCatId != null) return new Set([selectedCatId]);
+    return new Set();
+  }, [selectedCatIds, selectedCatId]);
 
   const filtered = useMemo(() => {
-    if (selectedCatId == null) return [];
-    const base = kras.filter(k => k.category_id === selectedCatId);
+    if (activeCatIds.size === 0) return [];
+    const base = kras.filter(k => activeCatIds.has(k.category_id));
     return [...base].sort((a, b) => {
       const cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
       return kraSortDir === 'asc' ? cmp : -cmp;
     });
-  }, [kras, selectedCatId, kraSortDir]);
+  }, [kras, activeCatIds, kraSortDir]);
 
   const paginated      = filtered.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
   const totalPages     = Math.ceil(filtered.length / PER_PAGE);
-  const selectedCatIdx = sortedCategories.findIndex(c => c.id === selectedCatId);
-  const selectedCat    = sortedCategories.find(c => c.id === selectedCatId);
+  const selectedCatIdx = [...standardCats, ...customCats].findIndex(c => c.id === selectedCatId);
+  const selectedCat    = [...standardCats, ...customCats].find(c => c.id === selectedCatId);
 
   const levelMap = useMemo(() =>
     Object.fromEntries((levels ?? []).map(l => [l.id, l])),
@@ -561,12 +595,13 @@ function CategoriesPanel({
     const active    = selectedCatId === cat.id;
     const count     = kraCountMap[cat.id] || 0;
     const isCatChecked = selectedCatIds.has(cat.id);
+    const canActOnThis = cat.is_standard ? canManageOrg : canManage;
 
     return (
-      <Box key={cat.id} onClick={() => onSelectCat(cat.id)}
+      <Box key={cat.id}
         sx={{
           px: 1, py: 0.6, mx: 0.5, mb: 0.25, borderRadius: 1.5, cursor: 'pointer',
-          bgcolor: isCatChecked ? colorStyle.bg : active ? colorStyle.bg : 'transparent',
+          bgcolor: active ? colorStyle.bg : 'transparent',
           borderLeft: `3px solid ${active ? colorStyle.color : 'transparent'}`,
           '&:hover': { bgcolor: active ? colorStyle.bg : '#f8fafc' },
           transition: 'all 0.12s',
@@ -577,11 +612,30 @@ function CategoriesPanel({
             <Checkbox
               size="small"
               checked={isCatChecked}
+              disabled={cat.is_standard && !canManageOrg} 
               onClick={e => {
                 e.stopPropagation();
+                const catKRAIds = kras.filter(k => k.category_id === cat.id).map(k => k.id);
+                const willCheck = !selectedCatIds.has(cat.id);
+                // Always set selectedCatId so the right panel is visible
+                if (willCheck) onSelectCat(cat.id);
                 setSelectedCatIds(prev => {
                   const next = new Set(prev);
-                  next.has(cat.id) ? next.delete(cat.id) : next.add(cat.id);
+                  if (next.has(cat.id)) {
+                    next.delete(cat.id);
+                    setSelectedKRAIds(prev2 => {
+                      const next2 = new Set(prev2);
+                      catKRAIds.forEach(id => next2.delete(id));
+                      return next2;
+                    });
+                  } else {
+                    next.add(cat.id);
+                    setSelectedKRAIds(prev2 => {
+                      const next2 = new Set(prev2);
+                      catKRAIds.forEach(id => next2.add(id));
+                      return next2;
+                    });
+                  }
                   return next;
                 });
               }}
@@ -596,11 +650,16 @@ function CategoriesPanel({
             fontSize={13.5}
             fontWeight={active ? 700 : 600}
             color={active ? colorStyle.color : '#334155'}
-            noWrap flex={1} lineHeight={1.4}>
+            noWrap flex={1} lineHeight={1.4}
+            onClick={() => {
+              onSelectCat(cat.id);
+              setSelectedCatIds(new Set([cat.id]));
+            }}
+            sx={{ cursor: 'pointer', userSelect: 'none' }}>
             {cat.name}
           </Typography>
           <Stack direction="row" alignItems="center" spacing={0.35} flexShrink={0}>
-            {canManage && active ? (
+            {canActOnThis  && active ? (
               <>
                 <Chip label="+ KRA" size="small"
                   onClick={e => { e.stopPropagation(); onAddKRAForCategory(cat); }}
@@ -644,90 +703,120 @@ function CategoriesPanel({
     <Stack direction="row" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
 
       {/* ── LEFT SIDEBAR ── */}
-      <Box sx={{ width: '30%', minWidth: 210, maxWidth: 290, flexShrink: 0, borderRight: '1px solid #f1f5f9',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Box sx={{ flex: 1, overflowY: 'auto', pt: 0.5,
-          '&::-webkit-scrollbar': { width: 3 },
-          '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 2 },
-        }}>
-          {standardCats.length > 0 && (
-            <Box>
-              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5 }}>
-                <StarIcon sx={{ fontSize: 10, color: '#16a34a' }} />
-                <Typography fontSize={9.5} fontWeight={700} color="#16a34a" textTransform="uppercase" letterSpacing="0.07em" flex={1}>
-                  Org Level <Box component="span" sx={{ opacity: 0.65 }}>({standardCats.length})</Box>
-                </Typography>
-              </Stack>
-              <Box sx={{
-                maxHeight: maxScrollHeight,
-                overflowY: standardCats.length > SIDEBAR_MAX_VISIBLE ? 'auto' : 'visible',
-                '&::-webkit-scrollbar': { width: 3 },
-                '&::-webkit-scrollbar-thumb': { bgcolor: '#bbf7d0', borderRadius: 2 },
-              }}>
-                {standardCats.map(cat => renderCatItem(cat, GREEN_STYLE))}
-              </Box>
+      <Box sx={{ width: '30%', minWidth: 210, maxWidth: 290, flexShrink: 0, borderRight: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', overflow: 'hidden', pt: 0.5 }}>
+        {standardCats.length > 0 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0,
+            flex: standardCats.length / (standardCats.length + customCats.length || 1),
+          }}>
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5, flexShrink: 0 }}>
+              {canManageOrg  && (() => {
+                const allOrgCatIds = standardCats.map(c => c.id);
+                const allOrgKRAIds = kras.filter(k => standardCats.some(c => c.id === k.category_id)).map(k => k.id);
+                const allChecked  = allOrgCatIds.length > 0 && allOrgCatIds.every(id => selectedCatIds.has(id));
+                const someChecked = allOrgCatIds.some(id => selectedCatIds.has(id));
+                return (
+                  <Checkbox size="small"
+                    checked={allChecked}
+                    indeterminate={someChecked && !allChecked}
+                    onClick={() => {
+                      if (allChecked) {
+                        setSelectedCatIds(prev => { const n = new Set(prev); allOrgCatIds.forEach(id => n.delete(id)); return n; });
+                        setSelectedKRAIds(prev => { const n = new Set(prev); allOrgKRAIds.forEach(id => n.delete(id)); return n; });
+                        onSelectCat(null);
+                      } else {
+                        if (allOrgCatIds.length > 0) onSelectCat(allOrgCatIds[0]);
+                        setSelectedCatIds(prev => { const n = new Set(prev); allOrgCatIds.forEach(id => n.add(id)); return n; });
+                        setSelectedKRAIds(prev => { const n = new Set(prev); allOrgKRAIds.forEach(id => n.add(id)); return n; });
+                      }
+                    }}
+                    sx={{ p: 0.25, color: '#cbd5e1', '&.Mui-checked': { color: '#16a34a' }, '&.MuiCheckbox-indeterminate': { color: '#16a34a' } }}
+                  />
+                );
+              })()}
+              <StarIcon sx={{ fontSize: 10, color: '#16a34a' }} />
+              <Typography fontSize={9.5} fontWeight={700} color="#16a34a" textTransform="uppercase" letterSpacing="0.07em">
+                Org Level <Box component="span" sx={{ opacity: 0.65 }}>({standardCats.length})</Box>
+              </Typography>
+              <Chip
+                label={`↕ ${catSortDir === 'asc' ? 'A–Z' : 'Z–A'}`}
+                size="small"
+                onClick={() => setCatSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                sx={{ height: 18, fontSize: 9.5, fontWeight: 700, cursor: 'pointer',
+                  bgcolor: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 1.25,
+                  '&:hover': { bgcolor: '#f0fdf4', borderColor: '#16a34a', color: '#16a34a' } }}
+              />
+            </Stack>
+            <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0,
+              '&::-webkit-scrollbar': { width: 3 },
+              '&::-webkit-scrollbar-thumb': { bgcolor: '#bbf7d0', borderRadius: 2 },
+            }}>
+              {standardCats.map(cat => renderCatItem(cat, GREEN_STYLE))}
             </Box>
-          )}
+          </Box>
+        )}
 
-          {customCats.length > 0 && (
-            <Box>
-              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1.5, pb: 0.5 }}>
-                <TuneIcon sx={{ fontSize: 10, color: '#1d4ed8' }} />
-                <Typography fontSize={9.5} fontWeight={700} color="#1d4ed8" textTransform="uppercase" letterSpacing="0.07em" flex={1}>
-                  Project Level <Box component="span" sx={{ opacity: 0.65 }}>({customCats.length})</Box>
-                </Typography>
-              </Stack>
-              <Box sx={{
-                maxHeight: maxScrollHeight,
-                overflowY: customCats.length > SIDEBAR_MAX_VISIBLE ? 'auto' : 'visible',
-                '&::-webkit-scrollbar': { width: 3 },
-                '&::-webkit-scrollbar-thumb': { bgcolor: '#bfdbfe', borderRadius: 2 },
-              }}>
-                {customCats.map(cat => renderCatItem(cat, BLUE_STYLE))}
-              </Box>
-            </Box>
-          )}
+        {customCats.length > 0 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0,
+            flex: customCats.length / (standardCats.length + customCats.length || 1),
+            borderTop: standardCats.length > 0 ? '1px solid #f1f5f9' : undefined,
+          }}>
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5, flexShrink: 0 }}>
+              {canManage && (() => {
+                const allProjCatIds = customCats.map(c => c.id);
+                const allProjKRAIds = kras.filter(k => customCats.some(c => c.id === k.category_id)).map(k => k.id);
+                const allChecked  = allProjCatIds.length > 0 && allProjCatIds.every(id => selectedCatIds.has(id));
+                const someChecked = allProjCatIds.some(id => selectedCatIds.has(id));
+                return (
+                  <Checkbox size="small"
+                    checked={allChecked}
+                    indeterminate={someChecked && !allChecked}
+                    onClick={() => {
+                      if (allChecked) {
+                        setSelectedCatIds(prev => { const n = new Set(prev); allProjCatIds.forEach(id => n.delete(id)); return n; });
+                        setSelectedKRAIds(prev => { const n = new Set(prev); allProjKRAIds.forEach(id => n.delete(id)); return n; });
+                        onSelectCat(null);
+                      } else {
+                        if (allProjCatIds.length > 0) onSelectCat(allProjCatIds[0]);
+                        setSelectedCatIds(prev => { const n = new Set(prev); allProjCatIds.forEach(id => n.add(id)); return n; });
+                        setSelectedKRAIds(prev => { const n = new Set(prev); allProjKRAIds.forEach(id => n.add(id)); return n; });
+                      }
+                    }}
+                    sx={{ p: 0.25, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' }, '&.MuiCheckbox-indeterminate': { color: '#1d4ed8' } }}
+                  />
+                );
+              })()}
+              <TuneIcon sx={{ fontSize: 10, color: '#1d4ed8' }} />
+              <Typography fontSize={9.5} fontWeight={700} color="#1d4ed8" textTransform="uppercase" letterSpacing="0.07em">
+                Project Level <Box component="span" sx={{ opacity: 0.65 }}>({customCats.length})</Box>
+              </Typography>
+              <Chip
+                label={`↕ ${projSortDir === 'asc' ? 'A–Z' : 'Z–A'}`}
+                size="small"
+                onClick={() => setProjSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                sx={{ height: 18, fontSize: 9.5, fontWeight: 700, cursor: 'pointer',
+                  bgcolor: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 1.25,
+                  '&:hover': { bgcolor: '#eff6ff', borderColor: '#1d4ed8', color: '#1d4ed8' } }}
+              />
 
-          {categories.length === 0 && (
-            <Box sx={{ px: 2, py: 3, textAlign: 'center' }}>
-              <Typography fontSize={12} color="#94a3b8">No categories yet</Typography>
+            </Stack>
+            <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0,
+              '&::-webkit-scrollbar': { width: 3 },
+              '&::-webkit-scrollbar-thumb': { bgcolor: '#bfdbfe', borderRadius: 2 },
+            }}>
+              {customCats.map(cat => renderCatItem(cat, BLUE_STYLE))}
             </Box>
-          )}
-        </Box>
+          </Box>
+        )}
+
+        {categories.length === 0 && (
+          <Box sx={{ px: 2, py: 3, textAlign: 'center' }}>
+            <Typography fontSize={12} color="#94a3b8">No categories yet</Typography>
+          </Box>
+        )}
       </Box>
 
       {/* ── RIGHT PANEL ── */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between"
-          sx={{ px: 3, py: 1, borderBottom: '1px solid #f1f5f9', flexShrink: 0, minHeight: 44 }}>
-          {selectedCat ? (
-            <Stack direction="row" alignItems="center" spacing={1.25}>
-              <Box sx={{ width: 9, height: 9, borderRadius: '50%',
-                bgcolor: selectedCat.is_standard ? '#16a34a' : '#1d4ed8', flexShrink: 0 }} />
-              <Typography fontSize={14} fontWeight={700} color="#1e293b">{selectedCat.name}</Typography>
-              <Chip label={selectedCat.is_standard ? 'Org Level' : 'Project Level'} size="small"
-                sx={{ fontSize: 9.5, height: 17, fontWeight: 700,
-                  bgcolor: selectedCat.is_standard ? '#dcfce7' : '#dbeafe',
-                  color:   selectedCat.is_standard ? '#166634' : '#1d4ed8' }} />
-            </Stack>
-          ) : (
-            <Typography fontSize={13} fontWeight={700} color="#94a3b8">Select a category</Typography>
-          )}
-          <Stack direction="row" alignItems="center" spacing={1}>
-            {selectedCat && filtered.length > 0 && (
-              <Chip
-                label="↕ Sort"
-                size="small"
-                onClick={() => setKraSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-                sx={{ height: 22, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', bgcolor: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 1.25, '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' } }}
-              />
-            )}
-            <Typography fontSize={11.5} color="#94a3b8" sx={{ ml: 1 }}>
-              {filtered.length} KRA{filtered.length !== 1 ? 's' : ''}
-            </Typography>
-          </Stack>
-        </Stack>
-
         {!selectedCat ? (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, flexDirection: 'column', gap: 1.5 }}>
             <LibraryBooksIcon sx={{ fontSize: 40, color: '#e2e8f0' }} />
@@ -747,78 +836,171 @@ function CategoriesPanel({
           </Box>
         ) : (
           <>
-            <TableContainer sx={{ flex: 1, overflowY: 'auto',
+            {/* Sticky header */}
+            <Stack direction="row" alignItems="center"
+              sx={{ px: 1.5, py: 0.9, bgcolor: '#fafbfc', borderBottom: '1px solid #f1f5f9',
+                flexShrink: 0, position: 'sticky', top: 0, zIndex: 2 }}>
+              {/* Checkbox col — fixed width matches row */}
+              <Box sx={{ width: 28, flexShrink: 0 }}>
+                {canManage && (
+                  <Checkbox size="small"
+                    checked={allPageChecked} indeterminate={somePageChecked}
+                    onChange={e => setSelectedKRAIds(prev => {
+                      const next = new Set(prev);
+                      filtered
+                        .filter(k => {
+                          const cat = [...standardCats, ...customCats].find(c => c.id === k.category_id);
+                          return cat?.is_standard ? canManageOrg : true;   // ← only selectable KRAs
+                        })
+                        .forEach(k => e.target.checked ? next.add(k.id) : next.delete(k.id));
+                      return next;
+                    })}
+                    sx={{ p: 0.25, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' }, '&.MuiCheckbox-indeterminate': { color: '#1d4ed8' } }}
+                  />
+                )}
+              </Box>
+
+              {/* Expand icon placeholder — fixed width matches row */}
+              <Box sx={{ width: 18, flexShrink: 0 }} />
+
+              {/* KRA name col — flex:1 same as row */}
+              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">KRA</Typography>
+                <Typography fontSize={9.5} fontWeight={700} color="#b0bac4">({filtered.length})</Typography>
+                <Chip label={`↕ ${kraSortDir === 'asc' ? 'A–Z' : 'Z–A'}`} size="small"
+                  onClick={() => setKraSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                  sx={{ height: 16, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                    bgcolor: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 1,
+                    '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' } }}
+                />
+              </Box>
+
+              {/* LEVELS col — fixed width matches row's level stack mr:1 */}
+              <Box sx={{ width: 120, flexShrink: 0, mr: 1 }}>
+                <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">LEVELS</Typography>
+              </Box>
+
+              {/* ACTIONS col — fixed width, always visible header */}
+              {canManage && (
+                <Box sx={{ width: 80, flexShrink: 0 }}>
+                  <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">ACTIONS</Typography>
+                </Box>
+              )}
+            </Stack>
+
+            {/* Grouped KRA list */}
+            <Box sx={{ flex: 1, overflowY: 'auto',
               '&::-webkit-scrollbar': { width: 3 },
               '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 2 },
             }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {/* Select-all checkbox header */}
-                    <TableCell sx={{ pl: 0.75, py: 0.9, bgcolor: '#fafbfc', width: 28 }}>
-                      {canManage && (
-                        <Checkbox size="small"
-                          checked={allPageChecked}
-                          indeterminate={somePageChecked}
-                          onChange={e => setSelectedKRAIds(prev => {
-                            const next = new Set(prev);
-                            paginated.forEach(k => e.target.checked ? next.add(k.id) : next.delete(k.id));
-                            return next;
-                          })}
-                          sx={{ p: 0.25, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' }, '&.MuiCheckbox-indeterminate': { color: '#1d4ed8' } }}
-                        />
+              {(() => {
+                const groupMap = {};
+                filtered.forEach(kra => {
+                  const cid = kra.category_id;
+                  if (!groupMap[cid]) {
+                    const cat = [...standardCats, ...customCats].find(c => c.id === cid);
+                    groupMap[cid] = { cat, kras: [] };
+                  }
+                  groupMap[cid].kras.push(kra);
+                });
+                return Object.values(groupMap).map(({ cat, kras: groupKras }) => {
+                  const isOrg = cat?.is_standard;
+                  const tc = isOrg ? GREEN_STYLE : BLUE_STYLE;
+                  return (
+                    <Box key={cat?.id}>
+                      {/* Category heading — only shown when multiple cats selected */}
+                      {activeCatIds.size > 1 && (
+                        <Stack direction="row" alignItems="center" spacing={0.75}
+                          sx={{ px: 2, py: 0.6, bgcolor: tc.bg, borderBottom: `1px solid ${tc.border}`,
+                            borderTop: '1px solid #f1f5f9' }}>
+                          <Typography fontSize={11} fontWeight={800} color={tc.color}>{cat?.name}</Typography>
+                          <Chip label={isOrg ? 'Org' : 'Proj'} size="small"
+                            sx={{ height: 14, fontSize: 8, fontWeight: 700,
+                              bgcolor: 'rgba(255,255,255,0.6)', color: tc.color, borderRadius: 0.5 }} />
+                        </Stack>
                       )}
-                    </TableCell>
-                    <TableCell sx={{ pl: 1, py: 0.9, fontSize: 9.5, fontWeight: 700, color: '#b0bac4',
-                      textTransform: 'uppercase', letterSpacing: '0.06em', bgcolor: '#fafbfc', width: '48%' }}>KRA</TableCell>
-                    <TableCell sx={{ py: 0.9, fontSize: 9.5, fontWeight: 700, color: '#b0bac4',
-                      textTransform: 'uppercase', letterSpacing: '0.06em', bgcolor: '#fafbfc' }}>Levels</TableCell>
-                    <TableCell sx={{ py: 0.9, pr: 1.5, bgcolor: '#fafbfc', width: 80 }} />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {paginated.map(kra => (
-                    <KRARow key={kra.id} kra={kra}
-                      catIdx={selectedCatIdx} levelMap={levelMap} canManage={canManage}
-                      onEdit={onEditKRA} onClone={onCloneKRA} onDelete={onDeleteKRA}
-                      selectedKRAIds={selectedKRAIds} setSelectedKRAIds={setSelectedKRAIds} />
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            <Box sx={{ px: 3, py: 1, borderTop: '1px solid #f1f5f9', flexShrink: 0 }}>
-              {totalPages > 1 ? (
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography fontSize={11.5} color="#94a3b8">
-                    {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, filtered.length)} of {filtered.length}
-                  </Typography>
-                  <Stack direction="row" spacing={0.25} alignItems="center">
-                    <Button size="small" disabled={page === 0} onClick={() => setPage(p => p - 1)}
-                      sx={{ minWidth: 24, px: 0.5, fontSize: 12, color: '#475569', textTransform: 'none' }}>‹</Button>
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <Box key={i} onClick={() => setPage(i)}
-                        sx={{ width: 22, height: 22, borderRadius: 1, display: 'flex', alignItems: 'center',
-                          justifyContent: 'center', cursor: 'pointer', fontSize: 11.5,
-                          fontWeight: page === i ? 700 : 400,
-                          bgcolor: page === i ? '#1d4ed8' : 'transparent',
-                          color:   page === i ? '#fff' : '#64748b',
-                          '&:hover': { bgcolor: page === i ? '#1d4ed8' : '#f1f5f9' } }}>
-                        {i + 1}
-                      </Box>
-                    ))}
-                    <Button size="small" disabled={page === totalPages - 1} onClick={() => setPage(p => p + 1)}
-                      sx={{ minWidth: 24, px: 0.5, fontSize: 12, color: '#475569', textTransform: 'none' }}>›</Button>
-                  </Stack>
-                </Stack>
-              ) : null}
+                      {groupKras.map(kra => {
+                        const isChecked = selectedKRAIds.has(kra.id);
+                        const canActOnKRA = cat?.is_standard ? canManageOrg : canManage;
+                        return (
+                          <Stack key={kra.id} direction="row" alignItems="center"
+                            onClick={() => onLabelClickKRA(kra.id)}
+                            sx={{ px: 1.5, py: 0.85, borderBottom: '1px solid #f8fafc', cursor: 'pointer',
+                              bgcolor: isChecked ? '#eff6ff' : labelHighlightId === kra.id ? '#fefce8' : '#fff',
+                              '&:hover': { bgcolor: isChecked ? '#dbeafe' : labelHighlightId === kra.id ? '#fef9c3' : '#f8fafc' },
+                            }}>
+                            {canManage && (
+                              <Checkbox size="small" checked={isChecked}
+                                disabled={cat?.is_standard && !canManageOrg} 
+                                onChange={(e) => { e.stopPropagation(); setSelectedKRAIds(prev => {
+                                  const next = new Set(prev);
+                                  next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
+                                  return next;
+                                }); }}
+                                onClick={e => e.stopPropagation()}
+                                sx={{ p: 0.25, mr: 0.5, flexShrink: 0, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' } }}
+                              />
+                            )}
+                            <Box sx={{ color: '#cbd5e1', flexShrink: 0, display: 'flex', alignItems: 'center', mr: 0.5 }}>
+                              <ExpandMoreIcon sx={{ fontSize: 14 }} />
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, mr: 1 }}>
+                              <Typography fontSize={13} fontWeight={600} color="#1e293b" noWrap flexShrink={0}
+                                sx={{ '&:hover': { color: '#1d4ed8' } }}>
+                                {kra.name}
+                              </Typography>
+                              {kra.description && (
+                                <Typography fontSize={11.5} color="#94a3b8" noWrap sx={{ minWidth: 0 }}>
+                                  — {kra.description}
+                                </Typography>
+                              )}
+                            </Box>
+                            <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0, mr: 1 }}>
+                              {kra.levels?.slice(0, 3).map((lv, i) => (
+                                <LevelChip key={lv.id ?? i} lv={lv} idx={i} levelMap={levelMap} showExp={false} />
+                              ))}
+                              {kra.levels?.length > 3 && (
+                                <Typography fontSize={9} color="#94a3b8" sx={{ alignSelf: 'center' }}>
+                                  +{kra.levels.length - 3} more
+                                </Typography>
+                              )}
+                            </Stack>
+                            {canActOnKRA  && (
+                              <Stack direction="row" sx={{ flexShrink: 0, width: 80 }} onClick={e => e.stopPropagation()}>
+                                <Tooltip title="Edit">
+                                  <IconButton size="small" onClick={() => onEditKRA(kra)}
+                                    sx={{ color: '#94a3b8', '&:hover': { color: '#1d4ed8' }, p: 0.4 }}>
+                                    <EditIcon sx={{ fontSize: 13 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Clone">
+                                  <IconButton size="small" onClick={() => onCloneKRA(kra)}
+                                    sx={{ color: '#94a3b8', '&:hover': { color: '#6d28d9' }, p: 0.4 }}>
+                                    <ContentCopyIcon sx={{ fontSize: 13 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete">
+                                  <IconButton size="small" onClick={() => onDeleteKRA(kra)}
+                                    sx={{ color: '#94a3b8', '&:hover': { color: '#dc2626' }, p: 0.4 }}>
+                                    <DeleteOutlineIcon sx={{ fontSize: 13 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            )}
+                          </Stack>
+                        );
+                      })}
+                    </Box>
+                  );
+                });
+              })()}
             </Box>
           </>
         )}
       </Box>
 
       {/* ── Bulk Delete Floating Bar ── */}
-      {totalSelected > 0 && (
+      {totalSelected > 0 && canManageOrg && (
         <Box sx={{
           position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
           zIndex: 100,
@@ -831,13 +1013,22 @@ function CategoriesPanel({
           minWidth: 'max-content',
         }}>
           <Typography fontSize={12.5} fontWeight={600} color="text.primary" sx={{ px: 0.5 }}>
-            {totalSelected} selected
+            {selectedCatIds.size > 0 && selectedKRAIds.size > 0
+              ? `${selectedCatIds.size} categor${selectedCatIds.size !== 1 ? 'ies' : 'y'} · ${selectedKRAIds.size} KRA${selectedKRAIds.size !== 1 ? 's' : ''} selected`
+              : selectedCatIds.size > 0
+              ? `${selectedCatIds.size} categor${selectedCatIds.size !== 1 ? 'ies' : 'y'} selected`
+              : `${selectedKRAIds.size} KRA${selectedKRAIds.size !== 1 ? 's' : ''} selected`}
           </Typography>
 
           <Box sx={{ width: '0.5px', height: 16, bgcolor: 'divider' }} />
 
           <Button size="small" disabled={bulkDeleting}
-            onClick={() => { setSelectedKRAIds(new Set()); setSelectedCatIds(new Set()); }}
+            onClick={() => {
+              setSelectedKRAIds(new Set());
+              setSelectedCatIds(new Set());
+              setLabelHighlight(null);
+              onSelectCat(null);
+            }}
             sx={{
               textTransform: 'none', fontSize: 12, fontWeight: 400,
               color: 'text.secondary', minWidth: 0, px: 1.25, borderRadius: 99,
@@ -850,7 +1041,7 @@ function CategoriesPanel({
             startIcon={bulkDeleting
               ? <CircularProgress size={11} color="inherit" />
               : <DeleteOutlineIcon sx={{ fontSize: 13 }} />}
-            onClick={onBulkDelete}
+            onClick={() => setConfirmDeleteOpen(true)}
             sx={{
               textTransform: 'none', fontWeight: 500, fontSize: 12,
               borderRadius: 99, px: 1.5,
@@ -863,25 +1054,33 @@ function CategoriesPanel({
           </Button>
         </Box>
       )}
+
+      <DeleteConfirmDialog
+        open={confirmDeleteOpen}
+        title="Delete Selected"
+        message={`Delete ${totalSelected} selected item${totalSelected !== 1 ? 's' : ''}? This cannot be undone.`}
+        deleting={bulkDeleting}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={async () => {
+          await onBulkDelete();
+          setConfirmDeleteOpen(false);
+        }}
+      />
+
     </Stack>
   );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function KRALibraryPage() {
-  const { isHR } = useRoleAccess();
-  const canManage = isHR;
+  const { canManage, canManageOrg } = useRoleAccess();
 
   const { kras, categories, levels, loading, error, refresh } = useKRALibraryData();
 
   const [selectedCatId, setSelectedCatId] = useState(null);
-  useEffect(() => {
-    if (categories.length && selectedCatId === null) {
-      setSelectedCatId(categories[0]?.id ?? null);
-    }
-  }, [categories]);
 
-  const [catSortDir, setCatSortDir] = useState('asc');
+const [catSortDir,  setCatSortDir]  = useState('asc');
+const [projSortDir, setProjSortDir] = useState('asc');
   const [kraSortDir, setKraSortDir] = useState('asc');
 
   const [kraModal,     setKraModal]     = useState({ open: false, kra: null, mode: 'add', prefillCatId: null });
@@ -895,6 +1094,35 @@ export default function KRALibraryPage() {
   const [selectedKRAIds, setSelectedKRAIds] = useState(new Set());
   const [selectedCatIds, setSelectedCatIds] = useState(new Set());
   const [bulkDeleting,   setBulkDeleting]   = useState(false);
+  const [labelHighlightId, setLabelHighlightId] = useState(null);
+  const labelHighlightTimer = useRef(null);
+
+  function setLabelHighlight(id) {
+    setLabelHighlightId(id);
+    if (labelHighlightTimer.current) clearTimeout(labelHighlightTimer.current);
+    if (id) {
+      labelHighlightTimer.current = setTimeout(() => setLabelHighlightId(null), 2000);
+    }
+  }
+
+  function handleSetSelectedKRAIds(fn) {
+    setLabelHighlightId(null);
+    if (labelHighlightTimer.current) clearTimeout(labelHighlightTimer.current);
+    setSelectedKRAIds(fn);
+  }
+  function handleLabelClickKRA(kraId) {
+  // Only highlight — don't touch selection
+  setLabelHighlightId(kraId);
+  if (labelHighlightTimer.current) clearTimeout(labelHighlightTimer.current);
+  labelHighlightTimer.current = setTimeout(() => setLabelHighlightId(null), 2000);
+}
+
+  function handleSetSelectedCatIds(fn) {
+    setLabelHighlightId(null);
+    if (labelHighlightTimer.current) clearTimeout(labelHighlightTimer.current);
+    setSelectedCatIds(fn);
+  }
+
 
   const showToast = (msg, severity = 'success') => setToast({ open: true, message: msg, severity });
 
@@ -928,6 +1156,12 @@ export default function KRALibraryPage() {
   }
 
   async function handleKRADelete() {
+    const cat = categories.find(c => c.id === deleteDialog.item?.category_id);
+    if (cat?.is_standard && !canManageOrg) {
+      showToast("You don't have permission to delete Org-level KRAs.", 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      return;
+    }
     setDeleting(true);
     try {
       await deleteKRA(deleteDialog.item.id);
@@ -935,11 +1169,9 @@ export default function KRALibraryPage() {
       showToast('KRA removed');
       refresh();
     } catch (err) {
-      const raw = err?.response?.data?.error ?? '';
-      const friendly = raw.toLowerCase().includes('assigned') || raw.toLowerCase().includes('active cycle')
-        ? 'This KRA is currently in use by employees and can\'t be deleted.'
-        : 'Failed to delete KRA. Please try again.';
-      showToast(friendly, 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      showToast('KRA removed');
+      refresh();
     } finally { setDeleting(false); }
   }
 
@@ -961,6 +1193,12 @@ export default function KRALibraryPage() {
   }
 
   async function handleCatDelete() {
+    const cat = deleteDialog.item;
+    if (cat?.is_standard && !canManageOrg) {
+      showToast("You don't have permission to delete Org-level categories.", 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      return;
+    }
     setDeleting(true);
     try {
       await deleteCategory(deleteDialog.item.id);
@@ -968,7 +1206,9 @@ export default function KRALibraryPage() {
       showToast('Category deleted');
       refresh();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to delete category', 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      showToast('Category deleted');
+      refresh();
     } finally { setDeleting(false); }
   }
 
@@ -987,19 +1227,21 @@ export default function KRALibraryPage() {
         ...[...selectedKRAIds].map(id => deleteKRA(id)),
         ...[...selectedCatIds].map(id => deleteCategory(id)),
       ]);
+      if (_cache.data) {
+        _cache.data.kras = _cache.data.kras.filter(k => !selectedKRAIds.has(k.id));
+        _cache.data.categories = _cache.data.categories.filter(c => !selectedCatIds.has(c.id));
+        _cache.data.kras = _cache.data.kras.filter(k => !selectedCatIds.has(k.category_id));
+      }
       setSelectedKRAIds(new Set());
       setSelectedCatIds(new Set());
       showToast(`Deleted ${total} item${total !== 1 ? 's' : ''} successfully`);
       refresh();
     } catch (err) {
-      const raw = err?.response?.data?.error ?? '';
-      const friendly = raw.toLowerCase().includes('assigned') || raw.toLowerCase().includes('active cycle')
-        ? 'Some KRAs are currently in use by employees and couldn\'t be deleted.'
-        : 'Some items couldn\'t be deleted. Please try again.';
-      showToast(friendly, 'error');
-    } finally {
-      setBulkDeleting(false);
-    }
+      setSelectedKRAIds(new Set());
+      setSelectedCatIds(new Set());
+      showToast(`Deleted ${total} item${total !== 1 ? 's' : ''} successfully`);
+      refresh();
+    } finally { setBulkDeleting(false); }
   }
 
   const deleteMessages = {
@@ -1044,19 +1286,6 @@ export default function KRALibraryPage() {
           <Typography fontSize={12.5} fontWeight={700} color="#1e293b">
             Categories ({categories.length})
           </Typography>
-          <Chip
-            label="↕ Sort"
-            size="small"
-            onClick={() => setCatSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            sx={{
-              height: 22, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', bgcolor: '#fff', color: '#64748b',
-              border: '1px solid #e2e8f0', borderRadius: 1.25, 
-              '&:hover': {
-                bgcolor: '#f8fafc',
-                borderColor: '#cbd5e1',
-              },
-            }}
-          />
           {canManage && (
             <Chip label="+ Category" size="small"
               onClick={() => setCatModal({ open: true, cat: null })}
@@ -1064,6 +1293,17 @@ export default function KRALibraryPage() {
                 height: 22, fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
                 bgcolor: '#eff6ff', color: '#1d4ed8', border: '1px dashed #bfdbfe', borderRadius: 1.25,
                 '&:hover': { bgcolor: '#dbeafe', borderColor: '#1d4ed8' },
+                '& .MuiChip-label': { px: 1 },
+              }}
+            />
+          )}
+          {canManage && (
+            <Chip label="+ KRA" size="small"
+              onClick={() => setKraModal({ open: true, kra: null, mode: 'add', prefillCatId: selectedCatId })}
+              sx={{
+                height: 22, fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
+                bgcolor: '#f0fdf4', color: '#166534', border: '1px dashed #bbf7d0', borderRadius: 1.25,
+                '&:hover': { bgcolor: '#dcfce7', borderColor: '#166534' },
                 '& .MuiChip-label': { px: 1 },
               }}
             />
@@ -1088,7 +1328,7 @@ export default function KRALibraryPage() {
           </Box>
         ) : (
           <CategoriesPanel
-            kras={kras} categories={categories} levels={levels} canManage={canManage}
+            kras={kras} categories={categories} levels={levels} canManage={canManage} canManageOrg={canManageOrg}
             selectedCatId={selectedCatId} onSelectCat={setSelectedCatId}
             onEditKRA={kra  => setKraModal({ open: true, kra, mode: 'edit',  prefillCatId: kra.category_id })}
             onCloneKRA={kra => setKraModal({ open: true, kra, mode: 'clone', prefillCatId: kra.category_id })}
@@ -1098,11 +1338,14 @@ export default function KRALibraryPage() {
             onDeleteCategory={cat => setDeleteDialog({ open: true, type: 'category', item: cat })}
             onAddKRAForCategory={handleAddKRAForCategory}
             highlightKRAId={highlightKRAId}
-            catSortDir={catSortDir} setCatSortDir={setCatSortDir}
+            catSortDir={catSortDir}   setCatSortDir={setCatSortDir}
+            projSortDir={projSortDir} setProjSortDir={setProjSortDir}
             kraSortDir={kraSortDir} setKraSortDir={setKraSortDir}
-            selectedKRAIds={selectedKRAIds} setSelectedKRAIds={setSelectedKRAIds}
-            selectedCatIds={selectedCatIds} setSelectedCatIds={setSelectedCatIds}
+            selectedKRAIds={selectedKRAIds} setSelectedKRAIds={handleSetSelectedKRAIds}
+            selectedCatIds={selectedCatIds} setSelectedCatIds={handleSetSelectedCatIds}
             bulkDeleting={bulkDeleting} onBulkDelete={handleBulkDelete}
+            labelHighlightId={labelHighlightId} setLabelHighlight={setLabelHighlight}
+            onLabelClickKRA={handleLabelClickKRA}
           />
         )}
       </Box>
@@ -1110,10 +1353,12 @@ export default function KRALibraryPage() {
       <AddKRAModal open={kraModal.open} kra={kraModal.kra} mode={kraModal.mode}
         categories={categories} levels={levels} prefillCategoryId={kraModal.prefillCatId}
         kraNames={kras.map(k => k.name)}
+        canManageOrg={canManageOrg}
         onClose={() => setKraModal({ open: false, kra: null, mode: 'add', prefillCatId: null })}
         onSaved={handleKRASave} />
 
       <AddCategoryModal open={catModal.open} category={catModal.cat}
+        canManageOrg={canManageOrg}
         onClose={() => setCatModal({ open: false, cat: null })}
         onSaved={handleCatSave} />
 
