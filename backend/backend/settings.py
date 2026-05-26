@@ -29,13 +29,12 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'local-dev-key-only')
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
-
+RENDER_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME', '')  # Render sets this automatically
 # ALLOWED_HOSTS = ["*"]
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    '.elasticbeanstalk.com',
-    os.getenv('EB_HOST', ''),
+    RENDER_HOSTNAME, 
     FRONTEND_URL,
 ]
 
