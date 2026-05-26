@@ -651,10 +651,19 @@ function CategoriesPanel({
             fontWeight={active ? 700 : 600}
             color={active ? colorStyle.color : '#334155'}
             noWrap flex={1} lineHeight={1.4}
-            onClick={() => {
-              onSelectCat(cat.id);
-              setSelectedCatIds(new Set([cat.id]));
-            }}
+            // REPLACE with:
+onClick={() => {
+  onSelectCat(cat.id);
+  // If already selected, clicking again deselects all
+  if (selectedCatIds.has(cat.id) && selectedCatIds.size === 1) {
+    setSelectedCatIds(new Set());
+    setSelectedKRAIds(() => new Set());
+  } else {
+    setSelectedCatIds(new Set([cat.id]));
+    const catKRAIds = kras.filter(k => k.category_id === cat.id).map(k => k.id);
+    setSelectedKRAIds(() => new Set(catKRAIds));
+  }
+}}
             sx={{ cursor: 'pointer', userSelect: 'none' }}>
             {cat.name}
           </Typography>
@@ -840,7 +849,8 @@ function CategoriesPanel({
             <Stack direction="row" alignItems="center"
               sx={{ px: 1.5, py: 0.9, bgcolor: '#fafbfc', borderBottom: '1px solid #f1f5f9',
                 flexShrink: 0, position: 'sticky', top: 0, zIndex: 2 }}>
-              {/* Checkbox col — fixed width matches row */}
+
+              {/* Checkbox col */}
               <Box sx={{ width: 28, flexShrink: 0 }}>
                 {canManage && (
                   <Checkbox size="small"
@@ -850,7 +860,7 @@ function CategoriesPanel({
                       filtered
                         .filter(k => {
                           const cat = [...standardCats, ...customCats].find(c => c.id === k.category_id);
-                          return cat?.is_standard ? canManageOrg : true;   // ← only selectable KRAs
+                          return cat?.is_standard ? canManageOrg : true;
                         })
                         .forEach(k => e.target.checked ? next.add(k.id) : next.delete(k.id));
                       return next;
@@ -860,11 +870,11 @@ function CategoriesPanel({
                 )}
               </Box>
 
-              {/* Expand icon placeholder — fixed width matches row */}
+              {/* Expand icon placeholder — matches the ExpandMoreIcon box in each row */}
               <Box sx={{ width: 18, flexShrink: 0 }} />
 
-              {/* KRA name col — flex:1 same as row */}
-              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              {/* KRA name col */}
+              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, mr: 1 }}>
                 <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">KRA</Typography>
                 <Typography fontSize={9.5} fontWeight={700} color="#b0bac4">({filtered.length})</Typography>
                 <Chip label={`↕ ${kraSortDir === 'asc' ? 'A–Z' : 'Z–A'}`} size="small"
@@ -875,12 +885,12 @@ function CategoriesPanel({
                 />
               </Box>
 
-              {/* LEVELS col — fixed width matches row's level stack mr:1 */}
+              {/* LEVELS col — must match row's Stack width + mr:1 */}
               <Box sx={{ width: 120, flexShrink: 0, mr: 1 }}>
                 <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">LEVELS</Typography>
               </Box>
 
-              {/* ACTIONS col — fixed width, always visible header */}
+              {/* ACTIONS col — must match row's Stack width:80 */}
               {canManage && (
                 <Box sx={{ width: 80, flexShrink: 0 }}>
                   <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">ACTIONS</Typography>
@@ -924,20 +934,31 @@ function CategoriesPanel({
                         const canActOnKRA = cat?.is_standard ? canManageOrg : canManage;
                         return (
                           <Stack key={kra.id} direction="row" alignItems="center"
-                            onClick={() => onLabelClickKRA(kra.id)}
+                            onClick={() => {
+                              setSelectedKRAIds(prev => {
+                                const next = new Set(prev);
+                                next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
+                                return next;
+                              });
+                            }}
                             sx={{ px: 1.5, py: 0.85, borderBottom: '1px solid #f8fafc', cursor: 'pointer',
                               bgcolor: isChecked ? '#eff6ff' : labelHighlightId === kra.id ? '#fefce8' : '#fff',
                               '&:hover': { bgcolor: isChecked ? '#dbeafe' : labelHighlightId === kra.id ? '#fef9c3' : '#f8fafc' },
                             }}>
                             {canManage && (
-                              <Checkbox size="small" checked={isChecked}
-                                disabled={cat?.is_standard && !canManageOrg} 
-                                onChange={(e) => { e.stopPropagation(); setSelectedKRAIds(prev => {
-                                  const next = new Set(prev);
-                                  next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
-                                  return next;
-                                }); }}
-                                onClick={e => e.stopPropagation()}
+                              <Checkbox size="small"
+                                checked={selectedKRAIds.has(kra.id)}
+                                indeterminate={false}
+                                disabled={cat?.is_standard && !canManageOrg}
+                                onChange={(e) => { e.stopPropagation(); }}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setSelectedKRAIds(prev => {
+                                    const next = new Set(prev);
+                                    next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
+                                    return next;
+                                  });
+                                }}
                                 sx={{ p: 0.25, mr: 0.5, flexShrink: 0, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' } }}
                               />
                             )}
@@ -955,7 +976,7 @@ function CategoriesPanel({
                                 </Typography>
                               )}
                             </Box>
-                            <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0, mr: 1 }}>
+                            <Stack direction="row" spacing={0.5} sx={{ width: 160, flexShrink: 0, mr: 1 }}>
                               {kra.levels?.slice(0, 3).map((lv, i) => (
                                 <LevelChip key={lv.id ?? i} lv={lv} idx={i} levelMap={levelMap} showExp={false} />
                               ))}
@@ -1111,11 +1132,16 @@ const [projSortDir, setProjSortDir] = useState('asc');
     setSelectedKRAIds(fn);
   }
   function handleLabelClickKRA(kraId) {
-  // Only highlight — don't touch selection
-  setLabelHighlightId(kraId);
-  if (labelHighlightTimer.current) clearTimeout(labelHighlightTimer.current);
-  labelHighlightTimer.current = setTimeout(() => setLabelHighlightId(null), 2000);
-}
+    // Toggle selection + highlight
+    setSelectedKRAIds(prev => {
+      const next = new Set(prev);
+      next.has(kraId) ? next.delete(kraId) : next.add(kraId);
+      return next;
+    });
+    setLabelHighlightId(kraId);
+    if (labelHighlightTimer.current) clearTimeout(labelHighlightTimer.current);
+    labelHighlightTimer.current = setTimeout(() => setLabelHighlightId(null), 2000);
+  }
 
   function handleSetSelectedCatIds(fn) {
     setLabelHighlightId(null);
