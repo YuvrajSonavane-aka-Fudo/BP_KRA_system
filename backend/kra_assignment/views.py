@@ -586,12 +586,12 @@ class KRABulkAssignmentEnrolView(APIView):
 
          
 
-        if enrolled:
-            threading.Thread(
-                target=send_bulk_kra_emails,
-                args=(enrolled, employee_map, cycle),
-                daemon=True,
-            ).start()
+        # if enrolled:
+        #     threading.Thread(
+        #         target=send_bulk_kra_emails,
+        #         args=(enrolled, employee_map, cycle),
+        #         daemon=True,
+        #     ).start()
 
         
 
