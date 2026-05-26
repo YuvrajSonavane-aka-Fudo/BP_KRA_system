@@ -356,7 +356,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmCol
 /* ══════════════ MAIN ══════════════ */
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { canManageCycles } = useRoleAccess();
+  const { canManageCycles, isEmployee } = useRoleAccess();
   const { data: allCycles, loading, error, refetch } = useCycles();
 
   const [stages, setStages] = useState([]);
@@ -654,13 +654,15 @@ const headerSx = {
                     </Button>
                   </Tooltip>
                 )}
-                <Tooltip title="Edit cycle details">
-                  <Button size="small" startIcon={<EditIcon sx={{ fontSize: 13 }} />}
-                    onClick={() => navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id)}?edit=true`)}
-                    sx={{ bgcolor: '#fff', color: '#1E3A8A', borderRadius: 99, fontSize: 11, fontWeight: 700, px: 1.25, py: 0.4, textTransform: 'none', minWidth: 0, '&:hover': { bgcolor: '#f0f6ff' } }}>
-                    Edit
-                  </Button>
-                </Tooltip>
+                {canManageCycles && (
+                  <Tooltip title="Edit cycle details">
+                    <Button size="small" startIcon={<EditIcon sx={{ fontSize: 13 }} />}
+                      onClick={() => navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id)}?edit=true`)}
+                      sx={{ bgcolor: '#fff', color: '#1E3A8A', borderRadius: 99, fontSize: 11, fontWeight: 700, px: 1.25, py: 0.4, textTransform: 'none', minWidth: 0, '&:hover': { bgcolor: '#f0f6ff' } }}>
+                      Edit
+                    </Button>
+                  </Tooltip>
+                )}
                 {canManageCycles && activeActions.filter(a => ['ON_HOLD', 'CANCELLED', 'CLOSED'].includes(a)).length > 0 && (
                   <>
                     <Tooltip title="Quick actions">
@@ -783,9 +785,7 @@ const headerSx = {
                   </TableSortLabel>
                 </TableCell>
 
-                <TableCell sx={headerSx}>
-                  Actions
-                </TableCell>
+                <TableCell sx={headerSx}>Actions</TableCell>
 
               </TableRow>
             </TableHead>

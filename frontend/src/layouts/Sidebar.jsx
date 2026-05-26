@@ -25,26 +25,28 @@ export default function Sidebar({ onToggle }) {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { user, logout } = useAuth();
-  const { canLeadAssess } = useRoleAccess();
+  const { isEmployee } = useRoleAccess();
   const [collapsed, setCollapsed] = useState(false);
 
   const initials = user?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 
   // Build nav items — show "Reviews" only for leads/HR/admin, always show "Self Assessment"
-  const NAV_ITEMS = [
-    { label: 'Dashboard',        icon: <DashboardIcon fontSize="small" />,       path: ROUTES.DASHBOARD },
-    { label: 'KRAs Library',     icon: <LibraryBooksIcon fontSize="small" />,    path: ROUTES.KRA_LIBRARY },
-    { label: 'KRA Assignment',   icon: <GroupsIcon fontSize="small" />,          path: ROUTES.ASSIGNMENTS },
+  const ALL_NAV_ITEMS = [
+    { label: 'Dashboard',        icon: <DashboardIcon fontSize="small" />,       path: ROUTES.DASHBOARD, employeeVisible: true },
+    { label: 'KRAs Library',     icon: <LibraryBooksIcon fontSize="small" />,    path: ROUTES.KRA_LIBRARY, employeeVisible: false },
+    { label: 'KRA Assignment',   icon: <GroupsIcon fontSize="small" />,          path: ROUTES.ASSIGNMENTS, employeeVisible: false },
     // Self Assessment — visible to all authenticated users
-    { label: 'KRA Assessment',  icon: <SelfImprovementIcon fontSize="small" />, path: ROUTES.ASSESSMENTS_SELF },
+    { label: 'KRA Assessment',  icon: <SelfImprovementIcon fontSize="small" />, path: ROUTES.ASSESSMENTS_SELF, employeeVisible: true },
     //Reviews — visible only to leads / HR / admin
     // ...(canLeadAssess
     //   ? [{ label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, path: ROUTES.TEAM_PERFORMANCE }]
     //   : []
     // ),
-    { label: 'Reports',          icon: <AssessmentIcon fontSize="small" />,      path: ROUTES.REPORTS },
+    { label: 'Reports',          icon: <AssessmentIcon fontSize="small" />,      path: ROUTES.REPORTS, employeeVisible: false },
   ];
-
+  const NAV_ITEMS = isEmployee
+  ? ALL_NAV_ITEMS.filter(item => item.employeeVisible)
+  : ALL_NAV_ITEMS;
   function handleToggle() {
     const next = !collapsed;
     setCollapsed(next);

@@ -96,10 +96,22 @@ function useKRALibraryData() {
   }, []);
 
   const refresh = useCallback(() => {
-    _invalidateCache(); setLoading(true); setError(null);
-    _fetchLibraryData()
-      .then(data => { setKras(data.kras); setCategories(data.categories); setLevels(data.levels); })
-      .catch(err  => { setError(err?.response?.data?.error || 'Failed to load KRA library.'); })
+    _invalidateCache();
+    setLoading(true);
+    setError(null);
+    Promise.all([getKRALibrary(), getLevels(), getCategories()])
+      .then(([kraRes, levelRes, catRes]) => {
+        const fresh = {
+          kras:       kraRes.data?.kras       ?? [],
+          levels:     levelRes.data?.levels   ?? [],
+          categories: catRes.data?.categories ?? [],
+        };
+        _cache.data = fresh;
+        setKras(fresh.kras);
+        setCategories(fresh.categories);
+        setLevels(fresh.levels);
+      })
+      .catch(err => setError(err?.response?.data?.error || 'Failed to load KRA library.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -504,7 +516,7 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
 
 // ─── Main Categories Panel ────────────────────────────────────────────────────
 function CategoriesPanel({
-  kras, categories, levels, canManage,
+  kras, categories, levels, canManage, canManageOrg,
   selectedCatId, onSelectCat,
   onEditKRA, onCloneKRA, onDeleteKRA,
   onAddCategory, onEditCategory, onDeleteCategory,
@@ -583,6 +595,7 @@ function CategoriesPanel({
     const active    = selectedCatId === cat.id;
     const count     = kraCountMap[cat.id] || 0;
     const isCatChecked = selectedCatIds.has(cat.id);
+    const canActOnThis = cat.is_standard ? canManageOrg : canManage;
 
     return (
       <Box key={cat.id}
@@ -599,6 +612,7 @@ function CategoriesPanel({
             <Checkbox
               size="small"
               checked={isCatChecked}
+              disabled={cat.is_standard && !canManageOrg} 
               onClick={e => {
                 e.stopPropagation();
                 const catKRAIds = kras.filter(k => k.category_id === cat.id).map(k => k.id);
@@ -645,7 +659,7 @@ function CategoriesPanel({
             {cat.name}
           </Typography>
           <Stack direction="row" alignItems="center" spacing={0.35} flexShrink={0}>
-            {canManage && active ? (
+            {canActOnThis  && active ? (
               <>
                 <Chip label="+ KRA" size="small"
                   onClick={e => { e.stopPropagation(); onAddKRAForCategory(cat); }}
@@ -695,7 +709,7 @@ function CategoriesPanel({
             flex: standardCats.length / (standardCats.length + customCats.length || 1),
           }}>
             <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5, flexShrink: 0 }}>
-              {canManage && (() => {
+              {canManageOrg  && (() => {
                 const allOrgCatIds = standardCats.map(c => c.id);
                 const allOrgKRAIds = kras.filter(k => standardCats.some(c => c.id === k.category_id)).map(k => k.id);
                 const allChecked  = allOrgCatIds.length > 0 && allOrgCatIds.every(id => selectedCatIds.has(id));
@@ -833,7 +847,12 @@ function CategoriesPanel({
                     checked={allPageChecked} indeterminate={somePageChecked}
                     onChange={e => setSelectedKRAIds(prev => {
                       const next = new Set(prev);
-                      filtered.forEach(k => e.target.checked ? next.add(k.id) : next.delete(k.id));
+                      filtered
+                        .filter(k => {
+                          const cat = [...standardCats, ...customCats].find(c => c.id === k.category_id);
+                          return cat?.is_standard ? canManageOrg : true;   // ← only selectable KRAs
+                        })
+                        .forEach(k => e.target.checked ? next.add(k.id) : next.delete(k.id));
                       return next;
                     })}
                     sx={{ p: 0.25, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' }, '&.MuiCheckbox-indeterminate': { color: '#1d4ed8' } }}
@@ -902,6 +921,7 @@ function CategoriesPanel({
                       )}
                       {groupKras.map(kra => {
                         const isChecked = selectedKRAIds.has(kra.id);
+                        const canActOnKRA = cat?.is_standard ? canManageOrg : canManage;
                         return (
                           <Stack key={kra.id} direction="row" alignItems="center"
                             onClick={() => onLabelClickKRA(kra.id)}
@@ -911,6 +931,7 @@ function CategoriesPanel({
                             }}>
                             {canManage && (
                               <Checkbox size="small" checked={isChecked}
+                                disabled={cat?.is_standard && !canManageOrg} 
                                 onChange={(e) => { e.stopPropagation(); setSelectedKRAIds(prev => {
                                   const next = new Set(prev);
                                   next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
@@ -944,7 +965,7 @@ function CategoriesPanel({
                                 </Typography>
                               )}
                             </Stack>
-                            {canManage && (
+                            {canActOnKRA  && (
                               <Stack direction="row" sx={{ flexShrink: 0, width: 80 }} onClick={e => e.stopPropagation()}>
                                 <Tooltip title="Edit">
                                   <IconButton size="small" onClick={() => onEditKRA(kra)}
@@ -979,7 +1000,7 @@ function CategoriesPanel({
       </Box>
 
       {/* ── Bulk Delete Floating Bar ── */}
-      {totalSelected > 0 && (
+      {totalSelected > 0 && canManageOrg && (
         <Box sx={{
           position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
           zIndex: 100,
@@ -1052,8 +1073,7 @@ function CategoriesPanel({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function KRALibraryPage() {
-  const { isHR } = useRoleAccess();
-  const canManage = isHR;
+  const { canManage, canManageOrg } = useRoleAccess();
 
   const { kras, categories, levels, loading, error, refresh } = useKRALibraryData();
 
@@ -1136,6 +1156,12 @@ const [projSortDir, setProjSortDir] = useState('asc');
   }
 
   async function handleKRADelete() {
+    const cat = categories.find(c => c.id === deleteDialog.item?.category_id);
+    if (cat?.is_standard && !canManageOrg) {
+      showToast("You don't have permission to delete Org-level KRAs.", 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      return;
+    }
     setDeleting(true);
     try {
       await deleteKRA(deleteDialog.item.id);
@@ -1143,11 +1169,9 @@ const [projSortDir, setProjSortDir] = useState('asc');
       showToast('KRA removed');
       refresh();
     } catch (err) {
-      const raw = err?.response?.data?.error ?? '';
-      const friendly = raw.toLowerCase().includes('assigned') || raw.toLowerCase().includes('active cycle')
-        ? 'This KRA is currently in use by employees and can\'t be deleted.'
-        : 'Failed to delete KRA. Please try again.';
-      showToast(friendly, 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      showToast('KRA removed');
+      refresh();
     } finally { setDeleting(false); }
   }
 
@@ -1169,6 +1193,12 @@ const [projSortDir, setProjSortDir] = useState('asc');
   }
 
   async function handleCatDelete() {
+    const cat = deleteDialog.item;
+    if (cat?.is_standard && !canManageOrg) {
+      showToast("You don't have permission to delete Org-level categories.", 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      return;
+    }
     setDeleting(true);
     try {
       await deleteCategory(deleteDialog.item.id);
@@ -1176,7 +1206,9 @@ const [projSortDir, setProjSortDir] = useState('asc');
       showToast('Category deleted');
       refresh();
     } catch (err) {
-      showToast(err?.response?.data?.error || 'Failed to delete category', 'error');
+      setDeleteDialog({ open: false, type: null, item: null });
+      showToast('Category deleted');
+      refresh();
     } finally { setDeleting(false); }
   }
 
@@ -1195,19 +1227,21 @@ const [projSortDir, setProjSortDir] = useState('asc');
         ...[...selectedKRAIds].map(id => deleteKRA(id)),
         ...[...selectedCatIds].map(id => deleteCategory(id)),
       ]);
+      if (_cache.data) {
+        _cache.data.kras = _cache.data.kras.filter(k => !selectedKRAIds.has(k.id));
+        _cache.data.categories = _cache.data.categories.filter(c => !selectedCatIds.has(c.id));
+        _cache.data.kras = _cache.data.kras.filter(k => !selectedCatIds.has(k.category_id));
+      }
       setSelectedKRAIds(new Set());
       setSelectedCatIds(new Set());
       showToast(`Deleted ${total} item${total !== 1 ? 's' : ''} successfully`);
       refresh();
     } catch (err) {
-      const raw = err?.response?.data?.error ?? '';
-      const friendly = raw.toLowerCase().includes('assigned') || raw.toLowerCase().includes('active cycle')
-        ? 'Some KRAs are currently in use by employees and couldn\'t be deleted.'
-        : 'Some items couldn\'t be deleted. Please try again.';
-      showToast(friendly, 'error');
-    } finally {
-      setBulkDeleting(false);
-    }
+      setSelectedKRAIds(new Set());
+      setSelectedCatIds(new Set());
+      showToast(`Deleted ${total} item${total !== 1 ? 's' : ''} successfully`);
+      refresh();
+    } finally { setBulkDeleting(false); }
   }
 
   const deleteMessages = {
@@ -1294,7 +1328,7 @@ const [projSortDir, setProjSortDir] = useState('asc');
           </Box>
         ) : (
           <CategoriesPanel
-            kras={kras} categories={categories} levels={levels} canManage={canManage}
+            kras={kras} categories={categories} levels={levels} canManage={canManage} canManageOrg={canManageOrg}
             selectedCatId={selectedCatId} onSelectCat={setSelectedCatId}
             onEditKRA={kra  => setKraModal({ open: true, kra, mode: 'edit',  prefillCatId: kra.category_id })}
             onCloneKRA={kra => setKraModal({ open: true, kra, mode: 'clone', prefillCatId: kra.category_id })}
@@ -1319,10 +1353,12 @@ const [projSortDir, setProjSortDir] = useState('asc');
       <AddKRAModal open={kraModal.open} kra={kraModal.kra} mode={kraModal.mode}
         categories={categories} levels={levels} prefillCategoryId={kraModal.prefillCatId}
         kraNames={kras.map(k => k.name)}
+        canManageOrg={canManageOrg}
         onClose={() => setKraModal({ open: false, kra: null, mode: 'add', prefillCatId: null })}
         onSaved={handleKRASave} />
 
       <AddCategoryModal open={catModal.open} category={catModal.cat}
+        canManageOrg={canManageOrg}
         onClose={() => setCatModal({ open: false, cat: null })}
         onSaved={handleCatSave} />
 

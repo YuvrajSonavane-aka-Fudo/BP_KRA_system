@@ -31,6 +31,7 @@ export default function AddKRAModal({
   mode = 'add',
   prefillCategoryId = null,
   kraNames = [],
+  canManageOrg, 
 }) {
   const isEdit  = mode === 'edit';
   const isClone = mode === 'clone';
@@ -218,7 +219,7 @@ export default function AddKRAModal({
                   <Typography fontSize={13} color="#94a3b8">No categories available</Typography>
                 </MenuItem>
               ) : (
-                categories.map(cat => {
+                categories.filter(cat => canManageOrg ? true : !cat.is_standard).map(cat => {
                   const isStd = cat.is_standard;
                   return (
                     <MenuItem key={cat.id} value={cat.id}>

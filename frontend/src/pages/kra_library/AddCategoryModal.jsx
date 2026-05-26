@@ -12,13 +12,13 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
-export default function AddCategoryModal({ open, onClose, onSaved, category }) {
+export default function AddCategoryModal({ open, onClose, onSaved, category, canManageOrg }) {
   const isEdit = Boolean(category);
   // Stay-open behaviour only in "add" mode
   const stayOpen = !isEdit;
 
   const [name,       setName]     = useState('');
-  const [isStandard, setStandard] = useState(true);
+  const [isStandard, setStandard] = useState(canManageOrg ? true : false);
   const [saving,     setSaving]   = useState(false);
   const [errors,     setErrors]   = useState({});
   const [savedCount, setSavedCount] = useState(0);
@@ -26,7 +26,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category }) {
   useEffect(() => {
     if (open) {
       setName(category?.name ?? '');
-      setStandard(category?.is_standard ?? true);
+      setStandard(canManageOrg ? (category?.is_standard ?? true) : false);
       setErrors({});
       setSaving(false);
       setSavedCount(0);
@@ -131,40 +131,50 @@ export default function AddCategoryModal({ open, onClose, onSaved, category }) {
           )}
 
           {/* Category Type — FIRST */}
-          <Box>
-            <Typography fontSize={12} fontWeight={700} color="text.secondary" mb={1}>
-              Category Type
-            </Typography>
-            <Stack direction="row" spacing={2.5}>
-              {[
-                { value: true,  label: 'Org Level',     icon: <StarIcon sx={{ fontSize: 13 }} />, color: '#16a34a' },
-                { value: false, label: 'Project Level', icon: <TuneIcon sx={{ fontSize: 13 }} />, color: '#1d4ed8' },
-              ].map(opt => {
-                const isSelected = isStandard === opt.value;
-                return (
-                  <Stack key={String(opt.value)} direction="row" alignItems="center" spacing={0.75}
-                    onClick={() => setStandard(opt.value)}
-                    sx={{ cursor: 'pointer', userSelect: 'none' }}>
-                    {/* Radio */}
-                    <Box sx={{
-                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                      border: `2px solid ${isSelected ? opt.color : '#cbd5e1'}`,
-                      bgcolor: isSelected ? opt.color : 'transparent',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'all 0.15s',
-                    }}>
-                      {isSelected && <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#fff' }} />}
-                    </Box>
-                    <Box sx={{ color: isSelected ? opt.color : '#94a3b8', display: 'flex' }}>{opt.icon}</Box>
-                    <Typography fontSize={13} fontWeight={isSelected ? 700 : 500}
-                      color={isSelected ? opt.color : '#64748b'}>
-                      {opt.label}
-                    </Typography>
-                  </Stack>
-                );
-              })}
-            </Stack>
-          </Box>
+          {canManageOrg ? (
+            <Box>
+              <Typography fontSize={12} fontWeight={700} color="text.secondary" mb={1}>
+                Category Type
+              </Typography>
+              <Stack direction="row" spacing={2.5}>
+                {[
+                  { value: true,  label: 'Org Level',     icon: <StarIcon sx={{ fontSize: 13 }} />, color: '#16a34a' },
+                  { value: false, label: 'Project Level', icon: <TuneIcon sx={{ fontSize: 13 }} />, color: '#1d4ed8' },
+                ].map(opt => {
+                  const isSelected = isStandard === opt.value;
+                  return (
+                    <Stack key={String(opt.value)} direction="row" alignItems="center" spacing={0.75}
+                      onClick={() => setStandard(opt.value)}
+                      sx={{ cursor: 'pointer', userSelect: 'none' }}>
+                      <Box sx={{
+                        width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                        border: `2px solid ${isSelected ? opt.color : '#cbd5e1'}`,
+                        bgcolor: isSelected ? opt.color : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.15s',
+                      }}>
+                        {isSelected && <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#fff' }} />}
+                      </Box>
+                      <Box sx={{ color: isSelected ? opt.color : '#94a3b8', display: 'flex' }}>{opt.icon}</Box>
+                      <Typography fontSize={13} fontWeight={isSelected ? 700 : 500}
+                        color={isSelected ? opt.color : '#64748b'}>
+                        {opt.label}
+                      </Typography>
+                    </Stack>
+                  );
+                })}
+              </Stack>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Typography fontSize={12} fontWeight={700} color="text.secondary">Category Type:</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5,
+                px: 1, py: 0.35, borderRadius: 1, bgcolor: '#dbeafe', border: '1px solid #bfdbfe' }}>
+                <TuneIcon sx={{ fontSize: 12, color: '#1d4ed8' }} />
+                <Typography fontSize={12} fontWeight={700} color="#1d4ed8">Project Level</Typography>
+              </Box>
+            </Box>
+          )}
 
           {/* Category Name — SECOND */}
           <TextField

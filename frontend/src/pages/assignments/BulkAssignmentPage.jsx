@@ -42,6 +42,7 @@ import EmployeeKRAView from './EmployeeKRAView';
 const G = 'linear-gradient(135deg, #1E3A8A 0%, #1e40af 60%, #1d4ed8 100%)';
 const ORG_COLOR  = { bg: '#f0fdf4', border: '#86efac', text: '#15803d', chip: '#dcfce7', icon: '#16a34a' };
 const PROJ_COLOR = { bg: '#eff6ff', border: '#93c5fd', text: '#1d4ed8', chip: '#dbeafe', icon: '#2563eb' };
+
 const WRITE_STAGES = ['ACTIVE', 'DRAFT'];
 
 const typeColor = (isStd) => (isStd ? ORG_COLOR : PROJ_COLOR);
@@ -1011,7 +1012,14 @@ export default function BulkAssignmentPage() {
     setActiveCycle(found);
     setSelectedKraSet(new Set());
     setSelectedEmpSet(new Set());
-    await handleRefresh(cycleId, { includeKraLibrary: true });
+    setGlobalLoading(true);
+    setGlobalLoadingMsg('Loading cycle data…');
+    try {
+      await handleRefresh(cycleId, { includeKraLibrary: true });
+    } finally {
+      setGlobalLoading(false);
+      setGlobalLoadingMsg('');
+    }
   };
 
   const handleToggleKRA = useCallback((ids, mode) => {
@@ -1035,6 +1043,8 @@ export default function BulkAssignmentPage() {
   const doAssign = useCallback(async ({ localEmpIds, kraLevelIds, kraSelections, kraLevelToKraId, categories: cats, kra_level_ids }) => {
     setAssigning(true);
     setPreviewOpen(false);
+    setGlobalLoading(true);
+    setGlobalLoadingMsg('Assigning KRAs…');
     try {
       const selEmps = localEmpIds.map(id => employeeIndexMap.get(id)).filter(Boolean); // O(1) lookup
       const payload = {
@@ -1080,9 +1090,10 @@ export default function BulkAssignmentPage() {
       } else {
         showToast(enrolled.length > 0 ? `${enrolled.length} assigned, ${failed.length} failed.` : 'Assignment failed.', enrolled.length > 0 ? 'warning' : 'error');
       }
+      await handleRefresh();
     } catch (e) { showToast(e?.response?.data?.message || 'Assignment failed.', 'error'); }
-    finally { setAssigning(false); }
-  }, [activeCycle, employeeIndexMap, showToast]);
+    finally { setAssigning(false); setGlobalLoading(false); setGlobalLoadingMsg(''); }
+  }, [activeCycle, employeeIndexMap, showToast, handleRefresh]);
 
   const handleDirectAssign = useCallback(async () => {
     const kraLevelIds = [];
@@ -1167,6 +1178,7 @@ export default function BulkAssignmentPage() {
         ));
       }
       showToast(`${kraKeys.length} KRA${kraKeys.length !== 1 ? 's' : ''} deleted.`, 'success');
+      handleRefresh(); 
     } catch (e) { showToast(e?.response?.data?.message || 'Delete failed.', 'error'); }
   };
 
@@ -1179,10 +1191,15 @@ export default function BulkAssignmentPage() {
       ));
       setAssignedKRAMap(prev => { const next = { ...prev }; delete next[emp.employee_kra_cycle_id]; return next; });
       showToast(`${emp.full_name} removed.`, 'success');
+      handleRefresh();  // ← add this
     } catch (e) { showToast(e?.response?.data?.message || 'Remove failed.', 'error'); }
   };
 
+  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalLoadingMsg, setGlobalLoadingMsg] = useState('');
   const handleBulkDelete = async () => {
+    setGlobalLoading(true);
+    setGlobalLoadingMsg('Unassigning KRAs from employees...');
     const toDelete = employees.filter(e => selectedEmpSet.has(e.employee_id) && e.assigned_to_cycle && e.employee_kra_cycle_id);
     if (!toDelete.length) { showToast('None of the selected employees have assignments to remove.', 'info'); return; }
     try {
@@ -1196,7 +1213,10 @@ export default function BulkAssignmentPage() {
       setAssignedKRAMap(prev => { const next = { ...prev }; removedEkIds.forEach(id => delete next[id]); return next; });
       setSelectedEmpSet(new Set());
       showToast(`${toDelete.length} employee${toDelete.length !== 1 ? 's' : ''} removed.`, 'success');
-    } catch { showToast('Bulk remove failed.', 'error'); }
+      handleRefresh(); 
+    } catch { showToast('Bulk remove failed.', 'error'); } 
+    finally { setGlobalLoading(false); setGlobalLoadingMsg(''); }
+    
   };
 
   const handleCloneEmployee = (emp) => { setCloneDefault(true);  setViewEmployee(emp); };
@@ -1365,6 +1385,28 @@ export default function BulkAssignmentPage() {
           />
         );
       })()}
+
+      {/* Global loading overlay */}
+      {globalLoading && (
+        <Box sx={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          bgcolor: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(2px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Paper elevation={0} sx={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 2, px: 4, py: 3.5, borderRadius: 3,
+            border: '1px solid #e2e8f0', bgcolor: '#fff',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }}>
+            <CircularProgress size={36} sx={{ color: '#1E3A8A' }} />
+            <Typography fontSize={13.5} fontWeight={600} color="#1e293b">
+              {globalLoadingMsg || 'Processing…'}
+            </Typography>
+          </Paper>
+        </Box>
+      )}
 
       <ToastStack toasts={toasts} />
     </Box>
