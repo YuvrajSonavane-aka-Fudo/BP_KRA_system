@@ -1067,9 +1067,14 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
   );
 }
 
-function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, isAdmin, dbStages, dirtyMap, onFieldChange, sectionRef, isActiveCycle }) {
+function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, isAdmin, dbStages, dirtyMap, onFieldChange, sectionRef, isActiveCycle, isSelected }) {
   const [collapsed, setCollapsed] = useState(true);
   const [empStageId, setEmpStageId] = useState(emp.current_stage_id ?? currentStageId);
+
+  // Auto-open when this employee is jumped to via the dropdown
+  useEffect(() => {
+    if (isSelected) setCollapsed(false);
+  }, [isSelected]);
 
   const kras = emp.kras ?? [];
   const reviewed = kras.filter(k => k.lead_rating_id || dirtyMap[k.employee_kra_level_id]?.lead_rating_id).length;
@@ -1331,6 +1336,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
   const [teamUnsavedDialog, setTeamUnsavedDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState(null); // { type: 'self' } | { type: 'cycle', id }
   const selfDirtyCount = useRef(0);
+  const [pendingJumpEmpId, setPendingJumpEmpId] = useState(null);
 
   function handleSelfDirtyCount(count) { selfDirtyCount.current = count; }
 
@@ -1360,13 +1366,13 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
     setPendingAction(null);
   }
 
-  function handleBackToTeam() {
+  function handleBackToTeam(jumpEmpId = null) {
+    if (jumpEmpId) setPendingJumpEmpId(jumpEmpId);
     if (selfDirtyCount.current > 0) { setUnsavedDialog(true); }
     else { setViewingSelf(false); setRefreshKey(k => k + 1); }
   }
 
   async function handleUnsavedSaveAndContinue() {
-    // Signal EmployeeView to save — we use a custom event
     window.dispatchEvent(new CustomEvent('kra-save-all'));
     setUnsavedDialog(false);
     setViewingSelf(false);
@@ -1403,12 +1409,24 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
         const emps = res.data?.employees ?? [];
 
         if (emps.length > 0) {
-          const firstNonSelf =
-            emps.find(e => e.employee_id !== user?.employee_id);
-
-          setSelectedEmpId(
-            firstNonSelf?.employee_id || emps[0].employee_id
-          );
+          // If we have a pending jump target (from "Jump to lead rating" in self-assessment view),
+          // select that employee and scroll to them once the section refs are mounted.
+          // Otherwise fall back to the first non-self employee.
+          setPendingJumpEmpId(pending => {
+            const jumpId = pending;
+            if (jumpId && emps.find(e => e.employee_id === jumpId)) {
+              setSelectedEmpId(jumpId);
+              setTimeout(() => {
+                const el = sectionRefs.current[jumpId];
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 200);
+              return null; // clear the pending jump
+            }
+            // default: select first non-self
+            const firstNonSelf = emps.find(e => e.employee_id !== user?.employee_id);
+            setSelectedEmpId(firstNonSelf?.employee_id || emps[0].employee_id);
+            return null;
+          });
         }
       })
       .catch(err => setError(err?.response?.data?.error || 'Failed to load'))
@@ -1535,28 +1553,74 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
         <Box sx={{ px: { xs: 2, md: 3 }, pt: 2, pb: 0, flexShrink: 0 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
             <Stack direction="row" alignItems="center" spacing={1.5}>
-              <Box onClick={handleBackToTeam} sx={{
+              <Box onClick={() => handleBackToTeam()} sx={{
                 px: 2, py: 0.6, borderRadius: 2, cursor: 'pointer', fontSize: 13, fontWeight: 700,
                 bgcolor: '#fff', color: '#64748b', border: '1.5px solid #e2e8f0',
                 transition: 'all 0.15s', '&:hover': { borderColor: BLUE, color: BLUE },
               }}>← Team Review</Box>
               <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>My Assessment</Typography>
             </Stack>
-            {cycles.length > 0 && (
-              <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
-                size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
-                {cycles.map(c => (
-                  <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <span>{c.name}</span>
-                      {c.status === 'ACTIVE' && (
-                        <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
-                      )}
-                    </Stack>
-                  </MenuItem>
-                ))}
-              </Select>
-            )}
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              {allEmployeesList.filter(e => e.employee_id !== user?.employee_id).length > 0 && (
+                <Autocomplete
+                  value={null}
+                  onChange={(_, newVal) => {
+                    if (!newVal) return;
+                    handleBackToTeam(newVal.employee_id);
+                  }}
+                  options={[...allEmployeesList]
+                    .filter(e => e.employee_id !== user?.employee_id)
+                    .sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''))}
+                  getOptionLabel={e => e.full_name ?? ''}
+                  isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
+                  size="small"
+                  disableClearable={false}
+                  blurOnSelect
+                  sx={{ minWidth: 240 }}
+                  renderInput={params => (
+                    <TextField
+                      {...params}
+                      placeholder="Jump to lead rating…"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: 13,
+                          borderRadius: 2,
+                          bgcolor: '#fff',
+                        },
+                      }}
+                    />
+                  )}
+                  renderOption={(props, e) => {
+                    const allRated = e.kras?.length > 0 && e.kras.filter(k => k.lead_rating_id).length === e.kras.length;
+                    return (
+                      <Box component="li" {...props} key={e.employee_id}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', cursor: 'pointer', py: 0.5 }}>
+                        <Avatar sx={{ width: 22, height: 22, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>
+                          {initials(e.full_name)}
+                        </Avatar>
+                        <Typography sx={{ fontSize: 13, flex: 1 }}>{e.full_name}</Typography>
+                        {allRated && <CheckCircleIcon sx={{ fontSize: 13, color: '#22c55e' }} />}
+                      </Box>
+                    );
+                  }}
+                />
+              )}
+              {cycles.length > 0 && (
+                <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
+                  size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
+                  {cycles.map(c => (
+                    <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <span>{c.name}</span>
+                        {c.status === 'ACTIVE' && (
+                          <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                        )}
+                      </Stack>
+                    </MenuItem>
+                  ))}
+                </Select>
+              )}
+            </Stack>
           </Stack>
           <Divider />
         </Box>
@@ -1657,106 +1721,63 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                         component="li"
                         {...props}
                         key={e.employee_id}
+                        onClick={(ev) => {
+                          ev.preventDefault();
+                          ev.stopPropagation();
+                          if (isSelf) {
+                            setSelectedEmpId(e.employee_id);
+                            interceptViewSelf();
+                          } else {
+                            setSelectedEmpId(e.employee_id);
+                            handleJumpToEmployee(e.employee_id);
+                          }
+                        }}
                         sx={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
+                          gap: 1,
                           width: '100%',
+                          cursor: 'pointer',
+                          py: 0.5,
+                          ...(isSelf && {
+                            borderTop: '1px solid #e2e8f0',
+                            mt: 0.5,
+                          }),
                         }}
                       >
-                        {/* LEFT SIDE */}
-                        <Box
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-
-                            setSelectedEmpId(e.employee_id);
-                            handleJumpToEmployee(e.employee_id);
-                          }}
+                        <Avatar
                           sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            flex: 1,
-                            cursor: 'pointer',
-                            py: 0.5,
+                            width: 22,
+                            height: 22,
+                            bgcolor: isSelf ? ACCENT : BLUE,
+                            fontSize: 9,
+                            fontWeight: 800,
                           }}
                         >
-                          <Avatar
-                            sx={{
-                              width: 22,
-                              height: 22,
-                              bgcolor: isSelf ? ACCENT : BLUE,
-                              fontSize: 9,
-                              fontWeight: 800,
-                            }}
-                          >
-                            {initials(e.full_name)}
-                          </Avatar>
+                          {initials(e.full_name)}
+                        </Avatar>
 
-                          <Typography sx={{ fontSize: 13 }}>
-                            {e.full_name}
-                          </Typography>
+                        <Typography sx={{ fontSize: 13, flex: 1 }}>
+                          {e.full_name}
+                        </Typography>
 
-                          {isSelf && (
-                            <Box
-                              component="span"
-                              sx={{
-                                px: 0.75,
-                                py: 0.15,
-                                borderRadius: 1,
-                                bgcolor: '#eff6ff',
-                                color: BLUE,
-                                fontSize: 10,
-                                fontWeight: 700,
-                              }}
-                            >
-                              
-                            </Box>
-                          )}
-
-                          {e.kras?.filter(k => k.lead_rating_id).length === e.kras?.length &&
-                            e.kras?.length > 0 && (
-                              <CheckCircleIcon
-                                sx={{
-                                  fontSize: 13,
-                                  color: '#22c55e',
-                                }}
-                              />
-                            )}
-                        </Box>
-
-                        {/* RIGHT ARROW */}
                         {isSelf && (
                           <Box
-                            onMouseDown={(ev) => {
-                              ev.preventDefault();
-                              ev.stopPropagation();
-                            }}
-                            onClick={(ev) => {
-                              ev.preventDefault();
-                              ev.stopPropagation();
-
-                              setSelectedEmpId(e.employee_id);
-                              interceptViewSelf();
-                            }}
+                            component="span"
                             sx={{
-                              width: 24,
-                              height: 24,
-                              ml: 1,
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              color: BLUE,
-                              '&:hover': {
-                                bgcolor: '#eff6ff',
-                              },
+                              px: 0.75, py: 0.15, borderRadius: 1,
+                              bgcolor: '#eff6ff', color: BLUE,
+                              fontSize: 10, fontWeight: 700,
                             }}
                           >
-                            <ArrowForwardIosIcon sx={{ fontSize: 11 }} />
+                            
                           </Box>
                         )}
+
+                        {!isSelf && e.kras?.filter(k => k.lead_rating_id).length === e.kras?.length &&
+                          e.kras?.length > 0 && (
+                            <CheckCircleIcon sx={{ fontSize: 13, color: '#22c55e' }} />
+                          )}
                       </Box>
                     );
                   }}
@@ -1860,7 +1881,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
           </Paper>
         ) : (
           <>
-            {sortedEmployees.map(emp => (
+            {sortedEmployees.filter(emp => emp.employee_id !== user?.employee_id).map(emp => (
               <EmployeeSection
                 key={emp.employee_id}
                 emp={emp}
@@ -1874,6 +1895,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                 onFieldChange={handleFieldChange}
                 sectionRef={el => { sectionRefs.current[emp.employee_id] = el; }}
                 isActiveCycle={isActiveCycle}
+                isSelected={emp.employee_id === selectedEmpId}
               />
             ))}
             {hasMore && (

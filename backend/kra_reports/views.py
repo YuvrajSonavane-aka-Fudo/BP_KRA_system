@@ -99,97 +99,33 @@ def _build_row(emp, ekc, kra_row, columns):
     return row
 
 
-#Report 1: Single cycle report 
-class CycleReportView(APIView):
-    """
-    GET /api/v1/reports/cycle/<cycle_id>
-
-    Query params:
-        columns      – comma-separated list of columns to include
-                       (employee_id, employee_name, department, level, manager,
-                        kra_name, category, self_rating, self_comment,
-                        lead_rating, lead_comment, progress_notes,
-                        lead_progress_notes, description_by_lead)
-        employee_ids – optional comma-separated list of employee IDs to filter
-        search       – optional search string (matches employee name or KRA name)
-
-    Response:
-        { cycle_id, cycle_name, columns, rows: [ {…} ] }
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, cycle_id):
-        caller = _get_caller(request)
-
-        # Only HR, Admin, Vertical Lead, Manager, Team Lead can access reports
-        if not (_is_hr(caller) or _is_lead(caller)):
-            return Response('Forbidden', status=status.HTTP_403_FORBIDDEN)
-
-        # Parse params
-        columns_param = request.query_params.get('columns', '')
-        columns = [c.strip() for c in columns_param.split(',') if c.strip()] or [
-            'employee_id', 'employee_name', 'department', 'level',
-            'kra_name', 'category', 'self_rating', 'self_comment',
-            'lead_rating', 'lead_comment',
-        ]
-        employee_ids_param = request.query_params.get('employee_ids', '')
-        employee_ids = [int(e) for e in employee_ids_param.split(',') if e.strip().isdigit()]
-        search = request.query_params.get('search', '').strip().lower()
-
-        try:
-            cycle = KRACycle.objects.get(id=cycle_id)
-        except KRACycle.DoesNotExist:
-            return Response('Cycle not found', status=status.HTTP_404_NOT_FOUND)
-
-        ekc_qs = _base_ekc_qs(caller, [cycle_id])
-        if employee_ids:
-            ekc_qs = ekc_qs.filter(employee_id__in=employee_ids)
-
-        rows = []
-        for ekc in ekc_qs:
-            emp = ekc.employee
-            for kra_row in ekc.kra_level_rows.all():
-                row = _build_row(emp, ekc, kra_row, columns)
-                row['_cycle_id'] = cycle_id  # internal use for filtering
-                if search:
-                    name_match = search in f'{emp.first_name} {emp.last_name}'.lower()
-                    kra_match  = search in (getattr(kra_row.kra_level, 'name', '') or '').lower()
-                    if not name_match and not kra_match:
-                        continue
-                rows.append(row)
-
-        return Response({
-            'cycle_id':   cycle_id,
-            'cycle_name': cycle.name,
-            'columns':    columns,
-            'total_rows': len(rows),
-            'rows':       rows,
-        }, status=status.HTTP_200_OK)
-
-
-# Report 2: Multi-cycle comparison report 
 class MultiCycleReportView(APIView):
     """
     GET /api/v1/reports/multi-cycle
 
+    Unified report view. Works for single or multiple cycles.
+
     Query params:
-        cycle_ids    – comma-separated list of cycle IDs (required)
-        columns      – comma-separated list of columns to include per cycle
+        cycle_ids    – comma-separated list of cycle IDs (required, min 1)
+        columns      – comma-separated list of per-cycle columns to include
                        (self_rating, self_comment, lead_rating, lead_comment,
                         progress_notes, lead_progress_notes, description_by_lead)
         employee_ids – optional comma-separated list of employee IDs to filter
-        search       – optional search string
+        search       – optional search string (matches employee name or KRA name)
 
     Response structure:
         {
           cycles: [ { id, name } ],
-          columns,
+          per_cycle_columns,
+          total_rows,
           rows: [
             {
-              employee_id, employee_name, department, level, manager,
-              kra_name, category,
+              employee_id, employee_name, department, level,
+              manager, previous_manager, kra_name, category,
               cycles: {
-                <cycle_id>: { self_rating, lead_rating, self_comment, lead_comment, … }
+                <cycle_id>: { self_rating, lead_rating, self_comment,
+                               lead_comment, progress_notes,
+                               lead_progress_notes, description_by_lead }
               }
             }
           ]
