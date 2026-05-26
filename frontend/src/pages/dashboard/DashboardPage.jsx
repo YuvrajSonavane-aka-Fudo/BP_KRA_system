@@ -356,7 +356,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmCol
 /* ══════════════ MAIN ══════════════ */
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { canManageCycles, isEmployee } = useRoleAccess();
+  const { canManageCycles, isAdmin  } = useRoleAccess();
   const { data: allCycles, loading, error, refetch } = useCycles();
 
   const [stages, setStages] = useState([]);
@@ -840,13 +840,13 @@ const headerSx = {
 
                     <TableCell onClick={e => e.stopPropagation()} sx={{ pr: 1.5 }}>
                       <Stack direction="row" spacing={0} justifyContent="flex">
-                        <Tooltip title="Open">
-                          <IconButton size="small"
-                            onClick={e => { e.stopPropagation(); navigate(ROUTES.CYCLE_DETAIL.replace(':id', cycle.id)); }}
-                            sx={{ color: '#94a3b8', '&:hover': { color: '#1E3A8A' }, p: 0.4 }}>
-                            <OpenInNewIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Tooltip>
+                          <Tooltip title="Open">
+                            <IconButton size="small"
+                              onClick={e => { e.stopPropagation(); navigate(ROUTES.CYCLE_DETAIL.replace(':id', cycle.id)); }}
+                              sx={{ color: '#94a3b8', '&:hover': { color: '#1E3A8A' }, p: 0.4 }}>
+                              <OpenInNewIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
                         {canManageCycles && (
                           <>
                             <Tooltip title="Clone">

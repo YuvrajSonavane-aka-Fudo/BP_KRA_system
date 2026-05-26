@@ -15,7 +15,7 @@ export default function useRoleAccess() {
   const isManager  = hasRole(ROLE.MANAGER);
   const isEmployee = hasRole(ROLE.EMPLOYEE);
 
-  const canManageCycles   = isAdmin || isManager;
+  const canManageCycles   = isAdmin;
   const canAssignKRAs     = isAdmin || isManager;
   const canManageOrg      = isAdmin;          // only Admin touches Org-level
   const canManage         = isAdmin || isManager;
