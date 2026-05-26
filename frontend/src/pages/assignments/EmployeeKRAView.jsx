@@ -406,7 +406,7 @@ export default function EmployeeKRAView({
             />
 
             {/* ── Clone button (top only) ── */}
-            <Tooltip title={checkedCount === 0 ? 'Select KRAs first to clone' : `Clone ${checkedCount} selected`}>
+            <Tooltip title={checkedCount === 0 ? 'Select KRAs first to copy' : `Clone ${checkedCount} selected`}>
               <span>
                 <Button size="small" disabled={checkedCount === 0}
                   startIcon={<ContentCopyIcon sx={{ fontSize: 13 }} />}
@@ -419,13 +419,13 @@ export default function EmployeeKRAView({
                     '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
                     '&.Mui-disabled': { color: 'rgba(255,255,255,0.25)', bgcolor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' },
                   }}>
-                  Clone{checkedCount > 0 ? ` (${checkedCount})` : ''}
+                  Copy{checkedCount > 0 ? ` (${checkedCount})` : ''}
                 </Button>
               </span>
             </Tooltip>
 
             {/* ── Delete button (top only) ── */}
-            <Tooltip title={checkedCount === 0 ? 'Select KRAs first to delete' : `Delete ${checkedCount} selected`}>
+            <Tooltip title={checkedCount === 0 ? 'Select KRAs first to unassign' : `Delete ${checkedCount} selected`}>
               <span>
                 <Button size="small" disabled={checkedCount === 0}
                   startIcon={<DeleteOutlineIcon sx={{ fontSize: 13 }} />}
@@ -438,7 +438,7 @@ export default function EmployeeKRAView({
                     '&:hover': { bgcolor: 'rgba(239,68,68,0.3)' },
                     '&.Mui-disabled': { color: 'rgba(255,255,255,0.25)', bgcolor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' },
                   }}>
-                  Delete{checkedCount > 0 ? ` (${checkedCount})` : ''}
+                  Unassign{checkedCount > 0 ? ` (${checkedCount})` : ''}
                 </Button>
               </span>
             </Tooltip>
@@ -501,6 +501,19 @@ export default function EmployeeKRAView({
               <Chip label={`${checkedCount} selected`} size="small"
                 sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: 10, height: 20 }} />
             )}
+            <Box flex={1} />
+            <Stack direction="row" gap={0.75} alignItems="center">
+              <Chip
+                icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#16a34a', ml: '6px !important' }} />}
+                label="Org" size="small"
+                sx={{ height: 20, fontSize: 9.5, fontWeight: 700, bgcolor: '#dcfce7', color: '#15803d', cursor: 'default' }}
+              />
+              <Chip
+                icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#2563eb', ml: '6px !important' }} />}
+                label="Project" size="small"
+                sx={{ height: 20, fontSize: 9.5, fontWeight: 700, bgcolor: '#dbeafe', color: '#1d4ed8', cursor: 'default' }}
+              />
+            </Stack>
           </Stack>
         </Box>
 

@@ -70,9 +70,9 @@ function fmtShort(s) {
 function toISO(y, m, d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
 
 /* ─────────────── RangePicker ─────────────── */
-function RangePicker({ startDate, endDate, onChange, minDate, onClose }) {
+function RangePicker({ startDate, endDate, onChange, minDate, maxDate, onClose }) {
   const init = () => {
-    const src = startDate || minDate;
+    const src = minDate || startDate;
     if (src) { const d = new Date(toDateOnly(src) + 'T00:00:00'); return { y: d.getFullYear(), m: d.getMonth() }; }
     const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() };
   };
@@ -89,10 +89,12 @@ function RangePicker({ startDate, endDate, onChange, minDate, onClose }) {
   const firstDay  = new Date(vy, vm, 1).getDay();
   const cells     = [...Array(firstDay).fill(null), ...Array.from({ length: totalDays }, (_, i) => i+1)];
 
+  const maxD = maxDate ? new Date(toDateOnly(maxDate) + 'T00:00:00') : null;
   function disabled(d) {
     if (!d) return true;
     const dt = new Date(vy, vm, d);
     if (minD) { const m2 = new Date(minD); m2.setHours(0,0,0,0); if (dt < m2) return true; }
+    if (maxD) { const m3 = new Date(maxD); m3.setHours(0,0,0,0); if (dt > m3) return true; }
     if (picking === 'end' && startD) { const s = new Date(startD); s.setHours(0,0,0,0); if (dt < s) return true; }
     return false;
   }
@@ -125,13 +127,17 @@ function RangePicker({ startDate, endDate, onChange, minDate, onClose }) {
     }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between"
         sx={{ px: 1.25, py: 0.75, background: gradient }}>
-        <IconButton size="small" onClick={() => vm===0 ? (setVm(11),setVy(y=>y-1)) : setVm(m=>m-1)}
-          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
+        <IconButton size="small"
+          disabled={minD && new Date(vy, vm, 1) <= new Date(minD.getFullYear(), minD.getMonth(), 1)}
+          onClick={() => vm===0 ? (setVm(11),setVy(y=>y-1)) : setVm(m=>m-1)}
+          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 }, '&.Mui-disabled': { opacity: 0.3 } }}>
           <ChevronLeftIcon sx={{ fontSize: 14 }} />
         </IconButton>
         <Typography sx={{ fontWeight: 700, fontSize: 12, color: '#fff' }}>{MONTHS[vm].slice(0,3)} {vy}</Typography>
-        <IconButton size="small" onClick={() => vm===11 ? (setVm(0),setVy(y=>y+1)) : setVm(m=>m+1)}
-          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
+        <IconButton size="small"
+          disabled={maxD && new Date(vy, vm, 1) >= new Date(maxD.getFullYear(), maxD.getMonth(), 1)}
+          onClick={() => vm===11 ? (setVm(0),setVy(y=>y+1)) : setVm(m=>m+1)}
+          sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 }, '&.Mui-disabled': { opacity: 0.3 } }}>
           <ChevronRightIcon sx={{ fontSize: 14 }} />
         </IconButton>
         <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml: 0.5 }}>
@@ -211,7 +217,7 @@ function RangePicker({ startDate, endDate, onChange, minDate, onClose }) {
 }
 
 /* ─────────────── DateRangeField ─────────────── */
-function DateRangeField({ startDate, endDate, onChange, minDate, disabled: dis, label, required, error: fieldError }) {
+function DateRangeField({ startDate, endDate, onChange, minDate, maxDate, disabled: dis, label, required, error: fieldError }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef();
   const popupRef   = useRef();
@@ -278,6 +284,7 @@ function DateRangeField({ startDate, endDate, onChange, minDate, disabled: dis, 
             startDate={startDate} endDate={endDate}
             onChange={v => { onChange(v); if (v.start_date && v.end_date) setOpen(false); }}
             minDate={minDate}
+            maxDate={maxDate}
             onClose={() => setOpen(false)}
           />
         </Box>
@@ -493,6 +500,7 @@ export default function CycleDetailPage() {
   const isClone  = isNew && !!cloneId;
   const isCreate = isNew && !cloneId;
   const rollbackTargetId = searchParams.get('rollback') ? parseInt(searchParams.get('rollback'), 10) : null;
+  const editModeParam = searchParams.get('edit') === 'true';
   const stageDateRef = useRef(null);
 
   const [cycle, setCycle]     = useState(null);
@@ -504,7 +512,7 @@ export default function CycleDetailPage() {
   const [successMsg, setMsg]  = useState('');
 
   /* ── Edit mode: read-only by default for existing cycles ── */
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false || editModeParam);
 
   const [editName, setEditName]         = useState('');
   const [editDesc, setEditDesc]         = useState('');
@@ -544,23 +552,61 @@ export default function CycleDetailPage() {
   function markDirty() { if (!isNew) setIsDirty(true); }
 
   useEffect(() => {
-    if (!isNew) return;
+    if (!isNew && !isEditMode) return;
     const errors = {};
     if (touched.name  && !editName.trim()) errors.name = 'Required.';
     if (touched.name  && editName.trim().length > 100) errors.name = 'Max 100 chars.';
     if (touched.start && !editStart) errors.cycleDates = 'Start date required.';
     if (touched.end   && !editEnd)   errors.cycleDates = 'End date required.';
     if (touched.end && editStart && editEnd && editEnd <= editStart) errors.cycleDates = 'End must be after start.';
-    stages.forEach(s => {
-      const d = editStageDates[s.id] ?? {};
-      if (touched[`s${s.id}s`] && !d.start_date) errors[`s${s.id}`] = 'Required.';
-      if (touched[`s${s.id}e`] && !d.end_date)   errors[`s${s.id}`] = 'Required.';
-      if (d.start_date && d.end_date && d.end_date < d.start_date) errors[`s${s.id}`] = 'End before start.';
-      if (editStart && d.start_date && d.start_date < editStart) errors[`s${s.id}`] = `Before cycle start (${fmt(editStart)}).`;
-      if (editEnd   && d.end_date   && d.end_date > editEnd)     errors[`s${s.id}`] = `Please select a date on or before (${fmt(editEnd)}).`;
+
+    stages.forEach((s, idx) => {
+      const d        = editStageDates[s.id] ?? {};
+      const prevS    = idx > 0 ? (editStageDates[stages[idx - 1].id] ?? {}) : null;
+      const nextS    = idx < stages.length - 1 ? (editStageDates[stages[idx + 1].id] ?? {}) : null;
+      const isTouched = touched[`s${s.id}s`] || touched[`s${s.id}e`];
+
+      if (!isTouched) return;
+
+      if (!d.start_date) { errors[`s${s.id}`] = 'Start date required.'; return; }
+      if (!d.end_date)   { errors[`s${s.id}`] = 'End date required.'; return; }
+
+      // end must be after start
+      if (d.end_date <= d.start_date) {
+        errors[`s${s.id}`] = 'End date must be after start date.'; return;
+      }
+
+      // must be within cycle period
+      if (editStart && d.start_date < editStart) {
+        errors[`s${s.id}`] = `Must start on or after cycle start (${fmt(editStart)}).`; return;
+      }
+      if (editEnd && d.end_date > editEnd) {
+        errors[`s${s.id}`] = `Must end on or before cycle end (${fmt(editEnd)}).`; return;
+      }
+
+      // must start the day after previous stage ends (no gap, no overlap)
+      if (prevS?.end_date) {
+        const expectedStart = (() => {
+          const [y, m, d] = prevS.end_date.split('-').map(Number);
+          const next = new Date(y, m - 1, d + 1);
+          return `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+        })();
+        if (d.start_date < expectedStart) {
+          errors[`s${s.id}`] = `Overlaps with previous stage. Must start on ${fmt(expectedStart)}.`; return;
+        }
+        if (d.start_date > expectedStart) {
+          errors[`s${s.id}`] = `Gap with previous stage. Must start on ${fmt(expectedStart)}.`; return;
+        }
+      }
+
+      // must end before next stage starts
+      if (nextS?.start_date && d.end_date >= nextS.start_date) {
+        errors[`s${s.id}`] = `Overlaps with next stage (starts ${fmt(nextS.start_date)}).`; return;
+      }
     });
+
     setFieldErrors(errors);
-  }, [editName, editStart, editEnd, editStageDates, touched, isNew, stages]);
+  }, [editName, editStart, editEnd, editStageDates, touched, isNew, isEditMode, stages]);
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError('');
@@ -612,7 +658,7 @@ export default function CycleDetailPage() {
         });
         setEditStages(sd);
         setIsDirty(false);
-        setIsEditMode(false); // reset to read-only on data reload
+        setIsEditMode(!!rollbackTargetId || editModeParam); // reset to read-only on data reload
       }
     } catch (err) {
       setError(err?.response?.data?.error || err.message || 'Failed to load data.');
@@ -632,14 +678,16 @@ export default function CycleDetailPage() {
 
   // Compute days remaining
   const daysRemaining = (() => {
-    if (!cycle?.end_date || currentStatus !== 'ACTIVE') return null;
+    if (currentStatus !== 'ACTIVE' || !currentStageId) return null;
+    const currentStageWindow = stageWindows.find(w => w.stage_id === currentStageId);
+    if (!currentStageWindow?.end_date) return null;
     const today = new Date(); today.setHours(0,0,0,0);
-    const end = new Date(toDateOnly(cycle.end_date) + 'T00:00:00');
+    const end = new Date(toDateOnly(currentStageWindow.end_date) + 'T00:00:00');
     return Math.ceil((end - today) / (1000 * 60 * 60 * 24));
   })();
 
   const step0Valid = !!editName.trim() && !!editStart && !!editEnd && editEnd > editStart;
-  const step1Valid = stages.length > 0 && stages.every(s => editStageDates[s.id]?.start_date && editStageDates[s.id]?.end_date);
+  const step1Valid = true;
   const configuredCount = stages.filter(s => editStageDates[s.id]?.start_date && editStageDates[s.id]?.end_date).length;
   const durationDays = editStart && editEnd && editEnd > editStart
     ? Math.round((new Date(editEnd) - new Date(editStart)) / 86400000) : null;
@@ -696,28 +744,47 @@ export default function CycleDetailPage() {
 
   async function handleSubmit() {
     const allT = { name: true, start: true, end: true };
-    stages.forEach(s => { allT[`s${s.id}s`] = true; allT[`s${s.id}e`] = true; });
     setTouched(allT);
     if (!step0Valid || !step1Valid) { setSubmitError('Please fill in all required fields.'); return; }
-    const stageOutOfRange = stages.find(s => {
-      const d = editStageDates[s.id] ?? {};
-      if (!d.start_date || !d.end_date) return false;
-      if (editStart && d.start_date < editStart) return true;
-      if (editEnd   && d.end_date   > editEnd)   return true;
-      return false;
-    });
-    if (stageOutOfRange) {
-      setSubmitError(`Please update the "${stageOutOfRange.name}" stage dates so they fall within the cycle period (${fmt(editStart)} — ${fmt(editEnd)}).`);
-      return;
+    const anyStageSet = stages.some(s => editStageDates[s.id]?.start_date || editStageDates[s.id]?.end_date);
+    if (anyStageSet) {
+      const stageOutOfRange = stages.find(s => {
+        const d = editStageDates[s.id] ?? {};
+        if (!d.start_date || !d.end_date) return false;
+        if (editStart && d.start_date < editStart) return true;
+        if (editEnd   && d.end_date   > editEnd)   return true;
+        return false;
+      });
+      if (stageOutOfRange) {
+        setSubmitError(`Please update the "${stageOutOfRange.name}" stage dates so they fall within the cycle period (${fmt(editStart)} — ${fmt(editEnd)}).`);
+        return;
+      }
+      // Check sequential / no-overlap only if stages are partially/fully filled
+      for (let i = 1; i < stages.length; i++) {
+        const prev = editStageDates[stages[i - 1].id] ?? {};
+        const curr = editStageDates[stages[i].id] ?? {};
+        if (prev.end_date && curr.start_date) {
+          const expectedStart = (() => {
+            const [y, mo, dy] = prev.end_date.split('-').map(Number);
+            const next = new Date(y, mo - 1, dy + 1);
+            return `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+          })();
+          if (curr.start_date !== expectedStart) {
+            setSubmitError(`"${stages[i].name}" must start on ${fmt(expectedStart)} (day after "${stages[i-1].name}" ends).`);
+            return;
+          }
+        }
+      }
     }
     setSubmitting(true); setSubmitError('');
     try {
+      const configuredStages = stages.filter(s => editStageDates[s.id]?.start_date && editStageDates[s.id]?.end_date);
       const payload = {
         name: editName.trim(),
         description: editDesc.trim() || undefined,
         start_date: editStart,
         end_date: editEnd,
-        stages: stages.map(s => ({ stage_id: s.id, start_date: editStageDates[s.id]?.start_date, end_date: editStageDates[s.id]?.end_date })),
+        stages: configuredStages.map(s => ({ stage_id: s.id, start_date: editStageDates[s.id].start_date, end_date: editStageDates[s.id].end_date })),
       };
       let newCycle;
       if (isClone) {
@@ -735,6 +802,21 @@ export default function CycleDetailPage() {
 
   async function handleSave() {
     if (!editName.trim()) { setSaveError('Cycle name is required.'); return; }
+    for (let i = 1; i < stages.length; i++) {
+      const prev = editStageDates[stages[i - 1].id] ?? {};
+      const curr = editStageDates[stages[i].id] ?? {};
+      if (prev.end_date && curr.start_date) {
+        const expectedStart = (() => {
+          const [y, mo, dy] = prev.end_date.split('-').map(Number);
+          const next = new Date(y, mo - 1, dy + 1);
+          return `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+        })();
+        if (curr.start_date !== expectedStart) {
+          setSaveError(`"${stages[i].name}" must start on ${fmt(expectedStart)} (day after "${stages[i-1].name}" ends).`);
+          return;
+        }
+      }
+    }
     setIsSaving(true); setSaveError('');
     try {
       await updateCycle(id, {
@@ -927,7 +1009,12 @@ export default function CycleDetailPage() {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        ({daysRemaining} days remaining)
+                        {daysRemaining > 0
+                          ? `(Stage ends in ${daysRemaining} days)`
+                          : daysRemaining === 0
+                            ? '(Stage ends today)'
+                            : `(Stage overdue by ${Math.abs(daysRemaining)} days)`
+                        }
                       </Typography>
                     </Box>
                   )}
@@ -1040,20 +1127,6 @@ export default function CycleDetailPage() {
         )}
         {submitError && (
           <Alert severity="error" sx={{ borderRadius: 1.5, fontSize: 12, flexShrink: 0 }}>{submitError}</Alert>
-        )}
-
-        {/* Create/clone hint */}
-        {isNew && (
-          <Box sx={{ px: 1.5, py: 1, bgcolor: '#eff6ff', borderRadius: 1.5, border: '1px solid #bfdbfe', flexShrink: 0 }}>
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <InfoOutlinedIcon sx={{ fontSize: 14, color: '#3b82f6' }} />
-              <Typography fontSize={12} color="#1d4ed8" fontWeight={500}>
-                {isClone
-                  ? `Cloning from "${source?.name}". Set new dates for this cycle and each stage.`
-                  : 'Fill in the cycle name, overall period, then set date for all 5 stages.'}
-              </Typography>
-            </Stack>
-          </Box>
         )}
 
         {/* ── Two-column layout ── */}
@@ -1197,13 +1270,19 @@ export default function CycleDetailPage() {
                   Cancel
                 </Button>
                 <Button
-                  disabled={submitting || !step0Valid || !step1Valid}
+                  disabled={submitting || !step0Valid}
                   onClick={handleSubmit}
                   variant="contained"
                   startIcon={submitting
                     ? <CircularProgress size={13} color="inherit" />
                     : isClone ? <ContentCopyIcon sx={{ fontSize: 14 }} /> : null}
-                  sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, background: gradient, '&:hover': { background: gradient, opacity: 0.9 }, '&.Mui-disabled': { opacity: 0.5 } }}>
+                  sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, background: gradient, 
+                    '&:hover': { background: gradient, opacity: 0.9 }, 
+                    '&.Mui-disabled': {
+                      opacity: 1,
+                      background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                      color: 'rgba(255,255,255,0.75)',
+                    } }}>
                   {submitting ? (isClone ? 'Cloning…' : 'Creating…') : (isClone ? 'Clone Cycle' : 'Create Cycle')}
                 </Button>
               </Stack>
@@ -1231,7 +1310,7 @@ export default function CycleDetailPage() {
               sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
               <Typography fontWeight={700} fontSize={13} color="#1e293b">Stage Dates</Typography>
               <Typography fontSize={11} color="#94a3b8">
-                {isNew ? `${configuredCount}/5 configured` : formEditable ? 'Edit inline' : 'Read-only'}
+                {isNew ? `${configuredCount}/5 configured (optional)` : formEditable ? 'Edit inline' : 'Read-only'}
               </Typography>
             </Stack>
 
@@ -1321,7 +1400,8 @@ export default function CycleDetailPage() {
                           startDate={stageStart}
                           endDate={stageEnd}
                           onChange={val => updateStageDraft(stage.id, val)}
-                          minDate={rollbackTargetId ? undefined : (editStart || undefined)}
+                          minDate={editStart || undefined}
+                          maxDate={editEnd || undefined}
                           disabled={false}
                           error={hasErr ? fieldErrors[`s${stage.id}`] : undefined}
                         />

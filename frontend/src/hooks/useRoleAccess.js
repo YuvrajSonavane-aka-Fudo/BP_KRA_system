@@ -1,49 +1,37 @@
-import useAuth from '../auth/useAuth';
-
+import useAuth from '../auth/useAuth'; 
 const ROLE = {
-  ADMIN:          'Admin',
-  HR:             'HR',
-  VERTICAL_LEAD:  'Vertical Lead',
-  TEAM_LEAD:      'Manager',   // backend uses "Manager" for reporting manager / team lead
-  EMPLOYEE:       'Employee',
+  ADMIN:     'Admin',
+  MANAGER:   'Manager',
+  EMPLOYEE:  'Employee',
 };
 
-/**
- * useRoleAccess — exposes boolean flags for the current user's roles.
- *
- * Usage:
- *   const { isHR, isLead, canManageCycles } = useRoleAccess();
- */
 export default function useRoleAccess() {
   const { user } = useAuth();
   const roles = user?.roles ?? [];
 
   const hasRole = (...names) => names.some((n) => roles.includes(n));
 
-  const isAdmin         = hasRole(ROLE.ADMIN);
-  const isHR            = hasRole(ROLE.HR, ROLE.ADMIN);
-  const isVerticalLead  = hasRole(ROLE.VERTICAL_LEAD);
-  const isTeamLead      = hasRole(ROLE.TEAM_LEAD);
-  const isEmployee      = hasRole(ROLE.EMPLOYEE);
+  const isAdmin    = hasRole(ROLE.ADMIN);
+  const isManager  = hasRole(ROLE.MANAGER);
+  const isEmployee = hasRole(ROLE.EMPLOYEE);
 
-  // Composite permissions
-  const canManageCycles    = isHR;                              // create / activate / clone
-  const canAssignKRAs      = isHR || isVerticalLead;           // bulk assignment stage
-  const canAddProjectKRAs  = isTeamLead;                       // KRA assignment by lead stage
-  const canViewAllEmployees = isHR || isVerticalLead;
-  const canLeadAssess      = isTeamLead || isVerticalLead || isHR;
+  const canManageCycles   = isAdmin || isManager;
+  const canAssignKRAs     = isAdmin || isManager;
+  const canManageOrg      = isAdmin;          // only Admin touches Org-level
+  const canManage         = isAdmin || isManager;
+  const canLeadAssess     = isAdmin || isManager;
+  const canViewAllEmployees = isAdmin || isManager;
 
   return {
     roles,
     isAdmin,
-    isHR,
-    isVerticalLead,
-    isTeamLead,
+    isManager,
     isEmployee,
+    canManage,
+    canManageOrg,
     canManageCycles,
     canAssignKRAs,
-    canAddProjectKRAs,
-    canViewAllEmployees,
     canLeadAssess,
+    canViewAllEmployees,
   };
 }

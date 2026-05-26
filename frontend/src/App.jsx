@@ -22,7 +22,7 @@ import ReportsPage from './pages/reports/ReportsPage';
 
 import ROUTES from './config/routes';
 import './assets/styles/global.css';
-
+const NON_EMPLOYEE_ROLES = ['Admin', 'HR', 'Vertical Lead', 'Manager'];
 const theme = createTheme({
   palette: {
     primary:    { main: '#1E3A8A' },
@@ -37,9 +37,9 @@ const theme = createTheme({
   },
 });
 
-function Protected({ children }) {
+function Protected({ children , allowedRoles  }) {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowedRoles={allowedRoles}>
       <MainLayout>{children}</MainLayout>
     </ProtectedRoute>
   );
@@ -55,16 +55,16 @@ function AppRoutes() {
       {/* Protected */}
       <Route path={ROUTES.DASHBOARD}    element={<Protected><DashboardPage /></Protected>} />
       <Route path={ROUTES.CYCLE_DETAIL} element={<Protected><CycleDetailPage /></Protected>} />
-      <Route path={ROUTES.CYCLES}       element={<Protected><CyclesListPage /></Protected>} />
-      <Route path={ROUTES.KRA_LIBRARY}  element={<Protected><KRALibraryPage /></Protected>} />
-      <Route path={ROUTES.ASSIGNMENTS}  element={<Protected><BulkAssignmentPage /></Protected>} />
+      <Route path={ROUTES.CYCLES}       element={<Protected allowedRoles={NON_EMPLOYEE_ROLES}><CyclesListPage /></Protected>} />
+      <Route path={ROUTES.KRA_LIBRARY}  element={<Protected allowedRoles={NON_EMPLOYEE_ROLES}><KRALibraryPage /></Protected>} />
+      <Route path={ROUTES.ASSIGNMENTS}  element={<Protected allowedRoles={NON_EMPLOYEE_ROLES}><BulkAssignmentPage /></Protected>} />
 
       {/* Assessment pages */}
       <Route path={ROUTES.ASSESSMENTS_SELF} element={<Protected><SelfAssessmentPage /></Protected>} />
-      <Route path={ROUTES.TEAM_PERFORMANCE} element={<Protected><TeamPerformancePage /></Protected>} />
+      <Route path={ROUTES.TEAM_PERFORMANCE} element={<Protected allowedRoles={NON_EMPLOYEE_ROLES}><TeamPerformancePage /></Protected>} />
 
       {/*Reports*/ }
-      <Route path={ROUTES.REPORTS} element={<Protected><ReportsPage /></Protected>} />
+      <Route path={ROUTES.REPORTS} element={<Protected allowedRoles={NON_EMPLOYEE_ROLES}><ReportsPage /></Protected>} />
 
       {/* Catch-all */}
       <Route path="/"  element={<Navigate to={ROUTES.DASHBOARD} replace />} />
