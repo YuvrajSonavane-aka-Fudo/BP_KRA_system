@@ -40,7 +40,7 @@ import {
 import EmployeeKRAView from './EmployeeKRAView';
 
 const G = 'linear-gradient(135deg, #1E3A8A 0%, #1e40af 60%, #1d4ed8 100%)';
-const ORG_COLOR  = { bg: '#f0fdf4', border: '#86efac', text: '#15803d', chip: '#dcfce7', icon: '#16a34a' };
+const ORG_COLOR = { bg: '#f0fdf4', border: '#86efac', text: '#15803d', chip: '#dcfce7', icon: '#16a34a' };
 const PROJ_COLOR = { bg: '#eff6ff', border: '#93c5fd', text: '#1d4ed8', chip: '#dbeafe', icon: '#2563eb' };
 
 const WRITE_STAGES = ['ACTIVE', 'DRAFT'];
@@ -48,8 +48,8 @@ const WRITE_STAGES = ['ACTIVE', 'DRAFT'];
 const typeColor = (isStd) => (isStd ? ORG_COLOR : PROJ_COLOR);
 const typeLabel = (isStd) => (isStd ? 'Org' : 'Project');
 
-const getLevelId  = (level) => level.kra_level_id ?? level.id;
-const makeKey     = (kraId, level) => `${kraId}_${getLevelId(level)}`;
+const getLevelId = (level) => level.kra_level_id ?? level.id;
+const makeKey = (kraId, level) => `${kraId}_${getLevelId(level)}`;
 
 function initials(name = '') {
   return name.split(' ').map(n => n[0]).filter(Boolean).join('').toUpperCase().slice(0, 2);
@@ -127,8 +127,8 @@ function CycleBanner({ cycle, allCycles, onCycleChange, isReadOnly }) {
               sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 12, fontWeight: 600, borderRadius: 1.5, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.45)' }, '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.7)' } }}>
               {allCycles.active?.length > 0 && <MenuItem disabled sx={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Active</MenuItem>}
               {allCycles.active?.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8' }}>{c.name}</MenuItem>)}
-              {allCycles.draft?.length > 0  && <MenuItem disabled sx={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mt: 0.5 }}>Draft / On Hold</MenuItem>}
-              {allCycles.draft?.map(c  => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, fontWeight: 600 }}>{c.name}</MenuItem>)}
+              {allCycles.draft?.length > 0 && <MenuItem disabled sx={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mt: 0.5 }}>Draft / On Hold</MenuItem>}
+              {allCycles.draft?.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, fontWeight: 600 }}>{c.name}</MenuItem>)}
               {allCycles.closed?.length > 0 && <MenuItem disabled sx={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', mt: 0.5 }}>Closed (Read Only)</MenuItem>}
               {allCycles.closed?.map(c => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12, color: '#94a3b8' }}>{c.name}</MenuItem>)}
             </Select>
@@ -161,7 +161,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
   // FIX: grouped does NOT depend on selectedKraSet — pure filter/group only
   const grouped = useMemo(() => {
     let list = kras;
-    if (typeFilter === 'org')     list = list.filter(k => k.is_standard === true);
+    if (typeFilter === 'org') list = list.filter(k => k.is_standard === true);
     if (typeFilter === 'project') list = list.filter(k => k.is_standard === false);
     if (levelFilter) list = list.filter(k => (k.levels ?? []).some(l => l.level_name === levelFilter));
     if (search.trim()) {
@@ -179,7 +179,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
     categories.forEach(cat => {
       const matchesTypeFilter =
         typeFilter === 'all' ||
-        (typeFilter === 'org'     && cat.is_standard === true) ||
+        (typeFilter === 'org' && cat.is_standard === true) ||
         (typeFilter === 'project' && cat.is_standard === false);
       if (!matchesTypeFilter) return;
       map[cat.id] = {
@@ -219,7 +219,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
         (kra.levels ?? []).map(level => ({
           kra, level, kraLevelId: makeKey(kra.id, level),
         }))
-      ).sort((a, b) =>{
+      ).sort((a, b) => {
         const aSelected = selectedKraSet.has(a.kraLevelId);
         const bSelected = selectedKraSet.has(b.kraLevelId);
 
@@ -244,7 +244,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
     [groupedWithRows]
   );
   // useMemo: .every()/.some() over all visible ids — don't recompute every render
-  const allSelected  = useMemo(
+  const allSelected = useMemo(
     () => allVisibleIds.length > 0 && allVisibleIds.every(id => selectedKraSet.has(id)),
     [allVisibleIds, selectedKraSet]
   );
@@ -292,7 +292,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
       </Stack>
 
       <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, mb: 0.5, borderRadius: 1.5, bgcolor: someSelected ? '#f0f9ff' : '#fafafa', border: `1px solid ${someSelected ? '#bae6fd' : '#f1f5f9'}` }}>
-        <Checkbox size="small" disabled={isReadOnly || allVisibleIds.length === 0} indeterminate={someSelected && !allSelected} checked={allSelected} onChange={() => {}} onClick={() => { if (isReadOnly || allVisibleIds.length === 0) return; onToggleKRA(allVisibleIds, allSelected ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5 }} />
+        <Checkbox size="small" disabled={isReadOnly || allVisibleIds.length === 0} indeterminate={someSelected && !allSelected} checked={allSelected} onChange={() => { }} onClick={() => { if (isReadOnly || allVisibleIds.length === 0) return; onToggleKRA(allVisibleIds, allSelected ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5 }} />
         <Typography fontSize={10} fontWeight={700} color="#475569" textTransform="uppercase" letterSpacing="0.06em" ml={0.75}>Select All Visible ({allVisibleIds.length})</Typography>
         {someSelected && <Typography fontSize={10} color="#0284c7" fontWeight={700} ml="auto">{selectedKraSet.size} / {totalKraLevelCount} total</Typography>}
       </Box>
@@ -306,15 +306,15 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
           </Box>
         ) : groupedWithRows.map(group => {
           const catLevelIds = group.rows.map(r => r.kraLevelId);
-          const catAll  = catLevelIds.length > 0 && catLevelIds.every(id => selectedKraSet.has(id));
+          const catAll = catLevelIds.length > 0 && catLevelIds.every(id => selectedKraSet.has(id));
           const catSome = catLevelIds.some(id => selectedKraSet.has(id));
-          const isOpen  = !!expanded[group.cid];
-          const tc      = typeColor(group.isStd);
+          const isOpen = !!expanded[group.cid];
+          const tc = typeColor(group.isStd);
           const selCount = catLevelIds.filter(id => selectedKraSet.has(id)).length;
           return (
             <Box key={group.cid} sx={{ mb: 0.75 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.85, borderRadius: 1.5, bgcolor: tc.bg, border: `1px solid ${tc.border}`, mb: 0.4 }}>
-                <Checkbox size="small" disabled={isReadOnly} indeterminate={catSome && !catAll} checked={catAll && catLevelIds.length > 0} onChange={() => {}} onClick={e => { e.stopPropagation(); if (isReadOnly) return; onToggleKRA(catLevelIds, catAll ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5, mr: 0.5, flexShrink: 0, color: tc.text, '&.Mui-checked': { color: tc.text } }} />
+                <Checkbox size="small" disabled={isReadOnly} indeterminate={catSome && !catAll} checked={catAll && catLevelIds.length > 0} onChange={() => { }} onClick={e => { e.stopPropagation(); if (isReadOnly) return; onToggleKRA(catLevelIds, catAll ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5, mr: 0.5, flexShrink: 0, color: tc.text, '&.Mui-checked': { color: tc.text } }} />
                 <Box flex={1} minWidth={0} onClick={() => toggleExpand(group.cid)} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', userSelect: 'none' }}>
                   <Typography fontSize={12} fontWeight={800} color={tc.text} noWrap>{group.name}</Typography>
                   <Typography fontSize={11} fontWeight={600} color={tc.text} sx={{ opacity: 0.7 }}>({group.rows.length})</Typography>
@@ -327,10 +327,10 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
                 <Box sx={{ pl: 1.5 }}>
                   {group.rows.map(({ kra, level, kraLevelId }) => {
                     const isSelected = selectedKraSet.has(kraLevelId);
-                    const ktc        = typeColor(kra.is_standard);
-                    const dupCount   = employeeDuplicateMap?.get(kraLevelId) ?? 0;
-                    const hasDup     = dupCount > 0;
-                    const toggle     = () => { if (!isReadOnly) onToggleKRA([kraLevelId], isSelected ? 'deselect' : 'select'); };
+                    const ktc = typeColor(kra.is_standard);
+                    const dupCount = employeeDuplicateMap?.get(kraLevelId) ?? 0;
+                    const hasDup = dupCount > 0;
+                    const toggle = () => { if (!isReadOnly) onToggleKRA([kraLevelId], isSelected ? 'deselect' : 'select'); };
                     return (
                       <Box key={kraLevelId} onClick={toggle} sx={{
                         ...SX.kraItemBase,
@@ -339,7 +339,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
                         border: `1px solid ${isSelected ? '#93c5fd' : hasDup ? '#fde68a' : 'transparent'}`,
                         '&:hover': { bgcolor: isReadOnly ? 'transparent' : isSelected ? '#dbeafe' : '#f8fafc', border: `1px solid ${isReadOnly ? 'transparent' : isSelected ? '#93c5fd' : '#e2e8f0'}` },
                       }}>
-                        <Checkbox size="small" checked={isSelected} disabled={isReadOnly} onChange={() => {}} onClick={e => { e.stopPropagation(); toggle(); }} sx={{ p: 0, mr: 1.25, flexShrink: 0 }} />
+                        <Checkbox size="small" checked={isSelected} disabled={isReadOnly} onChange={() => { }} onClick={e => { e.stopPropagation(); toggle(); }} sx={{ p: 0, mr: 1.25, flexShrink: 0 }} />
                         <Box flex={1} minWidth={0}>
                           <Stack direction="row" alignItems="center" gap={1}>
                             <Typography fontSize={12} fontWeight={isSelected ? 700 : 500} color="#1e293b" noWrap>
@@ -370,7 +370,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
 
 // ─── Employee Panel ───────────────────────────────────────────────────────────
 const COL_SX = {
-  id:   { width: 48, flexShrink: 0 },
+  id: { width: 48, flexShrink: 0 },
   name: { flex: 1, minWidth: 0 },
   role: { flex: 1, minWidth: 0 },
 };
@@ -403,11 +403,11 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
     return () => { el.removeEventListener('scroll', onScroll); ro.disconnect(); };
   }, []);
 
-  const totalH    = items.length * EMP_ROW_H;
-  const startIdx  = Math.max(0, Math.floor(scrollTop / EMP_ROW_H) - VIRT_OVERSCAN);
+  const totalH = items.length * EMP_ROW_H;
+  const startIdx = Math.max(0, Math.floor(scrollTop / EMP_ROW_H) - VIRT_OVERSCAN);
   const visibleCt = Math.ceil(viewportH / EMP_ROW_H) + VIRT_OVERSCAN * 2;
-  const endIdx    = Math.min(items.length, startIdx + visibleCt);
-  const visible   = items.slice(startIdx, endIdx);
+  const endIdx = Math.min(items.length, startIdx + visibleCt);
+  const visible = items.slice(startIdx, endIdx);
   const offsetTop = startIdx * EMP_ROW_H;
 
   return (
@@ -415,7 +415,7 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
       <Box sx={{ height: totalH, position: 'relative' }}>
         <Box sx={{ position: 'absolute', top: offsetTop, left: 0, right: 0 }}>
           {visible.map(emp => {
-            const isSel      = selectedEmpSet.has(emp.employee_id);
+            const isSel = selectedEmpSet.has(emp.employee_id);
             const isAssigned = emp.assigned_to_cycle;
             return (
               <Box key={emp.employee_id} sx={{
@@ -461,10 +461,10 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
 
 const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, onToggleEmployee, isReadOnly, onView }) {
   const [searchRaw, setSearchRaw] = useState('');
-  const [tab, setTab]             = useState(0);
-  const [deptFilter, setDept]     = useState('');
-  const [levelFilter, setLevel]   = useState('');
-  const [sort, setSort]           = useState({ col: 'id', dir: 'asc' });
+  const [tab, setTab] = useState(0);
+  const [deptFilter, setDept] = useState('');
+  const [levelFilter, setLevel] = useState('');
+  const [sort, setSort] = useState({ col: 'id', dir: 'asc' });
 
   // FIX: debounce search
   const search = useDebounce(searchRaw, 180);
@@ -476,8 +476,8 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
     return m;
   }, [employees]);
 
-  const depts  = useMemo(() => [...new Set(employees.map(e => e.department).filter(Boolean))].sort(), [employees]);
-  const levels = useMemo(() => [...new Set(employees.map(e => e.level).filter(Boolean))].sort(),      [employees]);
+  const depts = useMemo(() => [...new Set(employees.map(e => e.department).filter(Boolean))].sort(), [employees]);
+  const levels = useMemo(() => [...new Set(employees.map(e => e.level).filter(Boolean))].sort(), [employees]);
 
   const handleSort = (col) => {
     setSort(prev => prev.col === col
@@ -494,7 +494,7 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
     let list = employees;
     if (tab === 1) list = list.filter(e => e.assigned_to_cycle);
     if (tab === 2) list = list.filter(e => !e.assigned_to_cycle);
-    if (deptFilter)  list = list.filter(e => e.department === deptFilter);
+    if (deptFilter) list = list.filter(e => e.department === deptFilter);
     if (levelFilter) list = list.filter(e => e.level === levelFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -538,14 +538,14 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
       return 0;
     });
     return list;
-  }, [employees, tab, deptFilter, levelFilter, search, sort,selectedEmpSet]); // ← selectedEmpSet removed
+  }, [employees, tab, deptFilter, levelFilter, search, sort, selectedEmpSet]); // ← selectedEmpSet removed
 
   // These counts are cheap — they only read employees, not selectedEmpSet
-  const assigned   = useMemo(() => employees.filter(e => e.assigned_to_cycle).length, [employees]);
+  const assigned = useMemo(() => employees.filter(e => e.assigned_to_cycle).length, [employees]);
   const unassigned = employees.length - assigned;
 
   // useMemo: avoid re-running .every()/.some() on every render
-  const allSel  = useMemo(
+  const allSel = useMemo(
     () => filtered.length > 0 && filtered.every(e => selectedEmpSet.has(e.employee_id)),
     [filtered, selectedEmpSet]
   );
@@ -679,7 +679,7 @@ function PreviewAssignModal({
 
   // FIX: build a Set for O(1) localEmpIds lookup
   const localEmpIdSet = useMemo(() => new Set(localEmpIds), [localEmpIds]);
-  const selectedEmps  = useMemo(
+  const selectedEmps = useMemo(
     () => employees.filter(e => localEmpIdSet.has(e.employee_id)),
     [employees, localEmpIdSet]
   );
@@ -715,12 +715,12 @@ function PreviewAssignModal({
         }
       }
     });
-    const selectedKras  = kraLibrary.filter(k => (k.levels ?? []).some(l => localKraIdSet.has(makeKey(k.id, l))));
-    const uniqueCatIds  = [...new Set(selectedKras.map(k => k.category_id))];
+    const selectedKras = kraLibrary.filter(k => (k.levels ?? []).some(l => localKraIdSet.has(makeKey(k.id, l))));
+    const uniqueCatIds = [...new Set(selectedKras.map(k => k.category_id))];
     const count = uniqueCatIds.length;
-    const base  = count ? Math.floor(100 / count) : 0;
-    const rem   = count ? 100 - base * (count - 1) : 0;
-    const cats  = uniqueCatIds.map((cid, i) => ({ category_id: cid, weightage: String(i === count - 1 ? rem : base) }));
+    const base = count ? Math.floor(100 / count) : 0;
+    const rem = count ? 100 - base * (count - 1) : 0;
+    const cats = uniqueCatIds.map((cid, i) => ({ category_id: cid, weightage: String(i === count - 1 ? rem : base) }));
     await onConfirmAssign({ localEmpIds, kraLevelIds, kraSelections, kraLevelToKraId, categories: cats, kra_level_ids: kraLevelIds });
   };
 
@@ -868,30 +868,30 @@ function ToastStack({ toasts }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function BulkAssignmentPage() {
   const { toasts, push: showToast } = useToasts();
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState('');
-  const [refetching, setRefetching]   = useState(false);
-  const [categories, setCategories]   = useState([]);
-  const [allCycles, setAllCycles]     = useState({ active: [], draft: [], closed: [] });
-  const [kraLibrary, setKraLibrary]   = useState([]);
-  const [employees, setEmployees]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [refetching, setRefetching] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [allCycles, setAllCycles] = useState({ active: [], draft: [], closed: [] });
+  const [kraLibrary, setKraLibrary] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [activeCycle, setActiveCycle] = useState(null);
   const [assignedKRAMap, setAssignedKRAMap] = useState({});
 
   const [selectedKraSet, setSelectedKraSet] = useState(new Set());
   const [selectedEmpSet, setSelectedEmpSet] = useState(new Set());
 
-  const [assigning, setAssigning]     = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [viewEmployee, setViewEmployee]   = useState(null);
-  const [cloneDefault, setCloneDefault]   = useState(false);
+  const [viewEmployee, setViewEmployee] = useState(null);
+  const [cloneDefault, setCloneDefault] = useState(false);
   const hasMounted = useRef(false);
   const [leftPct, setLeftPct] = useState(50);
   const containerRef = useRef(null);
   const dragging = useRef(false);
 
   const isReadOnly = !WRITE_STAGES.includes(activeCycle?.status);
-  const canEdit    = !isReadOnly;
+  const canEdit = !isReadOnly;
   const onMouseDown = useCallback((e) => {
     e.preventDefault();
     dragging.current = true;
@@ -951,7 +951,7 @@ export default function BulkAssignmentPage() {
     const map = {};
     empList.forEach(e => {
       if (!e.employee_kra_cycle_id) return;
-      const cached        = getAssignmentFromCache(e.employee_kra_cycle_id);
+      const cached = getAssignmentFromCache(e.employee_kra_cycle_id);
       const apiKraLevelIds = (e.assigned_kras ?? []).map(k => k.kra_level_id).filter(Boolean);
       if (cached?.kra_level_ids?.length) {
         const merged = [...new Set([...cached.kra_level_ids, ...apiKraLevelIds])];
@@ -976,13 +976,13 @@ export default function BulkAssignmentPage() {
         const { categories: cats, activeCycle: ac, allCycles: cycles, kraLibrary: kl } = await loadKRAAssignmentPageData();
         setCategories(cats); setKraLibrary(kl); setAllCycles(cycles); setActiveCycle(ac);
         if (ac) {
-          const res  = await getEmployees(ac.id);
+          const res = await getEmployees(ac.id);
           const emps = res.data.employees ?? [];
           setEmployees(emps);
           rebuildAssignedMap(emps);
         }
       } catch { setError('Unable to load the page. Please check your connection and try again.'); }
-      finally  { setLoading(false); }
+      finally { setLoading(false); }
     })();
   }, []);
 
@@ -999,7 +999,7 @@ export default function BulkAssignmentPage() {
       rebuildAssignedMap(emps);
       if (pageData) { setKraLibrary(pageData.kraLibrary); setCategories(pageData.categories); }
     } catch { showToast('Could not refresh data.', 'error'); }
-    finally  { setRefetching(false); }
+    finally { setRefetching(false); }
   }, [activeCycle, rebuildAssignedMap]);
 
   const handleManualRefresh = useCallback(() => {
@@ -1025,7 +1025,7 @@ export default function BulkAssignmentPage() {
   const handleToggleKRA = useCallback((ids, mode) => {
     setSelectedKraSet(prev => {
       const next = new Set(prev);
-      if (mode === 'select_all'   || mode === 'select')   ids.forEach(id => next.add(id));
+      if (mode === 'select_all' || mode === 'select') ids.forEach(id => next.add(id));
       if (mode === 'deselect_all' || mode === 'deselect') ids.forEach(id => next.delete(id));
       return next;
     });
@@ -1034,7 +1034,7 @@ export default function BulkAssignmentPage() {
   const handleToggleEmployee = useCallback((ids, mode) => {
     setSelectedEmpSet(prev => {
       const next = new Set(prev);
-      if (mode === 'select_all'   || mode === 'select')   ids.forEach(id => next.add(id));
+      if (mode === 'select_all' || mode === 'select') ids.forEach(id => next.add(id));
       if (mode === 'deselect_all' || mode === 'deselect') ids.forEach(id => next.delete(id));
       return next;
     });
@@ -1085,7 +1085,7 @@ export default function BulkAssignmentPage() {
       if (failed.length === 0) {
         const parts = [];
         if (enrolled.length) parts.push(`${enrolled.length} assigned`);
-        if (skipped.length)  parts.push(`${skipped.length} skipped (already had these KRAs)`);
+        if (skipped.length) parts.push(`${skipped.length} skipped (already had these KRAs)`);
         showToast(parts.join(', ') + '.', 'success');
       } else {
         showToast(enrolled.length > 0 ? `${enrolled.length} assigned, ${failed.length} failed.` : 'Assignment failed.', enrolled.length > 0 ? 'warning' : 'error');
@@ -1098,7 +1098,7 @@ export default function BulkAssignmentPage() {
   const handleDirectAssign = useCallback(async () => {
     const kraLevelIds = [];
     const kraLevelToKraId = {};
-    const kraSelections   = [];
+    const kraSelections = [];
     selectedKraLevelIds.forEach(compositeKey => {
       for (const kra of kraLibrary) {
         for (const level of (kra.levels ?? [])) {
@@ -1117,9 +1117,9 @@ export default function BulkAssignmentPage() {
     const selectedKras = kraLibrary.filter(k => (k.levels ?? []).some(l => selectedKraLevelIds.includes(makeKey(k.id, l))));
     const uniqueCatIds = [...new Set(selectedKras.map(k => k.category_id))];
     const count = uniqueCatIds.length;
-    const base  = count ? Math.floor(100 / count) : 0;
-    const rem   = count ? 100 - base * (count - 1) : 0;
-    const cats  = uniqueCatIds.map((cid, i) => ({ category_id: cid, weightage: String(i === count - 1 ? rem : base) }));
+    const base = count ? Math.floor(100 / count) : 0;
+    const rem = count ? 100 - base * (count - 1) : 0;
+    const cats = uniqueCatIds.map((cid, i) => ({ category_id: cid, weightage: String(i === count - 1 ? rem : base) }));
     await doAssign({ localEmpIds: selectedEmployeeIds, kraLevelIds, kraSelections, kraLevelToKraId, categories: cats, kra_level_ids: kraLevelIds });
   }, [selectedKraLevelIds, selectedEmployeeIds, kraLibrary, doAssign]);
 
@@ -1178,7 +1178,7 @@ export default function BulkAssignmentPage() {
         ));
       }
       showToast(`${kraKeys.length} KRA${kraKeys.length !== 1 ? 's' : ''} deleted.`, 'success');
-      handleRefresh(); 
+      handleRefresh();
     } catch (e) { showToast(e?.response?.data?.message || 'Delete failed.', 'error'); }
   };
 
@@ -1205,7 +1205,7 @@ export default function BulkAssignmentPage() {
     try {
       await bulkRemoveEmployees(toDelete.map(e => e.employee_kra_cycle_id));
       bulkRemoveFromCache(toDelete.map(e => e.employee_kra_cycle_id));
-      const removedEkIds  = new Set(toDelete.map(e => e.employee_kra_cycle_id));
+      const removedEkIds = new Set(toDelete.map(e => e.employee_kra_cycle_id));
       const removedEmpIds = new Set(toDelete.map(e => e.employee_id));
       setEmployees(prev => prev.map(e =>
         removedEmpIds.has(e.employee_id) ? { ...e, assigned_to_cycle: false, employee_kra_cycle_id: null } : e
@@ -1213,40 +1213,139 @@ export default function BulkAssignmentPage() {
       setAssignedKRAMap(prev => { const next = { ...prev }; removedEkIds.forEach(id => delete next[id]); return next; });
       setSelectedEmpSet(new Set());
       showToast(`${toDelete.length} employee${toDelete.length !== 1 ? 's' : ''} removed.`, 'success');
-      handleRefresh(); 
-    } catch { showToast('Bulk remove failed.', 'error'); } 
+      handleRefresh();
+    } catch { showToast('Bulk remove failed.', 'error'); }
     finally { setGlobalLoading(false); setGlobalLoadingMsg(''); }
-    
+
   };
 
-  const handleCloneEmployee = (emp) => { setCloneDefault(true);  setViewEmployee(emp); };
-  const handleViewEmployee  = (emp) => { setCloneDefault(false); setViewEmployee(emp); };
+  const handleCloneEmployee = (emp) => { setCloneDefault(true); setViewEmployee(emp); };
+  const handleViewEmployee = (emp) => { setCloneDefault(false); setViewEmployee(emp); };
 
-  const handleCloneTo = async (targetIds, mode) => {
+  const handleCloneTo = async (targetEmployeeIds, mode, selectedKraKeys = []) => {
     try {
-      await cloneAssignmentToMany(targetIds, viewEmployee.employee_kra_cycle_id, mode);
-      const sourceCache       = getAssignmentFromCache(viewEmployee.employee_kra_cycle_id);
-      const sourceKraLevelIds = sourceCache?.kra_level_ids ?? [];
-      const sourceCategories  = sourceCache?.categories ?? [];
-      targetIds.forEach(ekId => {
+      const allSelected = employees.filter(e => targetEmployeeIds.includes(e.employee_id));
+      const assigned = allSelected.filter(e => e.employee_kra_cycle_id != null);
+      const unassigned = allSelected.filter(e => e.employee_kra_cycle_id == null);
+
+      const sourceCache = getAssignmentFromCache(viewEmployee.employee_kra_cycle_id);
+      const allSourceKraIds = sourceCache?.kra_level_ids ?? [];
+      const sourceCategories = sourceCache?.categories ?? [];
+
+      // Keys from checkedKRAs are "kraId-levelId" (dash-separated).
+      // Extract the numeric kra_level_id from each key and filter allSourceKraIds.
+      let kraIdsToClone;
+      if (selectedKraKeys.length > 0) {
+        const selectedLevelIds = new Set(
+          selectedKraKeys.map(key => {
+            const parts = key.split('-');
+            return Number(parts[parts.length - 1]);
+          }).filter(n => !isNaN(n) && n > 0)
+        );
+        kraIdsToClone = allSourceKraIds.filter(id => selectedLevelIds.has(id));
+        // If nothing matched (e.g. key format mismatch), fall back to all
+        if (kraIdsToClone.length === 0) kraIdsToClone = allSourceKraIds;
+      } else {
+        kraIdsToClone = allSourceKraIds;
+      }
+
+      // Derive categories that are relevant to the KRAs being cloned
+      const kraIdsToCloneSet = new Set(kraIdsToClone);
+      const relevantCatIds = new Set(
+        kraIdsToClone.flatMap(levelId => {
+          const entry = kraLevelIndexMap.get(levelId);
+          return entry ? [entry.kra.category_id] : [];
+        })
+      );
+      const categoriesToClone = sourceCategories.filter(c => relevantCatIds.has(c.category_id));
+      // If no category filter matched, use all source categories
+      const finalCategories = categoriesToClone.length > 0 ? categoriesToClone : sourceCategories;
+
+      // Step 1 — enrol unassigned employees with only the selected KRAs
+      let newlyEnrolled = [];
+      if (unassigned.length > 0) {
+        const enrolRes = await bulkAssignKRAs(
+          activeCycle.id,
+          {
+            assignments: unassigned.map(e => ({ employee_id: e.employee_id })),
+            shared: {
+              kra_level_ids: kraIdsToClone,
+              categories: finalCategories,
+              is_date_based: false,
+            },
+            enrol_mode: 'skip',
+          }
+        );
+
+        newlyEnrolled = enrolRes?.data?.enrolled ?? [];
+
+        // Update employees state with their new employee_kra_cycle_id
+        setEmployees(prev => {
+          const enrolMap = {};
+          newlyEnrolled.forEach(e => { enrolMap[e.employee_id] = e.employee_kra_cycle_id; });
+          return prev.map(e =>
+            enrolMap[e.employee_id]
+              ? { ...e, assigned_to_cycle: true, employee_kra_cycle_id: enrolMap[e.employee_id] }
+              : e
+          );
+        });
+      }
+
+      // Step 2 — copy selected KRAs to already-assigned employees via bulk assign append
+      const assignedCycleIds = assigned.map(e => e.employee_kra_cycle_id);
+      const newlyEnrolledCycleIds = newlyEnrolled.map(e => e.employee_kra_cycle_id);
+      const allTargetCycleIds = [...assignedCycleIds, ...newlyEnrolledCycleIds];
+
+      if (assigned.length > 0) {
+        await bulkAssignKRAs(
+          activeCycle.id,
+          {
+            assignments: assigned.map(e => ({ employee_id: e.employee_id })),
+            shared: {
+              kra_level_ids: kraIdsToClone,
+              categories: finalCategories,
+              is_date_based: false,
+            },
+            enrol_mode: 'append',
+          }
+        );
+      }
+
+      // Step 3 — update cache for all targets
+      allTargetCycleIds.forEach(ekId => {
         const targetCache = getAssignmentFromCache(ekId);
-        const mergedIds   = [...new Set([...(targetCache?.kra_level_ids ?? []), ...sourceKraLevelIds])];
+        const mergedIds = [...new Set([...(targetCache?.kra_level_ids ?? []), ...kraIdsToClone])];
         const catMap = {};
         (targetCache?.categories ?? []).forEach(c => { catMap[c.category_id] = c; });
-        sourceCategories.forEach(c => { if (!catMap[c.category_id]) catMap[c.category_id] = c; });
-        saveAssignmentToCache({ employee_kra_cycle_id: ekId, cycle_id: activeCycle.id, categories: Object.values(catMap), kra_level_ids: mergedIds });
+        finalCategories.forEach(c => { if (!catMap[c.category_id]) catMap[c.category_id] = c; });
+        saveAssignmentToCache({
+          employee_kra_cycle_id: ekId,
+          cycle_id: activeCycle.id,
+          categories: Object.values(catMap),
+          kra_level_ids: mergedIds,
+        });
       });
+
+      // Step 4 — update assignedKRAMap
       setAssignedKRAMap(prev => {
         const next = { ...prev };
-        targetIds.forEach(ekId => { next[ekId] = [...new Set([...(prev[ekId] ?? []), ...sourceKraLevelIds])]; });
+        allTargetCycleIds.forEach(ekId => {
+          next[ekId] = [...new Set([...(prev[ekId] ?? []), ...kraIdsToClone])];
+        });
         return next;
       });
-      const targetEkIdSet = new Set(targetIds);
-      setEmployees(prev => prev.map(e =>
-        e.employee_kra_cycle_id && targetEkIdSet.has(e.employee_kra_cycle_id) ? { ...e, assigned_to_cycle: true } : e
-      ));
-      showToast(`KRAs appended for ${targetIds.length} employee${targetIds.length !== 1 ? 's' : ''}.`, 'success');
-    } catch (e) { showToast(e?.response?.data?.error || 'Copy failed.', 'error'); }
+
+      const total = allTargetCycleIds.length;
+      showToast(
+        `${kraIdsToClone.length} KRA${kraIdsToClone.length !== 1 ? 's' : ''} copied to ${total} employee${total !== 1 ? 's' : ''}${unassigned.length > 0 ? ` (${unassigned.length} newly enrolled)` : ''}.`,
+        'success'
+      );
+
+      await handleRefresh();
+
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Copy failed.', 'error');
+    }
   };
 
   // useMemo: only recompute when employees or selection changes
@@ -1332,7 +1431,7 @@ export default function BulkAssignmentPage() {
               />
             </Paper>
           </Box>
-          
+
         ) : (
           <Paper elevation={0} sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', p: 6, textAlign: 'center', bgcolor: '#fff' }}>
             <Box sx={{ width: 64, height: 64, borderRadius: 2.5, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}><AssignmentIcon sx={{ fontSize: 32, color: '#cbd5e1' }} /></Box>
@@ -1375,11 +1474,11 @@ export default function BulkAssignmentPage() {
             kraLibrary={kraLibrary}
             categories={categories}
             cachedData={{ kra_level_ids: assignedKRAMap[freshEmployee.employee_kra_cycle_id] ?? [], categories: getAssignmentFromCache(freshEmployee.employee_kra_cycle_id)?.categories ?? [] }}
-            employees={employees.filter(e => e.assigned_to_cycle && e.employee_kra_cycle_id != null)}
+            employees={employees.filter(e => e.employee_id !== freshEmployee.employee_id)}
             activeCycleId={activeCycle?.id}
             defaultTab={cloneDefault ? 'clone' : 'kras'}
             onClose={() => { setViewEmployee(null); setCloneDefault(false); }}
-            onCloneTo={handleCloneTo}
+            onCloneTo={(targetEmployeeIds, mode, selectedKraKeys) => handleCloneTo(targetEmployeeIds, mode, selectedKraKeys)}
             onDeleteKRAs={(kraKeys) => handleDeleteKRAs(freshEmployee, kraKeys)}
             onSaveWeightages={(weightagesMap) => handleSaveWeightages(freshEmployee, weightagesMap)}
           />
