@@ -467,11 +467,14 @@ class KRACycleListCreateView(APIView):
                 .prefetch_related("cycle_stages__stage")
             )
         else:
+            from django.db.models import Q
             qs = (
                 KRACycle.objects.filter(
-                    is_deleted=False,
-                    status="ACTIVE",
-                    employee_cycles__employee=caller,
+                    Q(is_deleted=False) &
+                    (
+                        Q(status="ACTIVE") |
+                        Q(status__in=["DRAFT", "CLOSED"], employee_cycles__employee=caller)
+                    )
                 )
                 .select_related("stage")
                 .prefetch_related("cycle_stages__stage")
