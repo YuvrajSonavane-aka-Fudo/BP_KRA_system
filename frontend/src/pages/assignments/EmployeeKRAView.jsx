@@ -5,17 +5,17 @@ import {
   CircularProgress, Paper, TextField, InputAdornment,
   Collapse,
 } from '@mui/material';
-import CloseIcon         from '@mui/icons-material/Close';
-import ContentCopyIcon   from '@mui/icons-material/ContentCopy';
-import SearchIcon        from '@mui/icons-material/Search';
-import CheckCircleIcon   from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import SearchIcon from '@mui/icons-material/Search';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import ExpandMoreIcon    from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon    from '@mui/icons-material/ExpandLess';
-import BusinessIcon      from '@mui/icons-material/Business';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import BusinessIcon from '@mui/icons-material/Business';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
-import WarningAmberIcon  from '@mui/icons-material/WarningAmber';
-import SaveIcon          from '@mui/icons-material/Save';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import SaveIcon from '@mui/icons-material/Save';
 
 const gradient = 'linear-gradient(135deg, #1E3A8A 0%, #00236f 100%)';
 
@@ -84,8 +84,10 @@ function WarnDialog({ open, title, message, confirmLabel, confirmColor = '#dc262
         </Button>
         <Button onClick={onConfirm} disabled={loading} variant="contained"
           startIcon={loading ? <CircularProgress size={12} color="inherit" /> : null}
-          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
-            bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 } }}>
+          sx={{
+            textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
+            bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }
+          }}>
           {loading ? 'Processing…' : confirmLabel}
         </Button>
       </Stack>
@@ -94,30 +96,31 @@ function WarnDialog({ open, title, message, confirmLabel, confirmColor = '#dc262
 }
 
 // ── Clone panel (unchanged) ───────────────────────────────────────────────────
-function CloneTargetPanel({ employees, sourceEmployee, onClone, onClose }) {
-  const [search,      setSearch]     = useState('');
+function CloneTargetPanel({ employees = [], sourceEmployee, onClone, onClose, selectedKraKeys = [] }) {
+  const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
-  const [copyDone,    setCopyDone]    = useState(false);
-  const [cloning,     setCloning]     = useState(false);
+  const [copyDone, setCopyDone] = useState(false);
+  const [cloning, setCloning] = useState(false);
 
-  const eligible = useMemo(() =>
-    employees.filter(e =>
+  const eligible = useMemo(() => {
+    if (!employees) return [];
+    return employees.filter(e =>
       e.employee_id !== sourceEmployee?.employee_id &&
       (search.trim() === '' || e.full_name?.toLowerCase().includes(search.toLowerCase()))
-    ), [employees, sourceEmployee, search]);
+    );
+  }, [employees, sourceEmployee, search]);
 
-  const toggleId  = id => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
-  const toggleAll = c  => setSelectedIds(c ? eligible.map(e => e.employee_id) : []);
+  const toggleId = id => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const toggleAll = c => setSelectedIds(c ? eligible.map(e => e.employee_id) : []);
 
   const handleClone = async () => {
     if (!selectedIds.length) return;
-    const ids = employees
-      .filter(e => selectedIds.includes(e.employee_id))
-      .map(e => e.employee_kra_cycle_id)
-      .filter(Boolean);
     setCloning(true);
-    try { await onClone(ids, 'append'); }
-    finally { setCloning(false); }
+    try {
+      await onClone(selectedIds, 'append', selectedKraKeys); // ← forward selectedKraKeys
+    } finally {
+      setCloning(false);
+    }
     setCopyDone(true);
     setTimeout(() => { setCopyDone(false); setSelectedIds([]); setSearch(''); }, 1400);
   };
@@ -143,8 +146,7 @@ function CloneTargetPanel({ employees, sourceEmployee, onClone, onClose }) {
       <Stack direction="row" alignItems="center" sx={{ px: 0.25, mb: 0.4 }}>
         <Checkbox size="small"
           indeterminate={selectedIds.length > 0 && selectedIds.length < eligible.length}
-          checked={eligible.length > 0 && selectedIds.length === eligible.length}
-          onChange={e => toggleAll(e.target.checked)} sx={{ p: 0.25 }} />
+          checked={(eligible?.length > 0) && (selectedIds?.length === eligible?.length)} onChange={e => toggleAll(e.target.checked)} sx={{ p: 0.25 }} />
         <Typography fontSize={10} fontWeight={700} color="#64748b" textTransform="uppercase" letterSpacing="0.04em">
           All ({eligible.length})
         </Typography>
@@ -153,35 +155,41 @@ function CloneTargetPanel({ employees, sourceEmployee, onClone, onClose }) {
             sx={{ fontSize: 9, height: 15, fontWeight: 700, ml: 1, bgcolor: '#eff6ff', color: '#1d4ed8' }} />
         )}
       </Stack>
-      <Box sx={{ maxHeight: 160, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 1.5, mb: 1,
-        '&::-webkit-scrollbar': { width: 3 }, '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 2 } }}>
+      <Box sx={{
+        maxHeight: 160, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 1.5, mb: 1,
+        '&::-webkit-scrollbar': { width: 3 }, '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 2 }
+      }}>
         {eligible.length === 0
           ? <Box sx={{ textAlign: 'center', py: 2.5 }}>
-              <Typography fontSize={11} color="#94a3b8">No other employees found</Typography>
-            </Box>
+            <Typography fontSize={11} color="#94a3b8">No other employees found</Typography>
+          </Box>
           : eligible.map(emp => {
-              const sel = selectedIds.includes(emp.employee_id);
-              return (
-                <Box key={emp.employee_id} onClick={() => toggleId(emp.employee_id)}
-                  sx={{ display: 'flex', alignItems: 'center', px: 1.25, py: 0.65, cursor: 'pointer',
-                    bgcolor: sel ? '#eff6ff' : 'transparent',
-                    borderBottom: '1px solid #f1f5f9', '&:last-child': { borderBottom: 0 },
-                    '&:hover': { bgcolor: sel ? '#dbeafe' : '#f8fafc' } }}>
-                  <Checkbox size="small" checked={sel} onChange={() => toggleId(emp.employee_id)}
-                    onClick={e => e.stopPropagation()} sx={{ p: 0, mr: 1, flexShrink: 0 }} />
-                  <Box minWidth={0}>
-                    <Typography fontSize={11} fontWeight={600} color="#1e293b" noWrap>{emp.full_name}</Typography>
-                    <Typography fontSize={9.5} color="#94a3b8" noWrap>
-                      {emp.level}{emp.department ? ` · ${emp.department}` : ''}
-                    </Typography>
-                  </Box>
+            const sel = selectedIds.includes(emp.employee_id);
+            return (
+              <Box key={emp.employee_id} onClick={() => toggleId(emp.employee_id)}
+                sx={{
+                  display: 'flex', alignItems: 'center', px: 1.25, py: 0.65, cursor: 'pointer',
+                  bgcolor: sel ? '#eff6ff' : 'transparent',
+                  borderBottom: '1px solid #f1f5f9', '&:last-child': { borderBottom: 0 },
+                  '&:hover': { bgcolor: sel ? '#dbeafe' : '#f8fafc' }
+                }}>
+                <Checkbox size="small" checked={sel} onChange={() => toggleId(emp.employee_id)}
+                  onClick={e => e.stopPropagation()} sx={{ p: 0, mr: 1, flexShrink: 0 }} />
+                <Box minWidth={0}>
+                  <Typography fontSize={11} fontWeight={600} color="#1e293b" noWrap>{emp.full_name}</Typography>
+                  <Typography fontSize={9.5} color="#94a3b8" noWrap>
+                    {emp.level}{emp.department ? ` · ${emp.department}` : ''}
+                  </Typography>
                 </Box>
-              );
-            })}
+              </Box>
+            );
+          })}
       </Box>
       {copyDone && (
-        <Box sx={{ mb: 1, p: 1.25, borderRadius: 1.5, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0',
-          display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{
+          mb: 1, p: 1.25, borderRadius: 1.5, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0',
+          display: 'flex', alignItems: 'center', gap: 1
+        }}>
           <CheckCircleIcon sx={{ color: '#16a34a', fontSize: 16, flexShrink: 0 }} />
           <Typography fontSize={11} fontWeight={600} color="#166534">Done! KRAs copied successfully.</Typography>
         </Box>
@@ -190,9 +198,11 @@ function CloneTargetPanel({ employees, sourceEmployee, onClone, onClose }) {
         disabled={!selectedIds.length || cloning}
         startIcon={cloning ? <CircularProgress size={11} sx={{ color: '#fff' }} /> : <ContentCopyIcon sx={{ fontSize: 12 }} />}
         onClick={handleClone}
-        sx={{ fontSize: 11, fontWeight: 700, textTransform: 'none', background: gradient, color: '#fff',
+        sx={{
+          fontSize: 11, fontWeight: 700, textTransform: 'none', background: gradient, color: '#fff',
           borderRadius: 1.5, height: 32, '&:hover': { opacity: 0.9 },
-          '&:disabled': { opacity: 0.5, background: gradient, color: '#fff' } }}>
+          '&:disabled': { opacity: 0.5, background: gradient, color: '#fff' }
+        }}>
         {cloning ? 'Copying…' : selectedIds.length > 0 ? `Copy to ${selectedIds.length} employee${selectedIds.length !== 1 ? 's' : ''}` : 'Select employees'}
       </Button>
     </Box>
@@ -207,13 +217,13 @@ export default function EmployeeKRAView({
   onClose, onCloneTo, onDeleteKRAs, onSaveWeightages,
   isManager = false,
 }) {
-  const [search,        setSearch]       = useState('');
-  const [expandedCats,  setExpandedCats] = useState({});
-  const [checkedKRAs,   setCheckedKRAs]  = useState(new Set());
-  const [weightages,    setWeightages]   = useState({});
-  const [dirty,         setDirty]        = useState(false);
-  const [saving,        setSaving]       = useState(false);
-  const [saveSuccess,   setSaveSuccess]  = useState(false);
+  const [search, setSearch] = useState('');
+  const [expandedCats, setExpandedCats] = useState({});
+  const [checkedKRAs, setCheckedKRAs] = useState(new Set());
+  const [weightages, setWeightages] = useState({});
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [clonePanelOpen, setClonePanelOpen] = useState(false);  // single top-level clone panel
 
   const [warnClose,       setWarnClose]      = useState(false);
@@ -333,12 +343,12 @@ export default function EmployeeKRAView({
   const toggleKRA = (key, c) => {
     setCheckedKRAs(prev => { const next = new Set(prev); c ? next.add(key) : next.delete(key); return next; });
   };
-  const catChecked       = cid => { const k = filtered.find(g => g.category_id === cid)?.rows.map(r => r.key) ?? []; return k.length > 0 && k.every(x => checkedKRAs.has(x)); };
+  const catChecked = cid => { const k = filtered.find(g => g.category_id === cid)?.rows.map(r => r.key) ?? []; return k.length > 0 && k.every(x => checkedKRAs.has(x)); };
   const catIndeterminate = cid => { const k = filtered.find(g => g.category_id === cid)?.rows.map(r => r.key) ?? []; return k.some(x => checkedKRAs.has(x)) && !k.every(x => checkedKRAs.has(x)); };
 
-  const totalW    = Object.values(weightages).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+  const totalW = Object.values(weightages).reduce((s, v) => s + (parseFloat(v) || 0), 0);
   const remaining = parseFloat((100 - totalW).toFixed(1));
-  const wValid    = Math.abs(totalW - 100) < 0.01;
+  const wValid = Math.abs(totalW - 100) < 0.01;
 
   const handleWeightChange = (catId, val) => {
     if (val !== '' && (isNaN(val) || parseFloat(val) < 0)) return;
@@ -380,7 +390,10 @@ export default function EmployeeKRAView({
     } finally { setSaving(false); }
   };
 
-  const handleClone = async (targetIds, mode) => { await onCloneTo?.(targetIds, mode); };
+  const handleClone = async (targetEmployeeIds, mode, selectedKraKeys) => {
+    // selectedKraKeys comes from CloneTargetPanel which gets [...checkedKRAs]
+    await onCloneTo(targetEmployeeIds, mode, selectedKraKeys);
+  };
 
   const handleBulkDelete = async () => {
     setDeleting(true);
@@ -400,14 +413,16 @@ export default function EmployeeKRAView({
 
   return (
     <>
-      <Dialog open={open} onClose={() => {}} maxWidth="lg" fullWidth disableEscapeKeyDown
+      <Dialog open={open} onClose={() => { }} maxWidth="lg" fullWidth disableEscapeKeyDown
         PaperProps={{ sx: { borderRadius: 3, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}>
 
         {/* ── HEADER ── */}
         <Box sx={{ background: gradient, px: 2.5, pt: 2, pb: 1.75, color: '#fff', flexShrink: 0 }}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Avatar sx={{ width: 38, height: 38, fontSize: 13, fontWeight: 800, flexShrink: 0,
-              bgcolor: 'rgba(255,255,255,0.18)', border: '2px solid rgba(255,255,255,0.3)' }}>
+            <Avatar sx={{
+              width: 38, height: 38, fontSize: 13, fontWeight: 800, flexShrink: 0,
+              bgcolor: 'rgba(255,255,255,0.18)', border: '2px solid rgba(255,255,255,0.3)'
+            }}>
               {getInitials(employee.full_name)}
             </Avatar>
 
@@ -429,8 +444,10 @@ export default function EmployeeKRAView({
             <TextField size="small" placeholder={`Search across ${totalKRAs} KRAs…`}
               value={search} onChange={e => setSearch(e.target.value)}
               InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.5)' }} /></InputAdornment> }}
-              sx={{ flex: 1,
-                '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36,
+              sx={{
+                flex: 1,
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2, fontSize: 12, height: 36,
                   bgcolor: 'rgba(255,255,255,0.12)',
                   '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
                   '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
@@ -446,11 +463,12 @@ export default function EmployeeKRAView({
                 <Button size="small" disabled={checkedCount === 0}
                   startIcon={<ContentCopyIcon sx={{ fontSize: 13 }} />}
                   onClick={() => setClonePanelOpen(v => !v)}
-                  sx={{ fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,
+                  sx={{
+                    fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,
                     px: 1.5, height: 36, flexShrink: 0,
                     bgcolor: checkedCount > 0 ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)',
-                    color:   checkedCount > 0 ? '#fff' : 'rgba(255,255,255,0.35)',
-                    border:  '1px solid rgba(255,255,255,0.2)',
+                    color: checkedCount > 0 ? '#fff' : 'rgba(255,255,255,0.35)',
+                    border: '1px solid rgba(255,255,255,0.2)',
                     '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
                     '&.Mui-disabled': { color: 'rgba(255,255,255,0.25)', bgcolor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' },
                   }}>
@@ -465,11 +483,12 @@ export default function EmployeeKRAView({
                 <Button size="small" disabled={checkedCount === 0}
                   startIcon={<DeleteOutlineIcon sx={{ fontSize: 13 }} />}
                   onClick={() => setWarnBulkDelete(true)}
-                  sx={{ fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,
+                  sx={{
+                    fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,
                     px: 1.5, height: 36, flexShrink: 0,
                     bgcolor: checkedCount > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.07)',
-                    color:   checkedCount > 0 ? '#fca5a5' : 'rgba(255,255,255,0.35)',
-                    border:  `1px solid ${checkedCount > 0 ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    color: checkedCount > 0 ? '#fca5a5' : 'rgba(255,255,255,0.35)',
+                    border: `1px solid ${checkedCount > 0 ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.1)'}`,
                     '&:hover': { bgcolor: 'rgba(239,68,68,0.3)' },
                     '&.Mui-disabled': { color: 'rgba(255,255,255,0.25)', bgcolor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' },
                   }}>
@@ -480,9 +499,11 @@ export default function EmployeeKRAView({
 
             {/* Close */}
             <Tooltip title="Close">
-              <IconButton size="small" onClick={handleClose} sx={{ flexShrink: 0,
+              <IconButton size="small" onClick={handleClose} sx={{
+                flexShrink: 0,
                 color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.25)',
-                borderRadius: 1.5, p: 0.6, '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', color: '#fff' } }}>
+                borderRadius: 1.5, p: 0.6, '&:hover': { bgcolor: 'rgba(255,255,255,0.12)', color: '#fff' }
+              }}>
                 <CloseIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Tooltip>
@@ -492,36 +513,43 @@ export default function EmployeeKRAView({
           {clonePanelOpen && (
             <Box sx={{ mt: 1 }}>
               <CloneTargetPanel
-                employees={employees.filter(e => e.assigned_to_cycle && e.employee_kra_cycle_id != null)}
+                employees={employees}
                 sourceEmployee={employee}
                 onClone={handleClone}
                 onClose={() => setClonePanelOpen(false)}
+                selectedKraKeys={[...checkedKRAs]}  // ← add this
               />
             </Box>
           )}
         </Box>
 
         {/* ── WEIGHTAGE BANNER ── */}
-        <Box sx={{ flexShrink: 0, px: 2, py: 0.9,
+        <Box sx={{
+          flexShrink: 0, px: 2, py: 0.9,
           bgcolor: wValid ? '#f0fdf4' : remaining > 0 ? '#fefce8' : '#fef2f2',
-          borderBottom: `1px solid ${wValid ? '#bbf7d0' : remaining > 0 ? '#fde68a' : '#fecaca'}` }}>
+          borderBottom: `1px solid ${wValid ? '#bbf7d0' : remaining > 0 ? '#fde68a' : '#fecaca'}`
+        }}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <Tooltip title={allChecked ? 'Deselect all' : 'Select all KRAs'}>
               <Checkbox size="small" checked={allChecked} indeterminate={someChecked && !allChecked}
                 onChange={e => toggleAll(e.target.checked)}
-                sx={{ p: 0.4, flexShrink: 0,
+                sx={{
+                  p: 0.4, flexShrink: 0,
                   color: wValid ? '#166534' : remaining > 0 ? '#92400e' : '#991b1b',
                   '&.Mui-checked': { color: wValid ? '#166534' : remaining > 0 ? '#92400e' : '#991b1b' },
-                  '&.MuiCheckbox-indeterminate': { color: '#1E3A8A' } }} />
+                  '&.MuiCheckbox-indeterminate': { color: '#1E3A8A' }
+                }} />
             </Tooltip>
             <Typography fontSize={12.5} fontWeight={700}
               color={wValid ? '#166534' : remaining > 0 ? '#92400e' : '#991b1b'}>
               Total Weightage:
             </Typography>
             <Chip label={`${totalW.toFixed(0)}%`} size="small"
-              sx={{ fontSize: 11, height: 20, fontWeight: 800,
+              sx={{
+                fontSize: 11, height: 20, fontWeight: 800,
                 bgcolor: wValid ? '#dcfce7' : remaining > 0 ? '#fef9c3' : '#fee2e2',
-                color:   wValid ? '#166534' : remaining > 0 ? '#854d0e' : '#991b1b' }} />
+                color: wValid ? '#166534' : remaining > 0 ? '#854d0e' : '#991b1b'
+              }} />
             {!wValid && (
               <Typography fontSize={11.5} color={remaining > 0 ? '#92400e' : '#991b1b'} fontWeight={500}>
                 {remaining > 0 ? `${remaining}% still available` : `${Math.abs(remaining)}% over limit`}
@@ -553,9 +581,11 @@ export default function EmployeeKRAView({
         </Box>
 
         {/* ── BODY ── */}
-        <Box sx={{ flex: 1, overflow: 'auto', p: 2,
+        <Box sx={{
+          flex: 1, overflow: 'auto', p: 2,
           '&::-webkit-scrollbar': { width: 4 },
-          '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 99 } }}>
+          '&::-webkit-scrollbar-thumb': { bgcolor: '#e2e8f0', borderRadius: 99 }
+        }}>
           {filtered.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 8, color: '#94a3b8' }}>
               <Typography fontSize={13}>No KRAs match your search.</Typography>
@@ -563,11 +593,11 @@ export default function EmployeeKRAView({
           ) : (
             <Stack spacing={1.25}>
               {filtered.map(group => {
-                const isOrg  = group.is_standard;
-                const tc     = isOrg
+                const isOrg = group.is_standard;
+                const tc = isOrg
                   ? { header: '#dcfce7', color: '#166534', border: '#bbf7d0' }
                   : { header: '#dbeafe', color: '#1d4ed8', border: '#bfdbfe' };
-                const catW   = weightages[group.category_id] ?? '';
+                const catW = weightages[group.category_id] ?? '';
                 const catOpen = isCatOpen(group.category_id);
 
                 return (
@@ -587,13 +617,15 @@ export default function EmployeeKRAView({
                             toggleCategory(group.category_id, e.target.checked);
                           }}
                           onClick={e => e.stopPropagation()}
-                          sx={{ p: 0.4, flexShrink: 0, color: tc.color,
+                          sx={{
+                            p: 0.4, flexShrink: 0, color: tc.color,
                             '&.Mui-checked': { color: tc.color },
-                            '&.MuiCheckbox-indeterminate': { color: tc.color } }}
+                            '&.MuiCheckbox-indeterminate': { color: tc.color }
+                          }}
                         />
 
                         {isOrg
-                          ? <BusinessIcon      sx={{ fontSize: 14, color: tc.color, flexShrink: 0 }} />
+                          ? <BusinessIcon sx={{ fontSize: 14, color: tc.color, flexShrink: 0 }} />
                           : <FolderSpecialIcon sx={{ fontSize: 14, color: tc.color, flexShrink: 0 }} />}
 
                         {/* Category name — clickable to collapse */}
@@ -607,8 +639,10 @@ export default function EmployeeKRAView({
                             </Box>
                           </Typography>
                           <Chip label={isOrg ? 'Org' : 'Project'} size="small"
-                            sx={{ fontSize: 8.5, height: 16, fontWeight: 700,
-                              bgcolor: 'rgba(255,255,255,0.6)', color: tc.color }} />
+                            sx={{
+                              fontSize: 8.5, height: 16, fontWeight: 700,
+                              bgcolor: 'rgba(255,255,255,0.6)', color: tc.color
+                            }} />
                         </Stack>
 
                         {/* Weightage input */}
@@ -619,11 +653,15 @@ export default function EmployeeKRAView({
                               onChange={e => handleWeightChange(group.category_id, e.target.value)}
                               onClick={e => e.stopPropagation()}
                               inputProps={{ style: { textAlign: 'center', fontSize: 12, fontWeight: 700, padding: '3px 6px' } }}
-                              sx={{ width: 58,
-                                '& .MuiOutlinedInput-root': { borderRadius: 1.5, height: 28, bgcolor: '#fff',
+                              sx={{
+                                width: 58,
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 1.5, height: 28, bgcolor: '#fff',
                                   '& fieldset': { borderColor: 'rgba(0,0,0,0.15)' },
                                   '&:hover fieldset': { borderColor: tc.color },
-                                  '&.Mui-focused fieldset': { borderColor: tc.color, borderWidth: 2 } } }}
+                                  '&.Mui-focused fieldset': { borderColor: tc.color, borderWidth: 2 }
+                                }
+                              }}
                             />
                             <Typography fontSize={11} fontWeight={700} color={tc.color}>%</Typography>
                           </Stack>
@@ -649,11 +687,13 @@ export default function EmployeeKRAView({
                           return (
                             <Box key={row.key}>
                               <Stack direction="row" alignItems="center"
-                                sx={{ px: 1.5, py: 0.85,
+                                sx={{
+                                  px: 1.5, py: 0.85,
                                   borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
                                   bgcolor: isChecked ? '#f0f7ff' : '#fff',
                                   '&:hover': { bgcolor: isChecked ? '#e8f1ff' : '#fafafa' },
-                                  transition: 'background 0.1s' }}>
+                                  transition: 'background 0.1s'
+                                }}>
 
                                 <Checkbox size="small" checked={isChecked}
                                   disabled={isManager && (group.is_standard || isAdminAssigned(row.assigned_by_role))}
@@ -686,8 +726,10 @@ export default function EmployeeKRAView({
                                 </Box>
 
                                 <Chip label={row.level_name} size="small"
-                                  sx={{ fontSize: 9, height: 18, fontWeight: 600,
-                                    bgcolor: '#f0f9ff', color: '#0369a1', flexShrink: 0 }} />
+                                  sx={{
+                                    fontSize: 9, height: 18, fontWeight: 600,
+                                    bgcolor: '#f0f9ff', color: '#0369a1', flexShrink: 0
+                                  }} />
 
                                 {/* ── NO clone/delete icons per-row — use top header buttons ── */}
                               </Stack>
@@ -713,13 +755,15 @@ export default function EmployeeKRAView({
             <Button onClick={handleSave} disabled={saving || !dirty || totalW > 100}
               startIcon={saving ? <CircularProgress size={12} /> : <SaveIcon sx={{ fontSize: 14 }} />}
               variant="contained"
-              sx={{ fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,
+              sx={{
+                fontSize: 12, fontWeight: 700, textTransform: 'none', borderRadius: 1.75,
                 px: 2.5, height: 34, background: gradient, '&:hover': { opacity: 0.9 },
                 '&.Mui-disabled': {
                   opacity: 1,
                   background: '#c7d2fe',
                   color: '#6b7280',
-                } }}>
+                }
+              }}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </Stack>

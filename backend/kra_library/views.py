@@ -281,31 +281,44 @@ class KRACategoryDetailView(APIView):
 
         cat = get_object_or_404(KRACategory, id=category_id)
 
+        # Block deletion if any KRALevel under this category's KRAs
+        # (or directly tagged to this category) is assigned to an employee.
+        kra_levels_in_category = KRALevel.objects.filter(
+            kra__category=cat
+        )
+        assigned_kra_level_count = EmployeeKRALevel.objects.filter(
+            kra_level__in=kra_levels_in_category
+        ).values("kra_level_id").distinct().count()
+
+        assigned_kra_count = (
+            kra_levels_in_category
+            .filter(employee_kra_levels__isnull=False)
+            .values("kra_id")
+            .distinct()
+            .count()
+        )
+
+        if assigned_kra_level_count:
+            return Response(
+                {
+                    "error": (
+                        "Cannot delete — this category contains KRAs that are "
+                        "already assigned to employees"
+                    ),
+                    "assigned_kra_count":       assigned_kra_count,
+                    "assigned_kra_level_count": assigned_kra_level_count,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         try:
             with transaction.atomic():
-
-                # Get KRAs under category
-                kras = KRA.objects.filter(category=cat)
-
-                # Get KRALevels linked to those KRAs
-                kra_levels = KRALevel.objects.filter(
-                    kra__in=kras
-                )
-
-                # Delete employee assignments FIRST
-                EmployeeKRALevel.objects.filter(
-                    kra_level__in=kra_levels
-                ).delete()
-
-                # Delete KRALevels
+                kras       = KRA.objects.filter(category=cat)
+                kra_levels = KRALevel.objects.filter(kra__in=kras)
                 kra_levels.delete()
-
-                # Delete KRAs
                 kras.delete()
 
-                # Finally delete category
                 category_name = cat.name
-
                 _audit(
                     request,
                     "CATEGORY_DELETED",
@@ -313,7 +326,6 @@ class KRACategoryDetailView(APIView):
                     cat.id,
                     old_data=_category_dict(cat),
                 )
-
                 cat.delete()
 
             return Response(
@@ -327,12 +339,7 @@ class KRACategoryDetailView(APIView):
             )
 
         except Exception as e:
-            return Response(
-                {
-                    "error": str(e)
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         
 
@@ -807,10 +814,10 @@ class KRADetailView(APIView):
         if active_assignments:
             return Response(
                 {
-                    "error": "Cannot delete KRA — its level variants are assigned to employees in active cycles",
+                    "error": "Cannot delete — this KRA's level variants are assigned to employees",
                     "assigned_kra_level_count": active_assignments,
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_409_CONFLICT,
             )
 
         _audit(request, "KRA_DELETED", "KRA", kra.id,
