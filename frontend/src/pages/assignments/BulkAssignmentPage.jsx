@@ -38,6 +38,7 @@ import {
 } from '../../utils/assignmentStateManager';
 
 import EmployeeKRAView from './EmployeeKRAView';
+import useRoleAccess from '../../hooks/useRoleAccess';
 
 const G = 'linear-gradient(135deg, #1E3A8A 0%, #1e40af 60%, #1d4ed8 100%)';
 const ORG_COLOR = { bg: '#f0fdf4', border: '#86efac', text: '#15803d', chip: '#dcfce7', icon: '#16a34a' };
@@ -140,7 +141,7 @@ function CycleBanner({ cycle, allCycles, onCycleChange, isReadOnly }) {
 }
 
 // ─── KRA Panel ────────────────────────────────────────────────────────────────
-const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onToggleKRA, isReadOnly, employeeDuplicateMap }) {
+const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onToggleKRA, isReadOnly, isManager, employeeDuplicateMap }) {
   const [searchRaw, setSearchRaw] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('');
@@ -206,7 +207,9 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
       map[cid].kras.push(kra);
     });
 
-    return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
+    return Object.values(map)
+  .filter(g => !search.trim() || g.kras.length > 0)  // ← hide empty cats when searching
+  .sort((a, b) => a.name.localeCompare(b.name));
   }, [kras, typeFilter, levelFilter, search, categories]);
 
   // FIX: flatRows is selection-independent — sort is alphabetical only.
@@ -314,7 +317,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
           return (
             <Box key={group.cid} sx={{ mb: 0.75 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.85, borderRadius: 1.5, bgcolor: tc.bg, border: `1px solid ${tc.border}`, mb: 0.4 }}>
-                <Checkbox size="small" disabled={isReadOnly} indeterminate={catSome && !catAll} checked={catAll && catLevelIds.length > 0} onChange={() => { }} onClick={e => { e.stopPropagation(); if (isReadOnly) return; onToggleKRA(catLevelIds, catAll ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5, mr: 0.5, flexShrink: 0, color: tc.text, '&.Mui-checked': { color: tc.text } }} />
+                <Checkbox size="small" disabled={isReadOnly || (isManager && group.isStd)} indeterminate={catSome && !catAll} checked={catAll && catLevelIds.length > 0} onChange={() => {}} onClick={e => { e.stopPropagation(); if (isReadOnly || (isManager && group.isStd)) return; onToggleKRA(catLevelIds, catAll ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5, mr: 0.5, flexShrink: 0, color: tc.text, '&.Mui-checked': { color: tc.text } }} />
                 <Box flex={1} minWidth={0} onClick={() => toggleExpand(group.cid)} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', userSelect: 'none' }}>
                   <Typography fontSize={12} fontWeight={800} color={tc.text} noWrap>{group.name}</Typography>
                   <Typography fontSize={11} fontWeight={600} color={tc.text} sx={{ opacity: 0.7 }}>({group.rows.length})</Typography>
@@ -327,19 +330,21 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
                 <Box sx={{ pl: 1.5 }}>
                   {group.rows.map(({ kra, level, kraLevelId }) => {
                     const isSelected = selectedKraSet.has(kraLevelId);
-                    const ktc = typeColor(kra.is_standard);
-                    const dupCount = employeeDuplicateMap?.get(kraLevelId) ?? 0;
-                    const hasDup = dupCount > 0;
-                    const toggle = () => { if (!isReadOnly) onToggleKRA([kraLevelId], isSelected ? 'deselect' : 'select'); };
+                    const ktc        = typeColor(kra.is_standard);
+                    const dupCount   = employeeDuplicateMap?.get(kraLevelId) ?? 0;
+                    const hasDup     = dupCount > 0;
+                    const isOrgLocked = isManager && kra.is_standard;
+                    const toggle     = () => { if (!isReadOnly && !isOrgLocked) onToggleKRA([kraLevelId], isSelected ? 'deselect' : 'select'); };
                     return (
                       <Box key={kraLevelId} onClick={toggle} sx={{
                         ...SX.kraItemBase,
-                        cursor: isReadOnly ? 'default' : 'pointer',
+                        cursor: isReadOnly || isOrgLocked ? 'default' : 'pointer',
+                        opacity: isOrgLocked ? 0.5 : 1,
                         bgcolor: isSelected ? '#eff6ff' : hasDup ? '#fefce8' : 'transparent',
                         border: `1px solid ${isSelected ? '#93c5fd' : hasDup ? '#fde68a' : 'transparent'}`,
-                        '&:hover': { bgcolor: isReadOnly ? 'transparent' : isSelected ? '#dbeafe' : '#f8fafc', border: `1px solid ${isReadOnly ? 'transparent' : isSelected ? '#93c5fd' : '#e2e8f0'}` },
+                        '&:hover': { bgcolor: isReadOnly || isOrgLocked ? 'transparent' : isSelected ? '#dbeafe' : '#f8fafc', border: `1px solid ${isReadOnly || isOrgLocked ? 'transparent' : isSelected ? '#93c5fd' : '#e2e8f0'}` },
                       }}>
-                        <Checkbox size="small" checked={isSelected} disabled={isReadOnly} onChange={() => { }} onClick={e => { e.stopPropagation(); toggle(); }} sx={{ p: 0, mr: 1.25, flexShrink: 0 }} />
+                        <Checkbox size="small" checked={isSelected} disabled={isReadOnly || isOrgLocked} onChange={() => {}} onClick={e => { e.stopPropagation(); toggle(); }} sx={{ p: 0, mr: 1.25, flexShrink: 0 }} />
                         <Box flex={1} minWidth={0}>
                           <Stack direction="row" alignItems="center" gap={1}>
                             <Typography fontSize={12} fontWeight={isSelected ? 700 : 500} color="#1e293b" noWrap>
@@ -431,11 +436,11 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
                   {emp.employee_id}
                 </Typography>
                 <Box sx={{ ...COL_SX.name, ml: 1, minWidth: 0 }}
-                  onClick={() => isAssigned && onView(emp)}
-                  style={{ cursor: isAssigned ? 'pointer' : 'default' }}>
+                  onClick={() => onView(emp)}
+                  style={{ cursor: 'pointer' }}>
                   <Stack direction="row" alignItems="center" gap={0.5}>
-                    <Typography fontSize={12.5} fontWeight={600} color={isAssigned ? '#1d4ed8' : '#1e293b'} noWrap
-                      sx={{ '&:hover': { textDecoration: isAssigned ? 'underline' : 'none' } }}>
+                    <Typography fontSize={12.5} fontWeight={600} color='#1d4ed8' noWrap
+                      sx={{ '&:hover': { textDecoration: 'underline' } }}>
                       {emp.full_name}
                     </Typography>
                     {isAssigned && (
@@ -891,7 +896,8 @@ export default function BulkAssignmentPage() {
   const dragging = useRef(false);
 
   const isReadOnly = !WRITE_STAGES.includes(activeCycle?.status);
-  const canEdit = !isReadOnly;
+  const canEdit    = !isReadOnly;
+  const { isManager, isAdmin } = useRoleAccess();
   const onMouseDown = useCallback((e) => {
     e.preventDefault();
     dragging.current = true;
@@ -1135,6 +1141,14 @@ export default function BulkAssignmentPage() {
       categories: cats,
       kra_level_ids: kraLevelIds,
     });
+    // Update cache so the view reflects the new weightages immediately
+    saveAssignmentToCache({
+      employee_kra_cycle_id: emp.employee_kra_cycle_id,
+      cycle_id: activeCycle?.id,
+      categories: cats,
+      kra_level_ids: kraLevelIds,
+    });
+    await handleRefresh();  // ← re-fetch employees so UI is in sync
   };
 
   const handleDeleteKRAs = async (emp, kraKeys) => {
@@ -1405,7 +1419,9 @@ export default function BulkAssignmentPage() {
                 selectedKraSet={selectedKraSet}
                 onToggleKRA={handleToggleKRA}
                 isReadOnly={isReadOnly}
+                isManager={isManager}
                 employeeDuplicateMap={employeeDuplicateMap}
+
               />
             </Paper>
 
@@ -1481,6 +1497,7 @@ export default function BulkAssignmentPage() {
             onCloneTo={(targetEmployeeIds, mode, selectedKraKeys) => handleCloneTo(targetEmployeeIds, mode, selectedKraKeys)}
             onDeleteKRAs={(kraKeys) => handleDeleteKRAs(freshEmployee, kraKeys)}
             onSaveWeightages={(weightagesMap) => handleSaveWeightages(freshEmployee, weightagesMap)}
+            isManager={isManager}
           />
         );
       })()}

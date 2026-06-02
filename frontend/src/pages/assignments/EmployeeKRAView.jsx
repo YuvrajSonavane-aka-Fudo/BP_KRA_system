@@ -29,7 +29,7 @@ function truncateWords(str = '', max = 8) {
 }
 
 // ── Close dialog — only rendered when dirty=true ─────────────────────────────
-function CloseConfirmDialog({ open, onGoBack, onSaveClose, saving }) {
+function CloseConfirmDialog({ open, onGoBack, onDiscard, onSaveClose, saving  }) {
   return (
     <Dialog open={open} onClose={onGoBack} maxWidth="xs" fullWidth
       PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
@@ -47,15 +47,17 @@ function CloseConfirmDialog({ open, onGoBack, onSaveClose, saving }) {
       <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ px: 2.5, pb: 2.5 }}>
         <Button onClick={onGoBack} disabled={saving}
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>
-          Go Back
+          Keep Editing
+        </Button>
+        <Button onClick={onDiscard} disabled={saving}
+          sx={{ textTransform: 'none', color: '#ef4444', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>
+          Discard & Leave
         </Button>
         <Button onClick={onSaveClose} disabled={saving} variant="contained"
           startIcon={saving ? <CircularProgress size={12} color="inherit" /> : <SaveIcon sx={{ fontSize: 14 }} />}
-          sx={{
-            textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
-            background: gradient, '&:hover': { opacity: 0.9 }
-          }}>
-          {saving ? 'Saving…' : 'Save & Close'}
+          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
+            background: gradient, '&:hover': { opacity: 0.9 } }}>
+          {saving ? 'Saving…' : 'Save & Leave'}
         </Button>
       </Stack>
     </Dialog>
@@ -213,6 +215,7 @@ export default function EmployeeKRAView({
   kraLibrary = [], categories = [],
   cachedData, employees = [],
   onClose, onCloneTo, onDeleteKRAs, onSaveWeightages,
+  isManager = false,
 }) {
   const [search, setSearch] = useState('');
   const [expandedCats, setExpandedCats] = useState({});
@@ -223,10 +226,13 @@ export default function EmployeeKRAView({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [clonePanelOpen, setClonePanelOpen] = useState(false);  // single top-level clone panel
 
-  const [warnClose, setWarnClose] = useState(false);
-  const [warnBulkDelete, setWarnBulkDelete] = useState(false);
-  const [warnDeleteKRA, setWarnDeleteKRA] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const [warnClose,       setWarnClose]      = useState(false);
+  const [warnBulkDelete,  setWarnBulkDelete] = useState(false);
+  const [warnDeleteKRA,   setWarnDeleteKRA]  = useState(null);
+  const [deleting,        setDeleting]       = useState(false);
+
+  const HR_ROLES = ['Admin', 'HR', 'Vertical Lead'];
+  const isAdminAssigned = (role) => HR_ROLES.includes(role);
 
   // ── init on open ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -255,32 +261,44 @@ export default function EmployeeKRAView({
   const kraLevelIdSet = useMemo(() => new Set(kraLevelIds), [kraLevelIds]);
 
   const grouped = useMemo(() => {
-    const map = {};
-    kraLibrary.forEach(kra => {
-      kra.levels?.forEach(level => {
-        const lid = level.kra_level_id ?? level.id;
-        if (!kraLevelIdSet.has(lid)) return;
-        const cid = kra.category_id;
-        if (!map[cid]) {
-          map[cid] = {
-            category_id: cid,
-            category_name: categories.find(c => c.id === cid)?.name ?? kra.category_name ?? `Category ${cid}`,
-            is_standard: kra.is_standard,
-            rows: [],
-          };
-        }
-        map[cid].rows.push({
-          key: `${kra.id}-${lid}`,
-          kra_id: kra.id,
-          kra_name: kra.name,
-          level_name: level.level_name,
-          description: level.description || kra.description || '',
-          category_id: cid,
+      const map = {};
+      // Build a lookup for assigned_kras by kra_level_id for O(1) access
+      const assignedKraMap = new Map(
+        (employee?.assigned_kras ?? []).map(k => [k.kra_level_id, k])
+      );
+      // Build a lookup for assigned_categories by category_id
+      const assignedCatMap = new Map(
+        (employee?.assigned_categories ?? []).map(c => [c.category_id, c])
+      );
+      kraLibrary.forEach(kra => {
+        kra.levels?.forEach(level => {
+          const lid = level.kra_level_id ?? level.id;
+          if (!kraLevelIdSet.has(lid)) return;
+          const cid = kra.category_id;
+          if (!map[cid]) {
+            const assignedCat = assignedCatMap.get(cid);
+            map[cid] = {
+              category_id:      cid,
+              category_name:    categories.find(c => c.id === cid)?.name ?? kra.category_name ?? `Category ${cid}`,
+              is_standard:      kra.is_standard,
+              assigned_by_role: assignedCat?.assigned_by_role ?? null,
+              rows: [],
+            };
+          }
+          const assignedKra = assignedKraMap.get(lid);
+          map[cid].rows.push({
+            key:              `${kra.id}-${lid}`,
+            kra_id:           kra.id,
+            kra_name:         kra.name,
+            level_name:       level.level_name,
+            description:      level.description || kra.description || '',
+            category_id:      cid,
+            assigned_by_role: assignedKra?.assigned_by_role ?? null,
+          });
         });
       });
-    });
-    return Object.values(map).sort((a, b) => a.category_name.localeCompare(b.category_name));
-  }, [kraLibrary, kraLevelIdSet, categories]);
+      return Object.values(map).sort((a, b) => a.category_name.localeCompare(b.category_name));
+    }, [kraLibrary, kraLevelIdSet, categories, employee]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return grouped;
@@ -296,13 +314,28 @@ export default function EmployeeKRAView({
     })).filter(g => g.rows.length > 0);
   }, [grouped, search]);
 
-  const allKeys = useMemo(() => filtered.flatMap(g => g.rows.map(r => r.key)), [filtered]);
-  const totalKRAs = kraLevelIds.length;
-  const allChecked = allKeys.length > 0 && allKeys.every(k => checkedKRAs.has(k));
+
+  const allKeys = useMemo(() =>
+    filtered.flatMap(g =>
+      g.rows
+        .filter(r => !(isManager && (g.is_standard || isAdminAssigned(r.assigned_by_role))))
+        .map(r => r.key)
+    ),
+  [filtered, isManager]);
+  const totalKRAs   = kraLevelIds.length;
+  const allChecked  = allKeys.length > 0 && allKeys.every(k => checkedKRAs.has(k));
   const someChecked = allKeys.some(k => checkedKRAs.has(k));
   const checkedCount = allKeys.filter(k => checkedKRAs.has(k)).length;
 
-  const toggleAll = c => setCheckedKRAs(c ? new Set(allKeys) : new Set());
+  const toggleAll = c => {
+    if (!c) { setCheckedKRAs(new Set()); return; }
+    const allowed = filtered.flatMap(g =>
+      g.rows
+        .filter(r => !(isManager && (g.is_standard || isAdminAssigned(r.assigned_by_role))))
+        .map(r => r.key)
+    );
+    setCheckedKRAs(new Set(allowed));
+  };
   const toggleCategory = (catId, c) => {
     const keys = filtered.find(g => g.category_id === catId)?.rows.map(r => r.key) ?? [];
     setCheckedKRAs(prev => { const next = new Set(prev); keys.forEach(k => c ? next.add(k) : next.delete(k)); return next; });
@@ -578,7 +611,11 @@ export default function EmployeeKRAView({
                         <Checkbox size="small"
                           checked={catChecked(group.category_id)}
                           indeterminate={catIndeterminate(group.category_id)}
-                          onChange={e => toggleCategory(group.category_id, e.target.checked)}
+                          disabled={isManager && (group.is_standard || isAdminAssigned(group.assigned_by_role))}
+                          onChange={e => {
+                            if (isManager && (group.is_standard || isAdminAssigned(group.assigned_by_role))) return;
+                            toggleCategory(group.category_id, e.target.checked);
+                          }}
                           onClick={e => e.stopPropagation()}
                           sx={{
                             p: 0.4, flexShrink: 0, color: tc.color,
@@ -612,6 +649,7 @@ export default function EmployeeKRAView({
                         <Tooltip title="Set category weightage (all must total 100%)" placement="top">
                           <Stack direction="row" alignItems="center" spacing={0.4}>
                             <TextField size="small" value={catW} placeholder="0"
+                              disabled={isManager && (group.is_standard || (isAdminAssigned(group.assigned_by_role) && parseFloat(weightages[group.category_id] || '0') > 0))}
                               onChange={e => handleWeightChange(group.category_id, e.target.value)}
                               onClick={e => e.stopPropagation()}
                               inputProps={{ style: { textAlign: 'center', fontSize: 12, fontWeight: 700, padding: '3px 6px' } }}
@@ -658,11 +696,13 @@ export default function EmployeeKRAView({
                                 }}>
 
                                 <Checkbox size="small" checked={isChecked}
-                                  onChange={e => toggleKRA(row.key, e.target.checked)}
-                                  sx={{
-                                    p: 0.4, mr: 0.75, flexShrink: 0, color: '#cbd5e1',
-                                    '&.Mui-checked': { color: '#1E3A8A' }
+                                  disabled={isManager && (group.is_standard || isAdminAssigned(row.assigned_by_role))}
+                                  onChange={e => {
+                                    if (isManager && (group.is_standard || isAdminAssigned(row.assigned_by_role))) return;
+                                    toggleKRA(row.key, e.target.checked);
                                   }}
+                                  sx={{ p: 0.4, mr: 0.75, flexShrink: 0, color: '#cbd5e1',
+                                    '&.Mui-checked': { color: '#1E3A8A' } }}
                                 />
 
                                 <Typography fontSize={12.5} fontWeight={500} color="#1e293b"
@@ -734,6 +774,7 @@ export default function EmployeeKRAView({
       <CloseConfirmDialog
         open={warnClose}
         onGoBack={() => setWarnClose(false)}
+        onDiscard={() => { setWarnClose(false); onClose?.(); }}
         onSaveClose={handleSaveAndClose}
         saving={saving}
       />

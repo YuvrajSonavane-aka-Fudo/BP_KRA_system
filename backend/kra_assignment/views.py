@@ -205,26 +205,29 @@ class EmployeeListView(APIView):
                     "kra_level_id",
                     "kra_level__kra_id",
                     "kra_level__kra__name",
+                    "assigned_by_role",
                 ).distinct():
                     emp_id = ekc_to_emp.get(ekl["employee_kra_cycle_id"])
                     if emp_id is None:
                         continue
                     kra_map.setdefault(emp_id, []).append({
-                        "kra_level_id": ekl["kra_level_id"],
-                        "kra_id":       ekl["kra_level__kra_id"],
-                        "name":         ekl["kra_level__kra__name"],
+                        "kra_level_id":     ekl["kra_level_id"],
+                        "kra_id":           ekl["kra_level__kra_id"],
+                        "name":             ekl["kra_level__kra__name"],
+                        "assigned_by_role": ekl["assigned_by_role"],
                     })
 
                 # 3c. Category weightages — one query
                 for ekc_cat in EmployeeKRACycleCategory.objects.filter(
                     employee_kra_cycle_id__in=ekc_ids
-                ).values("employee_kra_cycle_id", "category_id", "weightage"):
+                ).values("employee_kra_cycle_id", "category_id", "weightage", "assigned_by_role"):
                     emp_id = ekc_to_emp.get(ekc_cat["employee_kra_cycle_id"])
                     if emp_id is None:
                         continue
                     category_map.setdefault(emp_id, []).append({
-                        "category_id": ekc_cat["category_id"],
-                        "weightage":   ekc_cat["weightage"],
+                        "category_id":      ekc_cat["category_id"],
+                        "weightage":        ekc_cat["weightage"],
+                        "assigned_by_role": ekc_cat["assigned_by_role"],
                     })
 
         #  4. Build response — pure Python, zero DB hits 
@@ -254,6 +257,7 @@ class KRABulkAssignmentEnrolView(APIView):
 
     def post(self, request, cycle_id):
         caller = _get_caller(request)
+        caller_role = caller.role.name if caller.role else "Unknown"
         data = request.data
 
         assignments = data.get("assignments", [])
@@ -435,6 +439,7 @@ class KRABulkAssignmentEnrolView(APIView):
                                 employee_kra_cycle=ekc,
                                 category_id=cat["category_id"],
                                 weightage=str(cat["weightage"]),
+                                assigned_by_role=caller_role,
                             )
                             for cat in categories
                         ])
@@ -444,6 +449,7 @@ class KRABulkAssignmentEnrolView(APIView):
                                 employee_id=eid,
                                 kra_level_id=kl_id,
                                 employee_kra_cycle=ekc,
+                                assigned_by_role=caller_role,
                             )
                             for kl_id in kra_level_ids
                         ])
@@ -482,6 +488,7 @@ class KRABulkAssignmentEnrolView(APIView):
                                         employee_kra_cycle=ekc,
                                         category_id=cid,
                                         weightage=str(cat_weight),
+                                        assigned_by_role=caller_role,
                                     )
                                 )
                                 remaining -= cat_weight
@@ -504,6 +511,7 @@ class KRABulkAssignmentEnrolView(APIView):
                                 employee_id=eid,
                                 kra_level_id=kl_id,
                                 employee_kra_cycle=ekc,
+                                assigned_by_role=caller_role,
                             )
                             for kl_id in to_add
                         ])
@@ -539,6 +547,7 @@ class KRABulkAssignmentEnrolView(APIView):
                             employee_kra_cycle=ekc,
                             category_id=cat["category_id"],
                             weightage=str(cat["weightage"]),
+                            assigned_by_role=caller_role,
                         )
                         for cat in categories
                     ])
@@ -548,6 +557,7 @@ class KRABulkAssignmentEnrolView(APIView):
                             employee_id=eid,
                             kra_level_id=kl_id,
                             employee_kra_cycle=ekc,
+                            assigned_by_role=caller_role,
                         )
                         for kl_id in kra_level_ids
                     ])
@@ -631,6 +641,7 @@ class KRAAssignmentUpdateDeleteView(APIView):
 
     def put(self, request, employee_kra_cycle_id):
         caller = _get_caller(request)
+        caller_role = caller.role.name if caller.role else "Unknown"
         ekc = get_object_or_404(EmployeeKRACycle, id=employee_kra_cycle_id)
         data = request.data
         categories = data.get("categories", [])
@@ -659,22 +670,37 @@ class KRAAssignmentUpdateDeleteView(APIView):
                 ekc.is_date_based = data["is_date_based"]
             ekc.save()
 
+            existing_cats = {
+                c.category_id: c
+                for c in ekc.categories.all()
+            }
             ekc.categories.all().delete()
             EmployeeKRACycleCategory.objects.bulk_create([
                 EmployeeKRACycleCategory(
                     employee_kra_cycle=ekc,
                     category_id=cat["category_id"],
                     weightage=str(cat["weightage"]),
+                    assigned_by_role=(
+                        caller_role
+                        if cat["category_id"] not in existing_cats
+                        or str(existing_cats[cat["category_id"]].weightage) != str(cat["weightage"])
+                        else existing_cats[cat["category_id"]].assigned_by_role
+                    ),
                 )
                 for cat in categories
             ])
 
+            existing_kra_roles = {
+                row.kra_level_id: row.assigned_by_role
+                for row in ekc.kra_level_rows.all()
+            }
             ekc.kra_level_rows.all().delete()
-            EmployeeKRALevel.objects.bulk_create([
+            EmployeeKRALevel.objects.bulk_create([  
                 EmployeeKRALevel(
                     employee_id=ekc.employee_id,
                     kra_level_id=kl_id,
                     employee_kra_cycle=ekc,
+                    assigned_by_role=existing_kra_roles.get(kl_id, caller_role),
                 )
                 for kl_id in kra_level_ids
             ])

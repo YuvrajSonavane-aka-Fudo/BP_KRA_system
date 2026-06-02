@@ -50,6 +50,12 @@ const ACTION_CONFIG = {
   CLOSED:    { label: 'Close',       icon: <CheckCircleIcon fontSize="small" />, confirmColor: '#1E3A8A' },
   CANCELLED: { label: 'Cancel',      icon: <BlockIcon fontSize="small" />,       confirmColor: '#dc2626' },
 };
+const ACTION_DIALOG_CONFIG = {
+  ACTIVE: { title:'Activate Cycle', confirmLabel:'Activate Cycle', cancelLabel:'Not Now' },
+  CLOSED: { title:'Close Cycle', confirmLabel:'Close Cycle', cancelLabel:'Keep Open' },
+  CANCELLED: { title:'Cancel Cycle', confirmLabel:'Cancel Cycle', cancelLabel:'Keep Cycle' },
+  ON_HOLD: { title:'Put Cycle On Hold', confirmLabel:'Put On Hold', cancelLabel:'Keep Active' },
+};
 
 const TAB_FILTERS = [null, 'DRAFT', 'CLOSED', 'ON_HOLD', 'CANCELLED'];
 const TAB_LABELS  = ['All', 'Draft', 'Closed', 'On Hold', 'Cancelled'];
@@ -169,6 +175,7 @@ function formatDate(dateStr) {
 /* ── Stage stepper for active cycle banner ── */
 function BannerStepper({
   stages,
+  stageWindows,
   currentStageId,
   canAdvance,
   canRollback,
@@ -268,31 +275,32 @@ function BannerStepper({
 
           const clickable = isNext || isBack;
 
+          const win = (stageWindows ?? []).find(w => w.stage_id === stage.id);
+
           return (
             <Step
               key={stage.id}
               completed={stage.id < currentStageId}
             >
-
-              <StepLabel
-                onClick={() => {
-
-                  if (isNext) {
-                    onAdvanceClick(stage);
-                  }
-
-                  if (isBack) {
-                    onRollbackClick(stage);
-                  }
-
-                }}
-                sx={{
-                  cursor: clickable ? 'pointer' : 'default',
-                }}
+              <Tooltip
+                title={
+                  win?.start_date && win?.end_date
+                    ? `${formatDate(win.start_date)} → ${formatDate(win.end_date)}`
+                    : 'No dates configured'
+                }
+                arrow
+                placement="top"
               >
-                {stage.name}
-              </StepLabel>
-
+                <StepLabel
+                  onClick={() => {
+                    if (isNext) onAdvanceClick(stage);
+                    if (isBack) onRollbackClick(stage);
+                  }}
+                  sx={{ cursor: clickable ? 'pointer' : 'default' }}
+                >
+                  {stage.name}
+                </StepLabel>
+              </Tooltip>
             </Step>
           );
         })}
@@ -321,7 +329,7 @@ function BannerStepper({
 }
 
 /* ── Confirm dialog ── */
-function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmColor, onClose, onConfirm, loading, error }) {
+function ConfirmDialog({ open, title, message, warning, confirmLabel, cancelLabel = 'Cancel', confirmColor, onClose, onConfirm, loading, error }) {
   return (
     <Dialog open={open} onClose={() => !loading && onClose()} maxWidth="xs" fullWidth
       PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
@@ -342,7 +350,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmCol
       </DialogContent>
       <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
         <Button onClick={onClose} disabled={loading}
-          sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>Cancel</Button>
+          sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>{cancelLabel}</Button>
         <Button onClick={onConfirm} disabled={loading} variant="contained"
           startIcon={loading ? <CircularProgress size={12} color="inherit" /> : null}
           sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }, '&:disabled': { opacity: 0.6 } }}>
@@ -691,6 +699,7 @@ const headerSx = {
 
             <BannerStepper
               stages={stages}
+              stageWindows={activeCycle?.cycle_stages ?? []} 
               currentStageId={currentStageId ?? 1}
               canAdvance={canAdvanceActive}
               canRollback={canRollbackActive}
@@ -912,7 +921,7 @@ const headerSx = {
       {confirm.open && confirm.action && (
         <ConfirmDialog
           open={confirm.open}
-          title={`${ACTION_CONFIG[confirm.action]?.label} Cycle`}
+          title={ACTION_DIALOG_CONFIG[confirm.action]?.title}
           message={`Are you sure you want to ${ACTION_CONFIG[confirm.action]?.label?.toLowerCase()} "${confirm.cycle?.name}"?`}
           warning={
             confirm.action === 'CANCELLED' ? 'This action cannot be undone. All assignments will be permanently cancelled.'
@@ -920,7 +929,8 @@ const headerSx = {
               : confirm.action === 'ACTIVE' ? 'Activating will send email notifications to all VLs and HRs.'
               : null
           }
-          confirmLabel={ACTION_CONFIG[confirm.action]?.label}
+          confirmLabel={ACTION_DIALOG_CONFIG[confirm.action]?.confirmLabel}
+          cancelLabel={ACTION_DIALOG_CONFIG[confirm.action]?.cancelLabel}
           confirmColor={ACTION_CONFIG[confirm.action]?.confirmColor}
           loading={confirmLoading}
           error={confirmError}

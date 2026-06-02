@@ -391,6 +391,7 @@ class EmployeeKRACycleCategory(models.Model):
     
     #stored as varchar in DB (ex : "30") keep as charfield to match schema
     weightage = models.CharField(max_length = 10 , null = True , blank = True)
+    assigned_by_role = models.CharField(max_length=50, null=True, blank=True)
     
     class Meta:
         db_table = 'employee_kra_cycle_category'
@@ -448,6 +449,7 @@ class EmployeeKRALevel(models.Model):
         related_name = 'kra_level_rows',
     )
     lead_progress_notes = models.TextField(null = True , blank = True)
+    assigned_by_role = models.CharField(max_length=50, null=True, blank=True)
     
     class Meta :
         db_table = 'employee_kra_level'

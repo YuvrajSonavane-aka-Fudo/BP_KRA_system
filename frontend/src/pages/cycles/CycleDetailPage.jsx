@@ -54,6 +54,12 @@ const ACTION_CONFIG = {
   CLOSED:    { label: 'Close Cycle', icon: <CheckCircleIcon fontSize="small" />, confirmColor: '#1E3A8A' },
   CANCELLED: { label: 'Cancel Cycle',icon: <BlockIcon fontSize="small" />,       confirmColor: '#dc2626' },
 };
+const ACTION_DIALOG_CONFIG = {
+  ACTIVE: { title: 'Activate Cycle', confirmLabel: 'Activate Cycle', cancelLabel: 'Not Now',},
+  CLOSED: { title: 'Close Cycle', confirmLabel: 'Close Cycle', cancelLabel: 'Keep Open', },
+  CANCELLED: { title: 'Cancel Cycle', confirmLabel: 'Cancel Cycle', cancelLabel: 'Keep Cycle', },
+  ON_HOLD: { title: 'Put Cycle On Hold', confirmLabel: 'Put On Hold', cancelLabel: 'Keep Active', },
+};
 
 /* ─────────────── helpers ─────────────── */
 function toDateOnly(s) { return s ? String(s).split('T')[0].split(' ')[0].trim() : ''; }
@@ -88,6 +94,8 @@ function RangePicker({ startDate, endDate, onChange, minDate, maxDate, onClose }
   const totalDays = new Date(vy, vm+1, 0).getDate();
   const firstDay  = new Date(vy, vm, 1).getDay();
   const cells     = [...Array(firstDay).fill(null), ...Array.from({ length: totalDays }, (_, i) => i+1)];
+
+  
 
   const maxD = maxDate ? new Date(toDateOnly(maxDate) + 'T00:00:00') : null;
   function disabled(d) {
@@ -294,7 +302,7 @@ function DateRangeField({ startDate, endDate, onChange, minDate, maxDate, disabl
 }
 
 /* ─────────────── ConfirmDialog ─────────────── */
-function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmColor, onClose, onConfirm, loading, error }) {
+function ConfirmDialog({ open, title, message, warning, confirmLabel,cancelLabel = 'Cancel', confirmColor, onClose, onConfirm, loading, error }) {
   return (
     <Dialog open={open} onClose={() => !loading && onClose()} maxWidth="xs" fullWidth
       PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
@@ -316,7 +324,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmCol
       <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
         <Button onClick={onClose} disabled={loading}
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>
-          Cancel
+          {cancelLabel}
         </Button>
         <Button onClick={onConfirm} disabled={loading} variant="contained"
           startIcon={loading ? <CircularProgress size={12} color="inherit" /> : null}
@@ -335,6 +343,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, confirmCol
 /* ─────────────── StageStepper ─────────────── */
 function StageStepper({
   stages,
+  stageWindows, 
   currentStageId,
   canAdvance,
   onAdvanceClick,
@@ -445,24 +454,32 @@ function StageStepper({
             canAdvance &&
             done;
 
+          const win = (stageWindows ?? []).find(w => w.stage_id === stage.id);
+
           return (
             <Step key={stage.id} completed={done}>
-              <StepLabel
-                onClick={() => {
-                  if (isNext) onAdvanceClick(stage);
-                  else if (isRollbackable) onRollbackClick(stage);
-                }}
-                sx={{
-                  cursor:
-                    isNext || isRollbackable
-                      ? 'pointer'
-                      : 'default',
-                }}
+              <Tooltip
+                title={
+                  win?.start_date && win?.end_date
+                    ? `${fmt(win.start_date)} → ${fmt(win.end_date)}`
+                    : 'No dates configured'
+                }
+                arrow
+                placement="top"
               >
-                {stage.name}
-              </StepLabel>
+                <StepLabel
+                  onClick={() => {
+                    if (isNext) onAdvanceClick(stage);
+                    else if (isRollbackable) onRollbackClick(stage);
+                  }}
+                  sx={{ cursor: isNext || isRollbackable ? 'pointer' : 'default' }}
+                >
+                  {stage.name}
+                </StepLabel>
+              </Tooltip>
             </Step>
           );
+
         })}
       </Stepper>
 
@@ -546,6 +563,8 @@ export default function CycleDetailPage() {
   const [deleteError, setDeleteError]     = useState('');
 
   const [actionsAnchor, setActionsAnchor] = useState(null);
+  const [unsavedWarningOpen, setUnsavedWarningOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation]   = useState(null);
 
   function flash(msg) { setMsg(msg); setTimeout(() => setMsg(''), 4000); }
   function touch(...keys) { setTouched(t => { const n = { ...t }; keys.forEach(k => n[k] = true); return n; }); }
@@ -926,7 +945,14 @@ export default function CycleDetailPage() {
       <Box sx={{ flexShrink: 0, bgcolor: '#fff', borderBottom: '1px solid #e2e8f0', px: 2.5, py: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <IconButton
-            onClick={() => navigate(ROUTES.DASHBOARD)}
+            onClick={() => {
+              if (isDirty && isEditMode && !isNew) {
+                setPendingNavigation(ROUTES.DASHBOARD);
+                setUnsavedWarningOpen(true);
+              } else {
+                navigate(ROUTES.DASHBOARD);
+              }
+            }}
             size="small"
             sx={{ color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 1.5, p: 0.5, '&:hover': { bgcolor: '#f1f5f9', color: '#1E3A8A' } }}>
             <ArrowBackIcon fontSize="small" />
@@ -992,32 +1018,27 @@ export default function CycleDetailPage() {
                     {fmt(cycle.start_date)} — {fmt(cycle.end_date)}
                   </Typography>
 
-                  {daysRemaining !== null && (
-                    <Box
-                      sx={{
-                        px: 1,
-                        py: 0.3,
-                        borderRadius: 99,
-                        bgcolor: 'transparent',
-                      }}
-                    >
+                  {currentStageId && (() => {
+                    const currentStageWindow = stageWindows.find(w => w.stage_id === currentStageId);
+                    if (!currentStageWindow?.start_date || !currentStageWindow?.end_date) return null;
+                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                    const end = new Date(toDateOnly(currentStageWindow.end_date) + 'T00:00:00');
+                    const days = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+                    return (
                       <Typography
                         sx={{
                           fontSize: 10,
                           fontWeight: 500,
-                          color: 'rgba(255,255,255,0.68)',
+                          color: days > 7 ? 'rgba(255,255,255,0.68)' : days >= 0 ? '#fcd34d' : '#fca5a5',
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {daysRemaining > 0
-                          ? `(Stage ends in ${daysRemaining} days)`
-                          : daysRemaining === 0
-                            ? '(Stage ends today)'
-                            : `(Stage overdue by ${Math.abs(daysRemaining)} days)`
-                        }
+                        {`( Stage Duration: ${fmt(currentStageWindow.start_date)} -> ${fmt(currentStageWindow.end_date)}  ·  ${
+                          days > 0 ? `${days} days left )` : days === 0 ? 'Ends today )' : `Overdue by ${Math.abs(days)} days )`
+                        }`}
                       </Typography>
-                    </Box>
-                  )}
+                    );
+                  })()}
                 </Stack>
 
                 {/* Right: Edit (always visible outside), then 3-dot with everything else */}
@@ -1101,6 +1122,7 @@ export default function CycleDetailPage() {
               {/* Stage stepper — name/dates/hint now rendered inside StageStepper below stepper */}
               <StageStepper
                 stages={stages}
+                stageWindows={stageWindows}
                 currentStageId={currentStageId}
                 canAdvance={canAdvance}
                 rollbackTargetId={rollbackTargetId}
@@ -1436,7 +1458,7 @@ export default function CycleDetailPage() {
             startIcon={isSaving ? <CircularProgress size={12} color="inherit" /> : <SaveIcon sx={{ fontSize: 13 }} />}
             sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 12, background: gradient, '&:hover': { background: gradient, opacity: 0.9 },
              '&.Mui-disabled': { opacity: 1, background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', color: 'rgba(255,255,255,0.75)',}}}>
-            {isSaving ? 'Saving…' : 'Save Changes'}
+            {isSaving ? 'Saving…' : 'Save'}
           </Button>
         </Box>
       )}
@@ -1455,6 +1477,7 @@ export default function CycleDetailPage() {
         onConfirm={handleAdvanceStage}
       />
 
+      
       {/* Rollback confirm */}
       <ConfirmDialog
         open={rollbackConfirm.open}
@@ -1468,23 +1491,41 @@ export default function CycleDetailPage() {
         onClose={() => setRollbackConfirm({ open: false, toStage: null })}
         onConfirm={confirmRollback}
       />
-
+      
       {statusConfirm.open && statusConfirm.action && (
         <ConfirmDialog
           open={statusConfirm.open}
-          title={`${ACTION_CONFIG[statusConfirm.action]?.label} Cycle`}
-          message={`Are you sure you want to ${ACTION_CONFIG[statusConfirm.action]?.label?.toLowerCase()} "${cycle?.name}"?`}
+          title={ACTION_DIALOG_CONFIG[statusConfirm.action]?.title}
+          
+          message={
+            statusConfirm.action === 'ON_HOLD'
+              ? `Are you sure you want to put "${cycle?.name}" on hold?`
+              : `Are you sure you want to ${ACTION_CONFIG[statusConfirm.action]?.label?.toLowerCase()} "${cycle?.name}"?`
+          }
+
           warning={
-            statusConfirm.action === 'CANCELLED' ? 'This cannot be undone. The cycle and all assignments will be permanently cancelled.'
-              : statusConfirm.action === 'CLOSED' ? 'Closing will lock all assessments and cannot be reversed.'
-              : statusConfirm.action === 'ACTIVE' ? 'Activating will send email notifications to all VLs and HRs.'
+            statusConfirm.action === 'CANCELLED'
+              ? 'This action cannot be undone. The cycle and all related assignments will be permanently cancelled.'
+              : statusConfirm.action === 'CLOSED'
+              ? 'Closing this cycle will lock all assessments and cannot be reversed.'
+              : statusConfirm.action === 'ON_HOLD'
+              ? 'Employees will not be able to access or update assessments while the cycle is on hold.'
+              : statusConfirm.action === 'ACTIVE'
+              ? 'Activating this cycle will notify all VLs and HRs by email.'
               : null
           }
-          confirmLabel={ACTION_CONFIG[statusConfirm.action]?.label}
+
+          confirmLabel={ACTION_DIALOG_CONFIG[statusConfirm.action]?.confirmLabel}
+          cancelLabel={ACTION_DIALOG_CONFIG[statusConfirm.action]?.cancelLabel}
           confirmColor={ACTION_CONFIG[statusConfirm.action]?.confirmColor}
           loading={statusLoading}
           error={statusError}
-          onClose={() => { setStatusConfirm({ open: false, action: null }); setStatusError(''); }}
+
+          onClose={() => {
+            setStatusConfirm({ open: false, action: null });
+            setStatusError('');
+          }}
+
           onConfirm={handleStatusChange}
         />
       )}
@@ -1500,6 +1541,58 @@ export default function CycleDetailPage() {
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDelete}
       />
+
+      <Dialog
+        open={unsavedWarningOpen}
+        onClose={() => setUnsavedWarningOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}
+      >
+        <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid #fde68a' }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <WarningAmberIcon sx={{ color: '#d97706', fontSize: 18 }} />
+            <Typography fontWeight={700} fontSize={14} color="#92400e">
+              Unsaved Changes
+            </Typography>
+          </Stack>
+        </Box>
+        <DialogContent sx={{ pt: 2, pb: 1 }}>
+          <Typography fontSize={13} color="#374151">
+            You have unsaved changes. What would you like to do?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
+          <Button
+            onClick={() => {
+              setUnsavedWarningOpen(false);
+              handleCancelEdit();
+              navigate(pendingNavigation);
+            }}
+            sx={{ textTransform: 'none', color: '#ef4444', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}
+          >
+            Discard & Leave
+          </Button>
+          <Button
+            onClick={() => setUnsavedWarningOpen(false)}
+            sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13, border: '1px solid #e2e8f0' }}
+          >
+            Keep Editing
+          </Button>
+          <Button
+            onClick={async () => {
+              setUnsavedWarningOpen(false);
+              await handleSave();
+              navigate(pendingNavigation);
+            }}
+            variant="contained"
+            startIcon={<SaveIcon sx={{ fontSize: 13 }} />}
+            sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 13, background: gradient, '&:hover': { background: gradient, opacity: 0.9 } }}
+          >
+            Save & Leave
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
