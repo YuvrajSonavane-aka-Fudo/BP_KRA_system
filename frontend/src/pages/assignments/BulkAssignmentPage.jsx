@@ -436,11 +436,11 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
                   {emp.employee_id}
                 </Typography>
                 <Box sx={{ ...COL_SX.name, ml: 1, minWidth: 0 }}
-                  onClick={() => onView(emp)}
-                  style={{ cursor: 'pointer' }}>
+                  onClick={() => isAssigned && onView(emp)}
+                  style={{ cursor: isAssigned ? 'pointer' : 'default' }}>
                   <Stack direction="row" alignItems="center" gap={0.5}>
-                    <Typography fontSize={12.5} fontWeight={600} color='#1d4ed8' noWrap
-                      sx={{ '&:hover': { textDecoration: 'underline' } }}>
+                    <Typography fontSize={12.5} fontWeight={600} color={isAssigned ? '#1d4ed8' : '#1e293b'} noWrap
+                      sx={isAssigned ? { '&:hover': { textDecoration: 'underline' } } : {}}>
                       {emp.full_name}
                     </Typography>
                     {isAssigned && (
