@@ -49,8 +49,7 @@ def _base_ekc_qs(caller, cycle_ids):
         Prefetch(
             'kra_level_rows',
             queryset=EmployeeKRALevel.objects.select_related(
-                'kra_level',
-                'kra_level__category',
+                'kra_level__kra__category',  # real name + real category in one join
                 'self_rating',
                 'lead_rating',
             )
@@ -79,9 +78,15 @@ def _build_row(emp, ekc, kra_row, columns):
     if 'previous_manager' in columns:
         row['previous_manager'] = f'{emp.previous_manager.first_name} {emp.previous_manager.last_name}' if emp.previous_manager else None
     if 'kra_name' in columns:
-        row['kra_name'] = getattr(kra_row.kra_level, 'name', None)
+        row['kra_name'] = (
+            kra_row.kra_level.kra.name
+            if kra_row.kra_level and kra_row.kra_level.kra else None
+        )
     if 'category' in columns:
-        row['category'] = getattr(kra_row.kra_level.category, 'name', None) if kra_row.kra_level else None
+        row['category'] = (
+            kra_row.kra_level.kra.category.name
+            if kra_row.kra_level and kra_row.kra_level.kra and kra_row.kra_level.kra.category else None
+        )
     if 'self_rating' in columns:
         row['self_rating'] = kra_row.self_rating.rating if kra_row.self_rating else None
     if 'self_comment' in columns:
@@ -183,8 +188,14 @@ class MultiCycleReportView(APIView):
                         'level':            emp.level.name if emp.level else None,
                         'manager':          f'{emp.manager.first_name} {emp.manager.last_name}' if emp.manager else None,
                         'previous_manager': f'{emp.previous_manager.first_name} {emp.previous_manager.last_name}' if emp.previous_manager else None,
-                        'kra_name':         getattr(kra_row.kra_level, 'name', None),
-                        'category':         getattr(kra_row.kra_level.category, 'name', None) if kra_row.kra_level else None,
+                        'kra_name':         (
+                            kra_row.kra_level.kra.name
+                            if kra_row.kra_level and kra_row.kra_level.kra else None
+                        ),
+                        'category':         (
+                            kra_row.kra_level.kra.category.name
+                            if kra_row.kra_level and kra_row.kra_level.kra and kra_row.kra_level.kra.category else None
+                        ),
                         'cycles':           {str(c): None for c in cycle_ids},
                     }
 
