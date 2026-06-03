@@ -334,40 +334,21 @@ function Report({ cycles, employees }) {
   const [sortCol, setSortCol] = useState('employee_name');
   const [sortDir, setSortDir] = useState('asc');
 
-  // Superset of employees belonging to ANY of the selected cycles.
-  // Before a report is run we can only filter by what the API returned per-cycle;
-  // once a report has been run we have the exact employee list from the result rows.
+  // Employees belonging to ANY of the selected cycles, derived directly from the
+  // cycle_ids array on each employee object (present in the /employees API response).
+  // Employees with an empty cycle_ids array have no cycle assignments and are excluded.
   const filteredEmployees = useMemo(() => {
     if (!cycleIds.length) return employees;
-    // If we already have result data use the employee set from those rows (most accurate)
-    if (result) {
-      const seen = new Set();
-      const list = [];
-      for (const row of result.rows ?? []) {
-        if (!seen.has(row.employee_id)) {
-          seen.add(row.employee_id);
-          const match = employees.find(e => (e.employee_id ?? e.id) === row.employee_id);
-          list.push(match ?? { employee_id: row.employee_id, full_name: row.employee_name });
-        }
-      }
-      return list;
-    }
-    // Before first run: filter employees by cycle_ids if the employee object carries that info
-    return employees.filter(e => {
-      const empCycles = e.cycle_ids ?? e.cycles ?? [];
-      if (!empCycles.length) return true; // no cycle info available — show all
-      return cycleIds.some(cid => empCycles.includes(cid));
-    });
-  }, [cycleIds, employees, result]);
+    return employees.filter(e =>
+      (e.cycle_ids ?? []).some(cid => cycleIds.includes(cid))
+    );
+  }, [cycleIds, employees]);
 
-  // Reset employee filter whenever cycle selection changes to avoid stale selections
+  // Keep empFilter in sync: drop any selected employee no longer in the filtered list
   useEffect(() => {
-    setEmpFilter(prev => {
-      if (!prev.length) return prev;
-      const validIds = new Set(filteredEmployees.map(e => e.employee_id ?? e.id));
-      const next = prev.filter(id => validIds.has(id));
-      return next.length === prev.length ? prev : next;
-    });
+    if (!empFilter.length) return;
+    const validIds = new Set(filteredEmployees.map(e => e.employee_id ?? e.id));
+    setEmpFilter(prev => prev.filter(id => validIds.has(id)));
   }, [filteredEmployees]);
 
   async function fetchReport() {
