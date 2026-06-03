@@ -1595,9 +1595,9 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                     return (
                       <Box component="li" {...props} key={e.employee_id}
                         sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', cursor: 'pointer', py: 0.5 }}>
-                        <Avatar sx={{ width: 22, height: 22, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>
-                          {initials(e.full_name)}
-                        </Avatar>
+                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
+                          #{e.employee_id}
+                        </Typography>
                         <Typography sx={{ fontSize: 13, flex: 1 }}>{e.full_name}</Typography>
                         {allRated && <CheckCircleIcon sx={{ fontSize: 13, color: '#22c55e' }} />}
                       </Box>
@@ -1745,17 +1745,9 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                           }),
                         }}
                       >
-                        <Avatar
-                          sx={{
-                            width: 22,
-                            height: 22,
-                            bgcolor: isSelf ? ACCENT : BLUE,
-                            fontSize: 9,
-                            fontWeight: 800,
-                          }}
-                        >
-                          {initials(e.full_name)}
-                        </Avatar>
+                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
+                          #{e.employee_id}
+                        </Typography>
 
                         <Typography sx={{ fontSize: 13, flex: 1 }}>
                           {e.full_name}

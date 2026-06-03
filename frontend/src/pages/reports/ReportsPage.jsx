@@ -122,6 +122,7 @@ function MultiSelect({
   sortFn,
   minWidth = 220,
   renderOptionContent,
+  disabled = false,
 }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [search, setSearch] = useState('');
@@ -168,22 +169,19 @@ function MultiSelect({
       <TextField
         size="small"
         value={summary}
-        onClick={e =>
-          setAnchorEl(e.currentTarget)
-        }
-        InputProps={{
-          readOnly: true,
-        }}
+        disabled={disabled}
+        onClick={e => !disabled && setAnchorEl(e.currentTarget)}
+        InputProps={{ readOnly: true }}
         sx={{
           minWidth,
           '& .MuiOutlinedInput-root': {
             fontSize: 13,
             borderRadius: 2,
-            bgcolor: '#fff',
-            cursor: 'pointer',
+            bgcolor: disabled ? '#f1f5f9' : '#fff',
+            cursor: disabled ? 'not-allowed' : 'pointer',
           },
           '& input': {
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
           },
         }}
       />
@@ -336,6 +334,42 @@ function Report({ cycles, employees }) {
   const [sortCol, setSortCol] = useState('employee_name');
   const [sortDir, setSortDir] = useState('asc');
 
+  // Superset of employees belonging to ANY of the selected cycles.
+  // Before a report is run we can only filter by what the API returned per-cycle;
+  // once a report has been run we have the exact employee list from the result rows.
+  const filteredEmployees = useMemo(() => {
+    if (!cycleIds.length) return employees;
+    // If we already have result data use the employee set from those rows (most accurate)
+    if (result) {
+      const seen = new Set();
+      const list = [];
+      for (const row of result.rows ?? []) {
+        if (!seen.has(row.employee_id)) {
+          seen.add(row.employee_id);
+          const match = employees.find(e => (e.employee_id ?? e.id) === row.employee_id);
+          list.push(match ?? { employee_id: row.employee_id, full_name: row.employee_name });
+        }
+      }
+      return list;
+    }
+    // Before first run: filter employees by cycle_ids if the employee object carries that info
+    return employees.filter(e => {
+      const empCycles = e.cycle_ids ?? e.cycles ?? [];
+      if (!empCycles.length) return true; // no cycle info available — show all
+      return cycleIds.some(cid => empCycles.includes(cid));
+    });
+  }, [cycleIds, employees, result]);
+
+  // Reset employee filter whenever cycle selection changes to avoid stale selections
+  useEffect(() => {
+    setEmpFilter(prev => {
+      if (!prev.length) return prev;
+      const validIds = new Set(filteredEmployees.map(e => e.employee_id ?? e.id));
+      const next = prev.filter(id => validIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [filteredEmployees]);
+
   async function fetchReport() {
     if (!cycleIds.length) return;
     setLoading(true); setError('');
@@ -417,12 +451,23 @@ function Report({ cycles, employees }) {
           </Box>
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#64748b', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Employees <Box component="span" sx={{ color: '#ef4444' }}>*</Box></Typography>
-            <MultiSelect label="All employees" options={employees} value={empFilter}
+            <MultiSelect label="All employees" options={filteredEmployees} value={empFilter}
               onChange={setEmpFilter}
               getLabel={e => e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
               getValue={e => e.employee_id ?? e.id}
               sortFn={(a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '')}
               minWidth={220}
+              disabled={!cycleIds.length}
+              renderOptionContent={e => (
+                <Stack direction="row" alignItems="center" gap={1} sx={{ width: '100%' }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
+                    #{e.employee_id ?? e.id}
+                  </Typography>
+                  <Typography sx={{ fontSize: 13 }}>
+                    {e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
+                  </Typography>
+                </Stack>
+              )}
             />
           </Box>
           <Box>
