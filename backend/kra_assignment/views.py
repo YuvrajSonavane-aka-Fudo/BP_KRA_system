@@ -146,7 +146,7 @@ class EmployeeListView(APIView):
         caller = _get_caller(request)
         cycle_id = request.query_params.get("cycle_id")
 
-        #  1. Base employee queryset 
+        #  1. Base employee queryset
         qs = (
             Employee.objects
             .filter(active=True)
@@ -165,8 +165,7 @@ class EmployeeListView(APIView):
         employees_list = list(qs)
         employee_ids = [e.id for e in employees_list]
 
-        # 2. Roles — one query for all employees, no per-row hit 
-        # employee_roles is a bridge table; pull (employee_id, role name) in bulk
+        # 2. Roles — one query for all employees, no per-row hit
         from django.db.models import F
         roles_qs = (
             Employee.objects
@@ -180,7 +179,7 @@ class EmployeeListView(APIView):
             if role_name:
                 roles_map[emp_id].append(role_name)
 
-        #  3. Cycle data — all in bulk if cycle_id provided 
+        #  3. Cycle data — all in bulk if cycle_id provided
         cycle_map = {}     # employee_id → employee_kra_cycle_id
         kra_map = {}       # employee_id → [{kra_level_id, kra_id, name}, ...]
         category_map = {}  # employee_id → [{category_id, weightage}, ...]
@@ -230,7 +229,16 @@ class EmployeeListView(APIView):
                         "assigned_by_role": ekc_cat["assigned_by_role"],
                     })
 
-        #  4. Build response — pure Python, zero DB hits 
+        # 4. Cycle membership — one bulk query across ALL cycles for this employee set
+        #    Returns cycle_ids list on every employee so the frontend can filter
+        #    the employee dropdown to only those enrolled in selected cycles.
+        all_cycle_ids_map = defaultdict(list)  # employee_id → [cycle_id, ...]
+        for row in EmployeeKRACycle.objects.filter(
+            employee_id__in=employee_ids
+        ).values("employee_id", "kra_cycle_id"):
+            all_cycle_ids_map[row["employee_id"]].append(row["kra_cycle_id"])
+
+        #  5. Build response — pure Python, zero DB hits
         result = []
         for e in employees_list:
             result.append({
@@ -241,12 +249,14 @@ class EmployeeListView(APIView):
                 "department":            e.department.department_name if e.department else None,
                 "level":                 e.level.name if e.level else None,
                 "manager_id":            e.manager_id,
-                # roles_map built in bulk — no per-employee query
                 "roles":                 roles_map.get(e.id, []),
                 "assigned_to_cycle":     e.id in cycle_map,
                 "employee_kra_cycle_id": cycle_map.get(e.id),
                 "assigned_categories":   category_map.get(e.id, []),
                 "assigned_kras":         kra_map.get(e.id, []),
+                # all cycles this employee is enrolled in — used by frontend
+                # to filter the employee dropdown to selected cycles (superset)
+                "cycle_ids":             all_cycle_ids_map.get(e.id, []),
             })
 
         return Response({"employees": result}, status=status.HTTP_200_OK)

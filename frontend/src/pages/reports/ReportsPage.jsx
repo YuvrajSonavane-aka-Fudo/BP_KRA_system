@@ -122,6 +122,7 @@ function MultiSelect({
   sortFn,
   minWidth = 220,
   renderOptionContent,
+  disabled = false,
 }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [search, setSearch] = useState('');
@@ -168,22 +169,19 @@ function MultiSelect({
       <TextField
         size="small"
         value={summary}
-        onClick={e =>
-          setAnchorEl(e.currentTarget)
-        }
-        InputProps={{
-          readOnly: true,
-        }}
+        disabled={disabled}
+        onClick={e => !disabled && setAnchorEl(e.currentTarget)}
+        InputProps={{ readOnly: true }}
         sx={{
           minWidth,
           '& .MuiOutlinedInput-root': {
             fontSize: 13,
             borderRadius: 2,
-            bgcolor: '#fff',
-            cursor: 'pointer',
+            bgcolor: disabled ? '#f1f5f9' : '#fff',
+            cursor: disabled ? 'not-allowed' : 'pointer',
           },
           '& input': {
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
           },
         }}
       />
@@ -336,6 +334,23 @@ function Report({ cycles, employees }) {
   const [sortCol, setSortCol] = useState('employee_name');
   const [sortDir, setSortDir] = useState('asc');
 
+  // Employees belonging to ANY of the selected cycles, derived directly from the
+  // cycle_ids array on each employee object (present in the /employees API response).
+  // Employees with an empty cycle_ids array have no cycle assignments and are excluded.
+  const filteredEmployees = useMemo(() => {
+    if (!cycleIds.length) return employees;
+    return employees.filter(e =>
+      (e.cycle_ids ?? []).some(cid => cycleIds.includes(cid))
+    );
+  }, [cycleIds, employees]);
+
+  // Keep empFilter in sync: drop any selected employee no longer in the filtered list
+  useEffect(() => {
+    if (!empFilter.length) return;
+    const validIds = new Set(filteredEmployees.map(e => e.employee_id ?? e.id));
+    setEmpFilter(prev => prev.filter(id => validIds.has(id)));
+  }, [filteredEmployees]);
+
   async function fetchReport() {
     if (!cycleIds.length) return;
     setLoading(true); setError('');
@@ -417,12 +432,23 @@ function Report({ cycles, employees }) {
           </Box>
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#64748b', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Employees <Box component="span" sx={{ color: '#ef4444' }}>*</Box></Typography>
-            <MultiSelect label="All employees" options={employees} value={empFilter}
+            <MultiSelect label="All employees" options={filteredEmployees} value={empFilter}
               onChange={setEmpFilter}
               getLabel={e => e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
               getValue={e => e.employee_id ?? e.id}
               sortFn={(a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '')}
               minWidth={220}
+              disabled={!cycleIds.length}
+              renderOptionContent={e => (
+                <Stack direction="row" alignItems="center" gap={1} sx={{ width: '100%' }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
+                    #{e.employee_id ?? e.id}
+                  </Typography>
+                  <Typography sx={{ fontSize: 13 }}>
+                    {e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
+                  </Typography>
+                </Stack>
+              )}
             />
           </Box>
           <Box>

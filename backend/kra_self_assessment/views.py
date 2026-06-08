@@ -80,25 +80,41 @@ class SelfAssessmentView(APIView):
         if not ekc:
             return Response('Forbidden', status=status.HTTP_403_FORBIDDEN)
 
-        kra_rows = ekc.kra_level_rows.select_related(
-            'kra_level', 'self_rating', 'lead_rating'
+        # FIX: query EmployeeKRALevel directly filtered by both employee AND ekc.
+        # Previously used ekc.kra_level_rows which resolves through EmployeeKRACycle
+        # and returns ALL employees' rows for that cycle, not just the caller's.
+        kra_rows = EmployeeKRALevel.objects.select_related(
+            'kra_level__kra',       # traverse KRALevel → KRA for the real name
+            'kra_level__category',  # traverse KRALevel → KRACategory for category_name
+            'self_rating',
+            'lead_rating',
+        ).filter(
+            employee=caller,        # only this employee's rows
+            employee_kra_cycle=ekc,
         )
 
         kras = [
             {
-                'employee_kra_level_id':       r.id,
-                'kra_level_id':                r.kra_level_id,
-                'kra_name':                    getattr(r.kra_level, 'name', None),
-                'description_by_lead':         r.description_by_lead,
+                'employee_kra_level_id':        r.id,
+                'kra_level_id':                 r.kra_level_id,
+                # Always use the master KRA name — kra_level.name is a stale denormalised copy
+                'kra_name': (
+                    r.kra_level.kra.name if r.kra_level and r.kra_level.kra else None
+                ),
+                'category_name': (
+                    r.kra_level.category.name
+                    if r.kra_level and r.kra_level.category else None
+                ),
+                'description_by_lead':          r.description_by_lead,
                 'help_and_assistance_required': r.help_and_assistance_required,
-                'self_rating_id':              r.self_rating_id,
-                'self_rating':                 r.self_rating.rating if r.self_rating else None,
-                'self_comment':                r.self_comment,
-                'progress_notes':              r.progress_notes,
-                'lead_rating_id':              r.lead_rating_id,
-                'lead_rating':                 r.lead_rating.rating if r.lead_rating else None,
-                'lead_comment':                r.lead_comment,
-                'lead_progress_notes':         r.lead_progress_notes,
+                'self_rating_id':               r.self_rating_id,
+                'self_rating':                  r.self_rating.rating if r.self_rating else None,
+                'self_comment':                 r.self_comment,
+                'progress_notes':               r.progress_notes,
+                'lead_rating_id':               r.lead_rating_id,
+                'lead_rating':                  r.lead_rating.rating if r.lead_rating else None,
+                'lead_comment':                 r.lead_comment,
+                'lead_progress_notes':          r.lead_progress_notes,
             }
             for r in kra_rows
         ]
@@ -138,7 +154,7 @@ class SelfAssessmentView(APIView):
             ),
             'kras': kras,
         }, status=status.HTTP_200_OK)
-        
+
 
 class SelfAssessmentSubmitView(APIView):
     """
@@ -165,7 +181,7 @@ class SelfAssessmentSubmitView(APIView):
 
         data = request.data
 
-        # Capture OLD DATA for audit 
+        # Capture OLD DATA for audit
         old_data = {
             "self_rating_id": row.self_rating_id,
             "self_comment": row.self_comment,
@@ -175,7 +191,7 @@ class SelfAssessmentSubmitView(APIView):
 
         updated_fields = {}
 
-        #  Apply updates 
+        # Apply updates
         self_rating_id = data.get('self_rating_id')
         if self_rating_id is not None:
             if not Rating.objects.filter(id=self_rating_id).exists():
@@ -197,7 +213,7 @@ class SelfAssessmentSubmitView(APIView):
 
         row.save()
 
-        # AUDIT LOG 
+        # AUDIT LOG
         _audit(
             request,
             "SELF_ASSESSMENT_UPDATED",
