@@ -24,6 +24,7 @@ import { getSelfAssessment, saveSelfAssessmentRow, getAssessmentProgress, submit
 import { getCycles, getReferenceData, advanceCycleStage } from '../../api/cyclesApi';
 import { getStageStates, canSelfAssess, canLeadReview, getStageLockReason, STAGE, CYCLE_STAGES } from '../../utils/stageUtils';
 import useAuth from '../../auth/useAuth';
+import { useSearchParams } from 'react-router-dom';
 import Tooltip from '@mui/material/Tooltip';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
@@ -1942,6 +1943,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function KRAAssessmentPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [cycles, setCycles] = useState([]);
   const [cycleId, setCycleId] = useState('');
   const [ratings, setRatings] = useState([]);
@@ -1959,8 +1961,14 @@ export default function KRAAssessmentPage() {
       });
       setCycles(sorted);
       if (sorted.length > 0) {
-        const active = sorted.find(c => c.status === 'ACTIVE');
-        setCycleId(active ? active.id : sorted[0].id);
+        const paramCycleId = searchParams.get('cycleId');
+        const preSelected = paramCycleId ? sorted.find(c => String(c.id) === String(paramCycleId)) : null;
+        if (preSelected) {
+          setCycleId(preSelected.id);
+        } else {
+          const active = sorted.find(c => c.status === 'ACTIVE');
+          setCycleId(active ? active.id : sorted[0].id);
+        }
       }
     });
     getReferenceData().then(res => {

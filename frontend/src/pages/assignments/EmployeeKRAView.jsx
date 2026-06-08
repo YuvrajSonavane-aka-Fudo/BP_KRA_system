@@ -237,11 +237,22 @@ export default function EmployeeKRAView({
   // ── init on open ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    const cats = employee?.assigned_categories?.length
-      ? employee.assigned_categories
-      : cachedData?.categories ?? [];
+
+    // Priority: API categories with real weightages > cached categories > API zeros
+    const apiCats = employee?.assigned_categories ?? [];
+    const cacheCats = cachedData?.categories ?? [];
+
+    const apiHasReal = apiCats.some(c => parseFloat(c.weightage) > 0);
+    const cacheHasReal = cacheCats.some(c => parseFloat(c.weightage) > 0);
+
+    const cats = apiHasReal
+      ? apiCats
+      : cacheHasReal
+        ? cacheCats
+        : apiCats; // fall through to zeros if nothing has real values
+
     const init = {};
-    cats.forEach(c => { init[c.category_id] = String(c.weightage ?? ''); });
+    cats.forEach(c => { init[c.category_id] = String(c.weightage ?? '0'); });
     setWeightages(init);
     setCheckedKRAs(new Set());
     setSearch('');
@@ -318,7 +329,7 @@ export default function EmployeeKRAView({
   const allKeys = useMemo(() =>
     filtered.flatMap(g =>
       g.rows
-        .filter(r => !(isManager && (g.is_standard || isAdminAssigned(r.assigned_by_role))))
+        .filter(r => !(isManager && g.is_standard ))
         .map(r => r.key)
     ),
   [filtered, isManager]);
@@ -331,7 +342,7 @@ export default function EmployeeKRAView({
     if (!c) { setCheckedKRAs(new Set()); return; }
     const allowed = filtered.flatMap(g =>
       g.rows
-        .filter(r => !(isManager && (g.is_standard || isAdminAssigned(r.assigned_by_role))))
+        .filter(r => !(isManager && g.is_standard ))
         .map(r => r.key)
     );
     setCheckedKRAs(new Set(allowed));
@@ -611,9 +622,9 @@ export default function EmployeeKRAView({
                         <Checkbox size="small"
                           checked={catChecked(group.category_id)}
                           indeterminate={catIndeterminate(group.category_id)}
-                          disabled={isManager && (group.is_standard || isAdminAssigned(group.assigned_by_role))}
+                          disabled={isManager && group.is_standard}
                           onChange={e => {
-                            if (isManager && (group.is_standard || isAdminAssigned(group.assigned_by_role))) return;
+                            if (isManager && group.is_standard) return;
                             toggleCategory(group.category_id, e.target.checked);
                           }}
                           onClick={e => e.stopPropagation()}
@@ -649,7 +660,7 @@ export default function EmployeeKRAView({
                         <Tooltip title="Set category weightage (all must total 100%)" placement="top">
                           <Stack direction="row" alignItems="center" spacing={0.4}>
                             <TextField size="small" value={catW} placeholder="0"
-                              disabled={isManager && (group.is_standard || (isAdminAssigned(group.assigned_by_role) && parseFloat(weightages[group.category_id] || '0') > 0))}
+                              disabled={isManager && group.is_standard }
                               onChange={e => handleWeightChange(group.category_id, e.target.value)}
                               onClick={e => e.stopPropagation()}
                               inputProps={{ style: { textAlign: 'center', fontSize: 12, fontWeight: 700, padding: '3px 6px' } }}
@@ -696,9 +707,9 @@ export default function EmployeeKRAView({
                                 }}>
 
                                 <Checkbox size="small" checked={isChecked}
-                                  disabled={isManager && (group.is_standard || isAdminAssigned(row.assigned_by_role))}
+                                  disabled={isManager && group.is_standard }
                                   onChange={e => {
-                                    if (isManager && (group.is_standard || isAdminAssigned(row.assigned_by_role))) return;
+                                    if (isManager && group.is_standard ) return;
                                     toggleKRA(row.key, e.target.checked);
                                   }}
                                   sx={{ p: 0.4, mr: 0.75, flexShrink: 0, color: '#cbd5e1',
@@ -782,8 +793,8 @@ export default function EmployeeKRAView({
       <WarnDialog
         open={warnBulkDelete}
         title="Delete KRAs"
-        message={`Delete ${checkedCount} selected KRA${checkedCount !== 1 ? 's' : ''}? This cannot be undone.`}
-        confirmLabel="Delete" confirmColor="#dc2626"
+        message={`Unassign ${checkedCount} selected KRA${checkedCount !== 1 ? 's' : ''}? This cannot be undone.`}
+        confirmLabel="Unassign" confirmColor="#dc2626"
         onConfirm={handleBulkDelete}
         onCancel={() => setWarnBulkDelete(false)}
         loading={deleting}

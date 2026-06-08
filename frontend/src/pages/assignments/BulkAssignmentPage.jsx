@@ -39,6 +39,7 @@ import {
 
 import EmployeeKRAView from './EmployeeKRAView';
 import useRoleAccess from '../../hooks/useRoleAccess';
+import { useSearchParams } from 'react-router-dom';
 
 const G = 'linear-gradient(135deg, #1E3A8A 0%, #1e40af 60%, #1d4ed8 100%)';
 const ORG_COLOR = { bg: '#f0fdf4', border: '#86efac', text: '#15803d', chip: '#dcfce7', icon: '#16a34a' };
@@ -147,7 +148,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
   const [levelFilter, setLevelFilter] = useState('');
   const [expanded, setExpanded] = useState({});
 
-  // FIX: debounce search so useMemo doesn't re-run on every keystroke
+  // debounce search so useMemo doesn't re-run on every keystroke
   const search = useDebounce(searchRaw, 180);
 
   const allLevels = useMemo(() => {
@@ -159,7 +160,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
     return list.sort((a, b) => a.name.localeCompare(b.name));
   }, [kras]);
 
-  // FIX: grouped does NOT depend on selectedKraSet — pure filter/group only
+  // grouped does NOT depend on selectedKraSet — pure filter/group only
   const grouped = useMemo(() => {
     let list = kras;
     if (typeFilter === 'org') list = list.filter(k => k.is_standard === true);
@@ -212,8 +213,6 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
   .sort((a, b) => a.name.localeCompare(b.name));
   }, [kras, typeFilter, levelFilter, search, categories]);
 
-  // FIX: flatRows is selection-independent — sort is alphabetical only.
-  // Selection highlight is applied at render time via Set lookup (O(1)).
   // This means checking a KRA checkbox no longer re-sorts the entire list.
   const groupedWithRows = useMemo(() => {
     return grouped.map(group => ({
@@ -281,7 +280,7 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
         </Stack>
       </Stack>
 
-      {/* FIX: value={searchRaw} — raw state updates instantly for responsive feel */}
+      {/*  value={searchRaw} — raw state updates instantly for responsive feel */}
       <TextField size="small" placeholder="Search KRAs…" value={searchRaw} onChange={e => setSearchRaw(e.target.value)}
         InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: '#94a3b8' }} /></InputAdornment>, endAdornment: searchRaw ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearchRaw('')}><ClearIcon sx={{ fontSize: 13 }} /></IconButton></InputAdornment> : null }}
         sx={{ mb: 1, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36, bgcolor: '#f8fafc' } }} />
@@ -471,10 +470,10 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
   const [levelFilter, setLevel] = useState('');
   const [sort, setSort] = useState({ col: 'id', dir: 'asc' });
 
-  // FIX: debounce search
+  //  debounce search
   const search = useDebounce(searchRaw, 180);
 
-  // FIX: pre-build an employee id→object Map so employeeDuplicateMap lookup is O(1)
+  //  pre-build an employee id→object Map so employeeDuplicateMap lookup is O(1)
   const empMap = useMemo(() => {
     const m = new Map();
     employees.forEach(e => m.set(e.employee_id, e));
@@ -491,10 +490,7 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
     );
   };
 
-  // FIX: filtered does NOT depend on selectedEmpSet — sort is by column only.
-  // Selected-first ordering is removed from the memo; selected items are
-  // visually highlighted at render time via O(1) Set.has(). This eliminates
-  // the full re-sort on every checkbox click.
+  // This eliminates the full re-sort on every checkbox click.
   const filtered = useMemo(() => {
     let list = employees;
     if (tab === 1) list = list.filter(e => e.assigned_to_cycle);
@@ -636,7 +632,7 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
           <Typography fontSize={13} fontWeight={600} color="#94a3b8">No employees found</Typography>
         </Box>
       ) : (
-        // FIX: virtualised list — only DOM nodes for visible rows are created
+        //  virtualised list — only DOM nodes for visible rows are created
         <VirtualEmpList
           key={`${filtered.length}-${selectedEmpSet.size}`}
           items={filtered}
@@ -668,7 +664,7 @@ function PreviewAssignModal({
     }
   }, [open, selectedKraLevelIds, selectedEmployeeIds]);
 
-  // FIX: build a Set for O(1) localKraIds lookup
+  //  build a Set for O(1) localKraIds lookup
   const localKraIdSet = useMemo(() => new Set(localKraIds), [localKraIds]);
 
   const selectedKraObjects = useMemo(() =>
@@ -722,10 +718,7 @@ function PreviewAssignModal({
     });
     const selectedKras = kraLibrary.filter(k => (k.levels ?? []).some(l => localKraIdSet.has(makeKey(k.id, l))));
     const uniqueCatIds = [...new Set(selectedKras.map(k => k.category_id))];
-    const count = uniqueCatIds.length;
-    const base = count ? Math.floor(100 / count) : 0;
-    const rem = count ? 100 - base * (count - 1) : 0;
-    const cats = uniqueCatIds.map((cid, i) => ({ category_id: cid, weightage: String(i === count - 1 ? rem : base) }));
+    const cats = uniqueCatIds.map(cid => ({ category_id: cid, weightage: '0' }));
     await onConfirmAssign({ localEmpIds, kraLevelIds, kraSelections, kraLevelToKraId, categories: cats, kra_level_ids: kraLevelIds });
   };
 
@@ -873,6 +866,7 @@ function ToastStack({ toasts }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function BulkAssignmentPage() {
   const { toasts, push: showToast } = useToasts();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refetching, setRefetching] = useState(false);
@@ -919,7 +913,7 @@ export default function BulkAssignmentPage() {
   const selectedKraLevelIds = useMemo(() => [...selectedKraSet], [selectedKraSet]);
   const selectedEmployeeIds = useMemo(() => [...selectedEmpSet], [selectedEmpSet]);
 
-  // FIX: pre-index kraLibrary by levelId for O(1) lookups everywhere
+  //  pre-index kraLibrary by levelId for O(1) lookups everywhere
   const kraLevelIndexMap = useMemo(() => {
     const idx = new Map();
     kraLibrary.forEach(kra => {
@@ -930,7 +924,7 @@ export default function BulkAssignmentPage() {
     return idx;
   }, [kraLibrary]);
 
-  // FIX: pre-index employees by employee_id — eliminates O(n) .find() inside loops
+  //  pre-index employees by employee_id — eliminates O(n) .find() inside loops
   const employeeIndexMap = useMemo(() => {
     const m = new Map();
     employees.forEach(e => m.set(e.employee_id, e));
@@ -953,24 +947,57 @@ export default function BulkAssignmentPage() {
     return map;
   }, [selectedEmpSet, employeeIndexMap, assignedKRAMap, kraLevelIndexMap]);
 
-  const rebuildAssignedMap = useCallback((empList) => {
+    const rebuildAssignedMap = useCallback((empList) => {
     const map = {};
+    const corrections = {}; 
+
     empList.forEach(e => {
-      if (!e.employee_kra_cycle_id) return;
-      const cached = getAssignmentFromCache(e.employee_kra_cycle_id);
-      const apiKraLevelIds = (e.assigned_kras ?? []).map(k => k.kra_level_id).filter(Boolean);
-      if (cached?.kra_level_ids?.length) {
-        const merged = [...new Set([...cached.kra_level_ids, ...apiKraLevelIds])];
-        saveAssignmentToCache({ employee_kra_cycle_id: e.employee_kra_cycle_id, cycle_id: activeCycle?.id, categories: cached.categories ?? [], kra_level_ids: merged });
-        map[e.employee_kra_cycle_id] = merged;
-      } else if (apiKraLevelIds.length) {
-        saveAssignmentToCache({ employee_kra_cycle_id: e.employee_kra_cycle_id, cycle_id: activeCycle?.id, categories: [], kra_level_ids: apiKraLevelIds });
+      if (!e.employee_kra_cycle_id) {
+        // No cycle record at all — ensure marked unassigned
+        if (e.assigned_to_cycle) corrections[e.employee_id] = false;
+        return;
+      }
+
+      const apiKraLevelIds = (e.assigned_kras ?? [])
+        .map(k => k.kra_level_id)
+        .filter(Boolean);
+
+      const apiCategories = e.assigned_categories ?? [];
+      const existingCache = getAssignmentFromCache(e.employee_kra_cycle_id);
+
+      const apiHasRealWeightages = apiCategories.some(c => parseFloat(c.weightage) > 0);
+      const categoriesToSave = apiHasRealWeightages
+        ? apiCategories
+        : (existingCache?.categories?.length ? existingCache.categories : apiCategories);
+
+      if (apiKraLevelIds.length > 0) {
+        saveAssignmentToCache({
+          employee_kra_cycle_id: e.employee_kra_cycle_id,
+          cycle_id: activeCycle?.id,
+          categories: categoriesToSave,
+          kra_level_ids: apiKraLevelIds,
+        });
         map[e.employee_kra_cycle_id] = apiKraLevelIds;
-      } else if (cached?.kra_level_ids?.length) {
-        map[e.employee_kra_cycle_id] = cached.kra_level_ids;
+
+        if (!e.assigned_to_cycle) corrections[e.employee_id] = true;
+
+      } else {
+        removeAssignmentFromCache(e.employee_kra_cycle_id);
+        map[e.employee_kra_cycle_id] = [];
+
+        if (e.assigned_to_cycle) corrections[e.employee_id] = false;
       }
     });
+
     setAssignedKRAMap(map);
+
+    if (Object.keys(corrections).length > 0) {
+      setEmployees(prev => prev.map(e =>
+        e.employee_id in corrections
+          ? { ...e, assigned_to_cycle: corrections[e.employee_id] }
+          : e
+      ));
+    }
   }, [activeCycle?.id]);
 
   useEffect(() => {
@@ -980,9 +1007,14 @@ export default function BulkAssignmentPage() {
       try {
         setLoading(true);
         const { categories: cats, activeCycle: ac, allCycles: cycles, kraLibrary: kl } = await loadKRAAssignmentPageData();
-        setCategories(cats); setKraLibrary(kl); setAllCycles(cycles); setActiveCycle(ac);
-        if (ac) {
-          const res = await getEmployees(ac.id);
+        setCategories(cats); setKraLibrary(kl); setAllCycles(cycles);
+        const paramCycleId = searchParams.get('cycleId');
+        const allFlat = [...(cycles.active ?? []), ...(cycles.draft ?? []), ...(cycles.closed ?? [])];
+        const preSelected = paramCycleId ? allFlat.find(c => String(c.id) === String(paramCycleId)) : null;
+        const chosenCycle = preSelected ?? ac;
+        setActiveCycle(chosenCycle);
+        if (chosenCycle) {
+          const res = await getEmployees(chosenCycle.id);
           const emps = res.data.employees ?? [];
           setEmployees(emps);
           rebuildAssignedMap(emps);
@@ -1052,40 +1084,32 @@ export default function BulkAssignmentPage() {
     setGlobalLoading(true);
     setGlobalLoadingMsg('Assigning KRAs…');
     try {
-      const selEmps = localEmpIds.map(id => employeeIndexMap.get(id)).filter(Boolean); // O(1) lookup
+      const selEmps = localEmpIds.map(id => employeeIndexMap.get(id)).filter(Boolean);
       const payload = {
         assignments: selEmps.map(e => ({ employee_id: e.employee_id, employee_level_id: e.level_id ?? null })),
-        shared: { categories: cats, kra_level_ids, kra_selections: kraSelections ?? [], kra_level_to_kra_id: kraLevelToKraId ?? {}, is_date_based: false },
+        shared: {
+          categories: cats,
+          kra_level_ids,
+          kra_selections: kraSelections ?? [],
+          kra_level_to_kra_id: kraLevelToKraId ?? {},
+          is_date_based: false,
+        },
         enrol_mode: 'append',
       };
       const res = await bulkAssignKRAs(activeCycle.id, payload);
       const { enrolled = [], skipped = [], failed = [] } = res.data;
 
-      enrolled.forEach(e => {
-        const emp = employeeIndexMap.get(e.employee_id);
-        const existingCache = emp?.employee_kra_cycle_id ? getAssignmentFromCache(emp.employee_kra_cycle_id) : null;
-        const mergedKraLevelIds = [...new Set([...(existingCache?.kra_level_ids ?? []), ...kra_level_ids])];
-        const catMap = {};
-        cats.forEach(c => { catMap[c.category_id] = c; });
-        (existingCache?.categories ?? []).forEach(c => { if (!catMap[c.category_id]) catMap[c.category_id] = c; });
-        saveAssignmentToCache({ employee_kra_cycle_id: e.employee_kra_cycle_id, cycle_id: activeCycle.id, categories: Object.values(catMap), kra_level_ids: mergedKraLevelIds });
-      });
-
       if (enrolled.length > 0) {
         const enrolledMap = new Map(enrolled.map(e => [e.employee_id, e]));
         setEmployees(prev => prev.map(emp => {
-          const enrolledEntry = enrolledMap.get(emp.employee_id);
-          if (!enrolledEntry) return emp;
-          return { ...emp, assigned_to_cycle: true, employee_kra_cycle_id: enrolledEntry.employee_kra_cycle_id ?? emp.employee_kra_cycle_id };
+          const entry = enrolledMap.get(emp.employee_id);
+          if (!entry) return emp;
+          return {
+            ...emp,
+            assigned_to_cycle: true,
+            employee_kra_cycle_id: entry.employee_kra_cycle_id ?? emp.employee_kra_cycle_id,
+          };
         }));
-        setAssignedKRAMap(prev => {
-          const next = { ...prev };
-          enrolled.forEach(e => {
-            const mergedIds = [...new Set([...(prev[e.employee_kra_cycle_id] ?? []), ...kra_level_ids])];
-            next[e.employee_kra_cycle_id] = mergedIds;
-          });
-          return next;
-        });
       }
 
       if (failed.length === 0) {
@@ -1094,11 +1118,22 @@ export default function BulkAssignmentPage() {
         if (skipped.length) parts.push(`${skipped.length} skipped (already had these KRAs)`);
         showToast(parts.join(', ') + '.', 'success');
       } else {
-        showToast(enrolled.length > 0 ? `${enrolled.length} assigned, ${failed.length} failed.` : 'Assignment failed.', enrolled.length > 0 ? 'warning' : 'error');
+        showToast(
+          enrolled.length > 0
+            ? `${enrolled.length} assigned, ${failed.length} failed.`
+            : 'Assignment failed.',
+          enrolled.length > 0 ? 'warning' : 'error'
+        );
       }
+
       await handleRefresh();
-    } catch (e) { showToast(e?.response?.data?.message || 'Assignment failed.', 'error'); }
-    finally { setAssigning(false); setGlobalLoading(false); setGlobalLoadingMsg(''); }
+    } catch (e) {
+      showToast(e?.response?.data?.message || 'Assignment failed.', 'error');
+    } finally {
+      setAssigning(false);
+      setGlobalLoading(false);
+      setGlobalLoadingMsg('');
+    }
   }, [activeCycle, employeeIndexMap, showToast, handleRefresh]);
 
   const handleDirectAssign = useCallback(async () => {
@@ -1122,48 +1157,62 @@ export default function BulkAssignmentPage() {
     });
     const selectedKras = kraLibrary.filter(k => (k.levels ?? []).some(l => selectedKraLevelIds.includes(makeKey(k.id, l))));
     const uniqueCatIds = [...new Set(selectedKras.map(k => k.category_id))];
-    const count = uniqueCatIds.length;
-    const base = count ? Math.floor(100 / count) : 0;
-    const rem = count ? 100 - base * (count - 1) : 0;
-    const cats = uniqueCatIds.map((cid, i) => ({ category_id: cid, weightage: String(i === count - 1 ? rem : base) }));
+    const cats = uniqueCatIds.map(cid => ({ category_id: cid, weightage: '0' }));
     await doAssign({ localEmpIds: selectedEmployeeIds, kraLevelIds, kraSelections, kraLevelToKraId, categories: cats, kra_level_ids: kraLevelIds });
   }, [selectedKraLevelIds, selectedEmployeeIds, kraLibrary, doAssign]);
 
-  const handleSaveWeightages = async (emp, weightagesMap) => {
-    const cats = Object.entries(weightagesMap).map(([category_id, weightage]) => ({
-      category_id: Number(category_id),
-      weightage: String(parseFloat(weightage) || 0),
-    }));
-    const kraLevelIds = assignedKRAMap[emp.employee_kra_cycle_id] ?? [];
-    await updateAssignment(emp.employee_kra_cycle_id, {
-      employee_level_id: emp.level_id ?? null,
-      is_date_based: false,
-      categories: cats,
-      kra_level_ids: kraLevelIds,
-    });
-    // Update cache so the view reflects the new weightages immediately
-    saveAssignmentToCache({
-      employee_kra_cycle_id: emp.employee_kra_cycle_id,
-      cycle_id: activeCycle?.id,
-      categories: cats,
-      kra_level_ids: kraLevelIds,
-    });
-    await handleRefresh();  // ← re-fetch employees so UI is in sync
-  };
+    const handleSaveWeightages = async (emp, weightagesMap) => {
+      const cats = Object.entries(weightagesMap).map(([category_id, weightage]) => ({
+        category_id: Number(category_id),
+        weightage: String(parseFloat(weightage) || 0),
+      }));
+      const kraLevelIds = assignedKRAMap[emp.employee_kra_cycle_id] ?? [];
+      await updateAssignment(emp.employee_kra_cycle_id, {
+        employee_level_id: emp.level_id ?? null,
+        is_date_based: false,
+        categories: cats,
+        kra_level_ids: kraLevelIds,
+      });
+
+      saveAssignmentToCache({
+        employee_kra_cycle_id: emp.employee_kra_cycle_id,
+        cycle_id: activeCycle?.id,
+        categories: cats,
+        kra_level_ids: kraLevelIds,
+      });
+
+      setEmployees(prev => prev.map(e =>
+        e.employee_id === emp.employee_id
+          ? { ...e, assigned_categories: cats }
+          : e
+      ));
+
+      await handleRefresh();
+    };
 
   const handleDeleteKRAs = async (emp, kraKeys) => {
-    const kraLevelIdsToKeep = (assignedKRAMap[emp.employee_kra_cycle_id] ?? []).filter(levelId => {
-      const isBeingDeleted = kraKeys.some(key => {
-        for (const kra of kraLibrary) {
-          for (const level of (kra.levels ?? [])) {
-            const lid = level.kra_level_id ?? level.id;
-            if (`${kra.id}-${lid}` === key && lid === levelId) return true;
-          }
-        }
-        return false;
-      });
-      return !isBeingDeleted;
-    });
+    // Extract numeric level IDs from composite "kraId-levelId" keys
+    const levelIdsToDelete = new Set(
+      kraKeys
+        .map(key => {
+          const parts = key.split('-');
+          return Number(parts[parts.length - 1]);
+        })
+        .filter(n => !isNaN(n) && n > 0)
+    );
+
+    // Use API data (emp.assigned_kras) as source of truth, NOT the local cache
+    // Cache can be stale/merged with ghost IDs from previous operations
+    const apiKraLevelIds = (emp.assigned_kras ?? [])
+      .map(k => k.kra_level_id)
+      .filter(Boolean);
+
+    // Fall back to cache only if API gave us nothing
+    const baseIds = apiKraLevelIds.length > 0
+      ? apiKraLevelIds
+      : (assignedKRAMap[emp.employee_kra_cycle_id] ?? []);
+
+    const kraLevelIdsToKeep = baseIds.filter(levelId => !levelIdsToDelete.has(levelId));
 
     const remainingCatIds = new Set(
       kraLevelIdsToKeep.flatMap(levelId => {
@@ -1172,9 +1221,11 @@ export default function BulkAssignmentPage() {
       })
     );
 
+    // Use API categories (emp.assigned_categories) as source of truth too
     const sourceCats = emp.assigned_categories?.length
       ? emp.assigned_categories
       : getAssignmentFromCache(emp.employee_kra_cycle_id)?.categories ?? [];
+
     const cachedCats = sourceCats.filter(c => remainingCatIds.has(c.category_id));
 
     try {
@@ -1184,16 +1235,36 @@ export default function BulkAssignmentPage() {
         categories: cachedCats,
         kra_level_ids: kraLevelIdsToKeep,
       });
-      saveAssignmentToCache({ employee_kra_cycle_id: emp.employee_kra_cycle_id, cycle_id: activeCycle.id, categories: cachedCats, kra_level_ids: kraLevelIdsToKeep });
-      setAssignedKRAMap(prev => ({ ...prev, [emp.employee_kra_cycle_id]: kraLevelIdsToKeep }));
+
+      // After successful API call, update cache with clean data
+      saveAssignmentToCache({
+        employee_kra_cycle_id: emp.employee_kra_cycle_id,
+        cycle_id: activeCycle.id,
+        categories: cachedCats,
+        kra_level_ids: kraLevelIdsToKeep,
+      });
+
+      setAssignedKRAMap(prev => ({
+        ...prev,
+        [emp.employee_kra_cycle_id]: kraLevelIdsToKeep,
+      }));
+
       if (kraLevelIdsToKeep.length === 0) {
         setEmployees(prev => prev.map(e =>
-          e.employee_kra_cycle_id === emp.employee_kra_cycle_id ? { ...e, assigned_to_cycle: false } : e
+          e.employee_kra_cycle_id === emp.employee_kra_cycle_id
+            ? { ...e, assigned_to_cycle: false }
+            : e
         ));
       }
-      showToast(`${kraKeys.length} KRA${kraKeys.length !== 1 ? 's' : ''} deleted.`, 'success');
+
+      showToast(
+        `${kraKeys.length} KRA${kraKeys.length !== 1 ? 's' : ''} deleted.`,
+        'success'
+      );
       handleRefresh();
-    } catch (e) { showToast(e?.response?.data?.message || 'Delete failed.', 'error'); }
+    } catch (e) {
+      showToast(e?.response?.data?.message || 'Delete failed.', 'error');
+    }
   };
 
   const handleDeleteEmployee = async (emp) => {
@@ -1271,9 +1342,17 @@ export default function BulkAssignmentPage() {
           return entry ? [entry.kra.category_id] : [];
         })
       );
-      const categoriesToClone = sourceCategories.filter(c => relevantCatIds.has(c.category_id));
-      // If no category filter matched, use all source categories
-      const finalCategories = categoriesToClone.length > 0 ? categoriesToClone : sourceCategories;
+      //  AFTER — zero out weightages for clone targets
+      const relevantCatIdsForClone = new Set(
+        kraIdsToClone.flatMap(levelId => {
+          const entry = kraLevelIndexMap.get(levelId);
+          return entry ? [entry.kra.category_id] : [];
+        })
+      );
+      const finalCategories = [...relevantCatIdsForClone].map(cid => ({
+        category_id: cid,
+        weightage: '0',
+      }));
 
       // Step 1 — enrol unassigned employees with only the selected KRAs
       let newlyEnrolled = [];
