@@ -336,7 +336,7 @@ export default function EmployeeKRAView({
   const totalKRAs   = kraLevelIds.length;
   const allChecked  = allKeys.length > 0 && allKeys.every(k => checkedKRAs.has(k));
   const someChecked = allKeys.some(k => checkedKRAs.has(k));
-  const checkedCount = allKeys.filter(k => checkedKRAs.has(k)).length;
+  const checkedCount = checkedKRAs.size;
 
   const toggleAll = c => {
     if (!c) { setCheckedKRAs(new Set()); return; }

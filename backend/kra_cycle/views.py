@@ -675,14 +675,16 @@ class KRACycleUpdateView(APIView):
             cycle.status = new_status
 
             if new_status == "ACTIVE":
-                first_cycle_stage = (
-                    cycle.cycle_stages.filter(is_deleted=False)
-                    .select_related("stage")
-                    .order_by("id")
-                    .first()
-                )
-                if first_cycle_stage:
-                    cycle.stage = first_cycle_stage.stage
+                # Only set first stage when activating a DRAFT cycle
+                if old_status == "DRAFT":
+                    first_cycle_stage = (
+                        cycle.cycle_stages.filter(is_deleted=False)
+                        .select_related("stage")
+                        .order_by("id")
+                        .first()
+                    )
+                    if first_cycle_stage:
+                        cycle.stage = first_cycle_stage.stage
 
         if is_deleted is not None:
             cycle.is_deleted = is_deleted

@@ -572,7 +572,10 @@ const headerSx = {
     <Alert severity="error" action={<Button onClick={refetch}>Retry</Button>}>{error}</Alert>
   );
 
-  const currentStageId   = activeCycle?.current_stage?.id ?? null;
+  const currentStageId = activeCycle?.current_stage?.id
+    ?? (activeCycle?.cycle_stages?.length > 0
+      ? Math.max(...activeCycle.cycle_stages.map(s => s.stage_id))
+      : null);
   const activeActions    = activeCycle ? (STATUS_ACTIONS[activeCycle.status] ?? []) : [];
   const maxStageId = stages.length > 0 ? Math.max(...stages.map(s => s.id)) : 5;
   const minStageId = stages.length > 0 ? Math.min(...stages.map(s => s.id)) : 1;
@@ -611,7 +614,7 @@ const headerSx = {
               <Box flex={1} minWidth={0} pr={2}>
                 <Stack direction="row" alignItems="center" spacing={1} mb={0.5} flexWrap="wrap" gap={0.5}>
                   <Chip
-                    label={activeCycle.status === 'ACTIVE' ? 'LIVE' : activeCycle.status === 'DRAFT' ? 'DRAFT' : activeCycle.status.replace('_', ' ')}
+                    label={activeCycle.status === 'ACTIVE' ? 'ACTIVE' : activeCycle.status === 'DRAFT' ? 'DRAFT' : activeCycle.status.replace('_', ' ')}
                     size="small"
                     sx={{
                       bgcolor: activeCycle.status === 'ACTIVE' ? '#10b981' : activeCycle.status === 'DRAFT' ? '#64748b' : activeCycle.status === 'CLOSED' ? '#166534' : '#92400e',
