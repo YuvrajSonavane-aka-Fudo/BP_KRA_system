@@ -113,8 +113,23 @@ function CycleBanner({ cycle, allCycles, onCycleChange, isReadOnly }) {
             </Box>
             <Box minWidth={0}>
               <Stack direction="row" alignItems="center" gap={0.75} mb={0.25} flexWrap="wrap">
-                <Chip label={isReadOnly ? 'VIEW ONLY' : 'LIVE'} size="small"
-                  sx={{ height: 17, fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', bgcolor: isReadOnly ? 'rgba(253,230,138,0.25)' : 'rgba(134,239,172,0.25)', color: isReadOnly ? '#fde68a' : '#86efac' }} />
+                <Chip
+                  label={cycle?.status?.replace('_', ' ') ?? '—'}
+                  size="small"
+                  sx={{
+                    height: 17, fontSize: 9, fontWeight: 800, letterSpacing: '0.06em',
+                    bgcolor:
+                      cycle?.status === 'ACTIVE' ? 'rgba(134,239,172,0.25)' :
+                      cycle?.status === 'DRAFT' ? 'rgba(148,163,184,0.25)' :
+                      cycle?.status === 'ON_HOLD' ? 'rgba(251,191,36,0.25)' :
+                      'rgba(253,230,138,0.25)',
+                    color:
+                      cycle?.status === 'ACTIVE' ? '#86efac' :
+                      cycle?.status === 'DRAFT' ? '#cbd5e1' :
+                      cycle?.status === 'ON_HOLD' ? '#fbbf24' :
+                      '#fde68a',
+                  }}
+                />
                 {cycle?.current_stage && (
                   <Chip label={`Stage ${cycle.current_stage.id}: ${STAGE_LABELS[cycle.current_stage.id] ?? cycle.current_stage.name}`}
                     size="small" sx={{ height: 17, fontSize: 9, fontWeight: 700, bgcolor: 'rgba(96,165,250,0.2)', color: '#bfdbfe' }} />

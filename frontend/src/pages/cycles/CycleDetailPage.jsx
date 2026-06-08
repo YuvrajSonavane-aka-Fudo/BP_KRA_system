@@ -689,7 +689,10 @@ export default function CycleDetailPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const currentStatus    = cycle?.status ?? null;
-  const currentStageId   = cycle?.current_stage?.id ?? null;
+  const currentStageId = cycle?.current_stage?.id
+    ?? (cycle?.cycle_stages?.length > 0
+      ? Math.max(...cycle.cycle_stages.map(s => s.stage_id))
+      : null);
   const availableActions = STATUS_ACTIONS[currentStatus] ?? [];
   const isFrozen   = currentStatus === 'CLOSED' || currentStatus === 'CANCELLED';
   const canDelete  = currentStatus === 'DRAFT';
@@ -1092,7 +1095,7 @@ export default function CycleDetailPage() {
                           <ListItemIcon sx={{ minWidth: 24 }}><ContentCopyIcon sx={{ fontSize: 16 }} /></ListItemIcon>
                           Clone Cycle
                         </MenuItem>
-                        
+
                         <MenuItem
                           onClick={() => { setActionsAnchor(null); navigate(`${ROUTES.ASSIGNMENTS}?cycleId=${id}`); }}
                           sx={{ fontSize: 13, fontWeight: 600, py: 1, gap: 1 }}>
