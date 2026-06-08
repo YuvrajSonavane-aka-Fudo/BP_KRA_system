@@ -18,6 +18,9 @@ import EditIcon             from '@mui/icons-material/Edit';
 import MoreVertIcon         from '@mui/icons-material/MoreVert';
 import WarningAmberIcon     from '@mui/icons-material/WarningAmber';
 import OpenInNewIcon        from '@mui/icons-material/OpenInNew';
+import AssignmentIndIcon    from '@mui/icons-material/AssignmentInd';
+import RateReviewIcon       from '@mui/icons-material/RateReview';
+
 import { useNavigate }      from 'react-router-dom';
 import ROUTES               from '../../config/routes';
 import { useCycles, invalidateCyclesCache } from '../../hooks/useCycles';
@@ -849,11 +852,25 @@ const headerSx = {
 
                     <TableCell onClick={e => e.stopPropagation()} sx={{ pr: 1.5 }}>
                       <Stack direction="row" spacing={0} justifyContent="flex">
-                          <Tooltip title="Open">
+                          <Tooltip title="Open Cycle">
                             <IconButton size="small"
                               onClick={e => { e.stopPropagation(); navigate(ROUTES.CYCLE_DETAIL.replace(':id', cycle.id)); }}
                               sx={{ color: '#94a3b8', '&:hover': { color: '#1E3A8A' }, p: 0.4 }}>
                               <OpenInNewIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="KRA Assignment">
+                            <IconButton size="small"
+                              onClick={e => { e.stopPropagation(); navigate(`${ROUTES.ASSIGNMENTS}?cycleId=${cycle.id}`); }}
+                              sx={{ color: '#94a3b8', '&:hover': { color: '#0369a1' }, p: 0.4 }}>
+                              <AssignmentIndIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="KRA Assessment">
+                            <IconButton size="small"
+                              onClick={e => { e.stopPropagation(); navigate(`${ROUTES.ASSESSMENTS_SELF}?cycleId=${cycle.id}`); }}
+                              sx={{ color: '#94a3b8', '&:hover': { color: '#7c3aed' }, p: 0.4 }}>
+                              <RateReviewIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Tooltip>
                         {canManageCycles && (

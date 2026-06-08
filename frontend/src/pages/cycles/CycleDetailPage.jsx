@@ -7,6 +7,8 @@ import {
 } from '@mui/material';
 import ArrowBackIcon        from '@mui/icons-material/ArrowBack';
 import ContentCopyIcon      from '@mui/icons-material/ContentCopy';
+import AssignmentIndIcon    from '@mui/icons-material/AssignmentInd';
+import RateReviewIcon       from '@mui/icons-material/RateReview';
 import DeleteOutlineIcon    from '@mui/icons-material/DeleteOutline';
 import CheckCircleIcon      from '@mui/icons-material/CheckCircle';
 import SaveIcon             from '@mui/icons-material/Save';
@@ -1089,6 +1091,20 @@ export default function CycleDetailPage() {
                           sx={{ fontSize: 13, fontWeight: 600, py: 1, gap: 1 }}>
                           <ListItemIcon sx={{ minWidth: 24 }}><ContentCopyIcon sx={{ fontSize: 16 }} /></ListItemIcon>
                           Clone Cycle
+                        </MenuItem>
+                        
+                        <MenuItem
+                          onClick={() => { setActionsAnchor(null); navigate(`${ROUTES.ASSIGNMENTS}?cycleId=${id}`); }}
+                          sx={{ fontSize: 13, fontWeight: 600, py: 1, gap: 1 }}>
+                          <ListItemIcon sx={{ minWidth: 24 }}><AssignmentIndIcon sx={{ fontSize: 16, color: '#0369a1' }} /></ListItemIcon>
+                          KRA Assignment
+                        </MenuItem>
+
+                        <MenuItem
+                          onClick={() => { setActionsAnchor(null); navigate(`${ROUTES.ASSESSMENTS_SELF}?cycleId=${id}`); }}
+                          sx={{ fontSize: 13, fontWeight: 600, py: 1, gap: 1 }}>
+                          <ListItemIcon sx={{ minWidth: 24 }}><RateReviewIcon sx={{ fontSize: 16, color: '#7c3aed' }} /></ListItemIcon>
+                          KRA Assessment
                         </MenuItem>
 
                         {/* Secondary status actions */}
