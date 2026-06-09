@@ -367,7 +367,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, cancelLabe
 /* ══════════════ MAIN ══════════════ */
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { canManageCycles, isAdmin  } = useRoleAccess();
+  const { canManageCycles, canManageCyclesActions, isAdmin, isManager  } = useRoleAccess();
   const { data: allCycles, loading, error, refetch } = useCycles();
 
   const [stages, setStages] = useState([]);
@@ -863,7 +863,7 @@ const headerSx = {
                             </IconButton>
                           </Tooltip>
                           {/* only visible to admin and manager */}
-                          {canManageCycles && (
+                          {canManageCyclesActions && (
                             <>
                               <Tooltip title="KRA Assignment">
                                 <IconButton size="small"
