@@ -862,20 +862,25 @@ const headerSx = {
                               <OpenInNewIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="KRA Assignment">
-                            <IconButton size="small"
-                              onClick={e => { e.stopPropagation(); navigate(`${ROUTES.ASSIGNMENTS}?cycleId=${cycle.id}`); }}
-                              sx={{ color: '#94a3b8', '&:hover': { color: '#0369a1' }, p: 0.4 }}>
-                              <AssignmentIndIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="KRA Assessment">
-                            <IconButton size="small"
-                              onClick={e => { e.stopPropagation(); navigate(`${ROUTES.ASSESSMENTS_SELF}?cycleId=${cycle.id}`); }}
-                              sx={{ color: '#94a3b8', '&:hover': { color: '#7c3aed' }, p: 0.4 }}>
-                              <RateReviewIcon sx={{ fontSize: 14 }} />
-                            </IconButton>
-                          </Tooltip>
+                          {/* only visible to admin and manager */}
+                          {canManageCycles && (
+                            <>
+                              <Tooltip title="KRA Assignment">
+                                <IconButton size="small"
+                                  onClick={e => { e.stopPropagation(); navigate(`${ROUTES.ASSIGNMENTS}?cycleId=${cycle.id}`); }}
+                                  sx={{ color: '#94a3b8', '&:hover': { color: '#0369a1' }, p: 0.4 }}>
+                                  <AssignmentIndIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="KRA Assessment">
+                                <IconButton size="small"
+                                  onClick={e => { e.stopPropagation(); navigate(`${ROUTES.ASSESSMENTS_SELF}?cycleId=${cycle.id}`); }}
+                                  sx={{ color: '#94a3b8', '&:hover': { color: '#7c3aed' }, p: 0.4 }}>
+                                  <RateReviewIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         {canManageCycles && (
                           <>
                             <Tooltip title="Clone">
