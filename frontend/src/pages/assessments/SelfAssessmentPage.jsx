@@ -1572,7 +1572,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                   options={[...allEmployeesList]
                     .filter(e => e.employee_id !== user?.employee_id)
                     .sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''))}
-                  getOptionLabel={e => e.full_name ?? ''}
+                  getOptionLabel={e => e.full_name ? `#${e.employee_id} ${e.full_name}` : ''}
                   isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
                   size="small"
                   disableClearable={false}
@@ -1695,7 +1695,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                     const cmp = (a.full_name ?? '').localeCompare(b.full_name ?? '');
                     return empSortDir === 'asc' ? cmp : -cmp;
                   })}
-                  getOptionLabel={e => e.full_name ?? ''}
+                  getOptionLabel={e => e.full_name ? `#${e.employee_id} ${e.full_name}` : ''}
                   isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
                   size="small"
                   disableClearable
