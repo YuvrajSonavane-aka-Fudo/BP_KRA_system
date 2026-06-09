@@ -679,19 +679,30 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
             </Box>
             <Stack direction="row" alignItems="center" spacing={1.5}>
               {cycles.length > 0 && (
-                <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
-                  size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
-                  {cycles.map(c => (
-                    <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                <Autocomplete
+                  value={cycles.find(c => c.id === cycleId) ?? null}
+                  onChange={(_, newVal) => { if (newVal) onCycleChange(newVal.id); }}
+                  options={cycles}
+                  getOptionLabel={c => c.name ?? ''}
+                  isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                  disableClearable
+                  size="small"
+                  sx={{ minWidth: 260 }}
+                  renderInput={params => (
+                    <TextField {...params} placeholder="Select cycle…"
+                      sx={{ '& .MuiOutlinedInput-root': { fontSize: 13, borderRadius: 2, bgcolor: '#fff' } }} />
+                  )}
+                  renderOption={(props, c) => (
+                    <Box component="li" {...props} key={c.id}>
                       <Stack direction="row" alignItems="center" spacing={1}>
-                        <span>{c.name}</span>
+                        <span style={{ fontSize: 13 }}>{c.name}</span>
                         {c.status === 'ACTIVE' && (
                           <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
                         )}
                       </Stack>
-                    </MenuItem>
-                  ))}
-                </Select>
+                    </Box>
+                  )}
+                />
               )}
               {editable && (
                 <Box onClick={dirtyCount > 0 && !saving ? handleSaveAll : undefined} sx={{
@@ -1572,7 +1583,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                   options={[...allEmployeesList]
                     .filter(e => e.employee_id !== user?.employee_id)
                     .sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''))}
-                  getOptionLabel={e => e.full_name ? `#${e.employee_id} ${e.full_name}` : ''}
+                  getOptionLabel={e => e.full_name ? `${e.employee_id} ${e.full_name}` : ''}
                   isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
                   size="small"
                   disableClearable={false}
@@ -1597,7 +1608,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                       <Box component="li" {...props} key={e.employee_id}
                         sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', cursor: 'pointer', py: 0.5 }}>
                         <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
-                          #{e.employee_id}
+                          {e.employee_id}
                         </Typography>
                         <Typography sx={{ fontSize: 13, flex: 1 }}>{e.full_name}</Typography>
                         {allRated && <CheckCircleIcon sx={{ fontSize: 13, color: '#22c55e' }} />}
@@ -1607,19 +1618,30 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                 />
               )}
               {cycles.length > 0 && (
-                <Select value={cycleId} onChange={e => onCycleChange(e.target.value)}
-                  size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
-                  {cycles.map(c => (
-                    <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+                <Autocomplete
+                  value={cycles.find(c => c.id === cycleId) ?? null}
+                  onChange={(_, newVal) => { if (newVal) onCycleChange(newVal.id); }}
+                  options={cycles}
+                  getOptionLabel={c => c.name ?? ''}
+                  isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                  disableClearable
+                  size="small"
+                  sx={{ minWidth: 260 }}
+                  renderInput={params => (
+                    <TextField {...params} placeholder="Select cycle…"
+                      sx={{ '& .MuiOutlinedInput-root': { fontSize: 13, borderRadius: 2, bgcolor: '#fff' } }} />
+                  )}
+                  renderOption={(props, c) => (
+                    <Box component="li" {...props} key={c.id}>
                       <Stack direction="row" alignItems="center" spacing={1}>
-                        <span>{c.name}</span>
+                        <span style={{ fontSize: 13 }}>{c.name}</span>
                         {c.status === 'ACTIVE' && (
                           <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
                         )}
                       </Stack>
-                    </MenuItem>
-                  ))}
-                </Select>
+                    </Box>
+                  )}
+                />
               )}
             </Stack>
           </Stack>
@@ -1664,19 +1686,30 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
           <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#1e293b' }}>Team Review</Typography>
           <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
             {cycles.length > 0 && (
-              <Select value={cycleId} onChange={e => interceptCycleChange(e.target.value)}
-                size="small" sx={{ minWidth: 260, fontSize: 12, borderRadius: 2, bgcolor: '#fff' }}>
-                {cycles.map(c => (
-                  <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
+              <Autocomplete
+                value={cycles.find(c => c.id === cycleId) ?? null}
+                onChange={(_, newVal) => { if (newVal) interceptCycleChange(newVal.id); }}
+                options={cycles}
+                getOptionLabel={c => c.name ?? ''}
+                isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                disableClearable
+                size="small"
+                sx={{ minWidth: 260 }}
+                renderInput={params => (
+                  <TextField {...params} placeholder="Select cycle…"
+                    sx={{ '& .MuiOutlinedInput-root': { fontSize: 13, borderRadius: 2, bgcolor: '#fff' } }} />
+                )}
+                renderOption={(props, c) => (
+                  <Box component="li" {...props} key={c.id}>
                     <Stack direction="row" alignItems="center" spacing={1}>
-                      <span>{c.name}</span>
-                      {(c.status === 'ACTIVE') && (
+                      <span style={{ fontSize: 13 }}>{c.name}</span>
+                      {c.status === 'ACTIVE' && (
                         <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
                       )}
                     </Stack>
-                  </MenuItem>
-                ))}
-              </Select>
+                  </Box>
+                )}
+              />
             )}
 
             {employees.length > 0 && (
@@ -1695,7 +1728,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                     const cmp = (a.full_name ?? '').localeCompare(b.full_name ?? '');
                     return empSortDir === 'asc' ? cmp : -cmp;
                   })}
-                  getOptionLabel={e => e.full_name ? `#${e.employee_id} ${e.full_name}` : ''}
+                  getOptionLabel={e => e.full_name ? `${e.employee_id} ${e.full_name}` : ''}
                   isOptionEqualToValue={(opt, val) => opt.employee_id === val.employee_id}
                   size="small"
                   disableClearable
@@ -1747,7 +1780,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                         }}
                       >
                         <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
-                          #{e.employee_id}
+                          {e.employee_id}
                         </Typography>
 
                         <Typography sx={{ fontSize: 13, flex: 1 }}>
@@ -1825,8 +1858,9 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
 
         {allEmployees.length > 1 && !loading && (
-          <Stack direction="row" alignItems="center" spacing={1} mb={2}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', flexShrink: 0 }}>Sort by:</Typography>
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', border: '1.5px solid #7490bb', borderRadius: 2, px: 1.5, py: 0.75, mb: 2, bgcolor: '#fff' }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#131313', flexShrink: 0 }}>Sort by:</Typography>
             {[
               { key: 'name', label: 'Name' },
               { key: 'lead_progress', label: 'Lead Review Progress' },
@@ -1855,6 +1889,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
               );
             })}
           </Stack>
+          </Box>
         )}
 
         {toast.msg && <Alert severity={toast.severity} sx={{ mb: 2, borderRadius: 2 }}>{toast.msg}</Alert>}
@@ -1947,9 +1982,9 @@ export default function KRAAssessmentPage() {
     getCycles().then(res => {
       const list = res.data?.cycles ?? [];
       const sorted = [...list].sort((a, b) => {
-        if (a.status === 'ACTIVE') return -1;
-        if (b.status === 'ACTIVE') return 1;
-        return 0;
+        if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+        if (b.status === 'ACTIVE' && a.status !== 'ACTIVE') return 1;
+        return (a.name ?? '').localeCompare(b.name ?? '');
       });
       setCycles(sorted);
       if (sorted.length > 0) {

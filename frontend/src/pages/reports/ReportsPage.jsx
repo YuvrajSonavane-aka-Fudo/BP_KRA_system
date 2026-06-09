@@ -442,7 +442,7 @@ function Report({ cycles, employees }) {
               renderOptionContent={e => (
                 <Stack direction="row" alignItems="center" gap={1} sx={{ width: '100%' }}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
-                    #{e.employee_id ?? e.id}
+                    {e.employee_id ?? e.id}
                   </Typography>
                   <Typography sx={{ fontSize: 13 }}>
                     {e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
