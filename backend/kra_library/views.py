@@ -89,18 +89,18 @@ class KRACategoryListCreateView(APIView):
         Error Responses:
             401: Unauthorized
         """
-        qs = KRACategory.objects.all()
+        queryset = KRACategory.objects.all()
 
         is_standard = request.query_params.get("is_standard")
         if is_standard is not None:
-            qs = qs.filter(is_standard=(is_standard.lower() == "true"))
+            queryset = queryset.filter(is_standard=(is_standard.lower() == "true"))
 
         search = request.query_params.get("search")
         if search:
-            qs = qs.filter(name__icontains=search)
+            queryset = queryset.filter(name__icontains=search)
 
         return Response(
-            {"categories": KRACategorySerializer(qs, many=True).data},
+            {"categories": KRACategorySerializer(queryset, many=True).data},
             status=status.HTTP_200_OK,
         )
 
@@ -153,16 +153,16 @@ class KRACategoryListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cat = KRACategory.objects.create(
+        category = KRACategory.objects.create(
             name=name,
             description=request.data.get("description"),
             is_standard=request.data.get("is_standard", False),
         )
 
-        _audit(request, "CATEGORY_CREATED", "KRACategory", cat.id,
-               new_data=KRACategorySerializer(cat).data)
+        _audit(request, "CATEGORY_CREATED", "KRACategory", category.id,
+               new_data=KRACategorySerializer(category).data)
 
-        return Response(KRACategorySerializer(cat).data, status=status.HTTP_201_CREATED)
+        return Response(KRACategorySerializer(category).data, status=status.HTTP_201_CREATED)
 
 
 class KRACategoryDetailView(APIView):
@@ -192,8 +192,8 @@ class KRACategoryDetailView(APIView):
             404: Category not found
             401: Unauthorized
         """
-        cat = get_object_or_404(KRACategory, id=category_id)
-        return Response(KRACategorySerializer(cat).data, status=status.HTTP_200_OK)
+        category = get_object_or_404(KRACategory, id=category_id)
+        return Response(KRACategorySerializer(category).data, status=status.HTTP_200_OK)
 
     def _update(self, request: Request, category_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
@@ -201,11 +201,11 @@ class KRACategoryDetailView(APIView):
             return Response({"error": "Only HR can update categories"},
                             status=status.HTTP_403_FORBIDDEN)
 
-        cat      = get_object_or_404(KRACategory, id=category_id)
-        old_data = KRACategorySerializer(cat).data
+        category = get_object_or_404(KRACategory, id=category_id)
+        old_data = KRACategorySerializer(category).data
         data     = request.data
 
-        name = data.get("name", "").strip() if not partial else data.get("name", cat.name or "").strip()
+        name = data.get("name", "").strip() if not partial else data.get("name", category.name or "").strip()
 
         if not partial and not name:
             return Response({"error": "name is required"},
@@ -221,18 +221,18 @@ class KRACategoryDetailView(APIView):
             )
 
         if name:
-            cat.name = name
+            category.name = name
         if "description" in data:
-            cat.description = data["description"]
+            category.description = data["description"]
         if "is_standard" in data:
-            cat.is_standard = data["is_standard"]
+            category.is_standard = data["is_standard"]
 
-        cat.save()
+        category.save()
 
-        _audit(request, "CATEGORY_UPDATED", "KRACategory", cat.id,
-               old_data=old_data, new_data=KRACategorySerializer(cat).data)
+        _audit(request, "CATEGORY_UPDATED", "KRACategory", category.id,
+               old_data=old_data, new_data=KRACategorySerializer(category).data)
 
-        return Response(KRACategorySerializer(cat).data, status=status.HTTP_200_OK)
+        return Response(KRACategorySerializer(category).data, status=status.HTTP_200_OK)
 
     def put(self, request: Request, category_id: int) -> Response:
         """
@@ -329,24 +329,32 @@ class KRACategoryDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        cat = get_object_or_404(KRACategory, id=category_id)
+        category = get_object_or_404(KRACategory, id=category_id)
 
         # Block deletion if any KRALevel under this category's KRAs
         # (or directly tagged to this category) is assigned to an employee.
-        kra_levels_in_category = KRALevel.objects.filter(
-            kra__category=cat
-        )
-        assigned_kra_level_count = EmployeeKRALevel.objects.filter(
-            kra_level__in=kra_levels_in_category
-        ).values("kra_level_id").distinct().count()
+        from django.db import connection
+        with connection.cursor() as cursor:
+            # count assigned kra_levels under this category
+            cursor.execute("""
+                SELECT COUNT(DISTINCT ekl.kra_level_id)
+                FROM employee_kra_level ekl
+                INNER JOIN kra_level kl ON ekl.kra_level_id = kl.id
+                INNER JOIN kra k ON kl.kra_id = k.id
+                WHERE k.category_id = %s
+            """, [category.id])
+            assigned_kra_level_count = cursor.fetchone()[0] or 0
 
-        assigned_kra_count = (
-            kra_levels_in_category
-            .filter(employee_kra_levels__isnull=False)
-            .values("kra_id")
-            .distinct()
-            .count()
-        )
+            # count assigned kras under this category
+            cursor.execute("""
+                SELECT COUNT(DISTINCT kl.kra_id)
+                FROM employee_kra_level ekl
+                INNER JOIN kra_level kl ON ekl.kra_level_id = kl.id
+                INNER JOIN kra k ON kl.kra_id = k.id
+                WHERE k.category_id = %s
+            """, [category.id])
+            assigned_kra_count = cursor.fetchone()[0] or 0
+
 
         if assigned_kra_level_count:
             return Response(
@@ -363,20 +371,20 @@ class KRACategoryDetailView(APIView):
 
         try:
             with transaction.atomic():
-                kras       = KRA.objects.filter(category=cat)
+                kras       = KRA.objects.filter(category=category)
                 kra_levels = KRALevel.objects.filter(kra__in=kras)
                 kra_levels.delete()
                 kras.delete()
 
-                category_name = cat.name
+                category_name = category.name
                 _audit(
                     request,
                     "CATEGORY_DELETED",
                     "KRACategory",
-                    cat.id,
-                    old_data=KRACategorySerializer(cat).data,
+                    category.id,
+                    old_data=KRACategorySerializer(category).data,
                 )
-                cat.delete()
+                category.delete()
 
             return Response(
                 {
@@ -489,14 +497,14 @@ class LevelListCreateView(APIView):
         Error Responses:
             401: Unauthorized
         """
-        qs = Level.objects.all()
+        queryset = Level.objects.all()
 
         search = request.query_params.get("search")
         if search:
-            qs = qs.filter(name__icontains=search)
+            queryset = queryset.filter(name__icontains=search)
 
         return Response(
-            {"levels": LevelSerializer(qs, many=True).data},
+            {"levels": LevelSerializer(queryset, many=True).data},
             status=status.HTTP_200_OK,
         )
 
@@ -558,17 +566,17 @@ class LevelListCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        lvl = Level.objects.create(
+        level = Level.objects.create(
             name=name,
             description=request.data.get("description"),
             min_experience=min_exp,
             max_experience=max_exp,
         )
 
-        _audit(request, "LEVEL_CREATED", "Level", lvl.id,
-               new_data=LevelSerializer(lvl).data)
+        _audit(request, "LEVEL_CREATED", "Level", level.id,
+               new_data=LevelSerializer(level).data)
 
-        return Response(LevelSerializer(lvl).data, status=status.HTTP_201_CREATED)
+        return Response(LevelSerializer(level).data, status=status.HTTP_201_CREATED)
 
 
 class LevelDetailView(APIView):
@@ -599,8 +607,8 @@ class LevelDetailView(APIView):
             404: Level not found
             401: Unauthorized
         """
-        lvl = get_object_or_404(Level, id=level_id)
-        return Response(LevelSerializer(lvl).data, status=status.HTTP_200_OK)
+        level = get_object_or_404(Level, id=level_id)
+        return Response(LevelSerializer(level).data, status=status.HTTP_200_OK)
 
     def _update(self, request: Request, level_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
@@ -608,11 +616,11 @@ class LevelDetailView(APIView):
             return Response({"error": "Only HR can update levels"},
                             status=status.HTTP_403_FORBIDDEN)
 
-        lvl      = get_object_or_404(Level, id=level_id)
-        old_data = LevelSerializer(lvl).data
+        level    = get_object_or_404(Level, id=level_id)
+        old_data = LevelSerializer(level).data
         data     = request.data
 
-        name = data.get("name", lvl.name or "").strip()
+        name = data.get("name", level.name or "").strip()
 
         if not partial and not name:
             return Response({"error": "name is required"},
@@ -626,8 +634,8 @@ class LevelDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        min_exp = data.get("min_experience", lvl.min_experience)
-        max_exp = data.get("max_experience", lvl.max_experience)
+        min_exp = data.get("min_experience", level.min_experience)
+        max_exp = data.get("max_experience", level.max_experience)
 
         if min_exp is not None and max_exp is not None:
             if int(min_exp) > int(max_exp):
@@ -637,17 +645,17 @@ class LevelDetailView(APIView):
                 )
 
         if name:
-            lvl.name = name
+            level.name = name
         if "description" in data:
-            lvl.description = data["description"]
-        lvl.min_experience = min_exp
-        lvl.max_experience = max_exp
-        lvl.save()
+            level.description = data["description"]
+        level.min_experience = min_exp
+        level.max_experience = max_exp
+        level.save()
 
-        _audit(request, "LEVEL_UPDATED", "Level", lvl.id,
-               old_data=old_data, new_data=LevelSerializer(lvl).data)
+        _audit(request, "LEVEL_UPDATED", "Level", level.id,
+               old_data=old_data, new_data=LevelSerializer(level).data)
 
-        return Response(LevelSerializer(lvl).data, status=status.HTTP_200_OK)
+        return Response(LevelSerializer(level).data, status=status.HTTP_200_OK)
 
     def put(self, request: Request, level_id: int) -> Response:
         """
@@ -745,12 +753,12 @@ class LevelDetailView(APIView):
             return Response({"error": "Only HR can delete levels"},
                             status=status.HTTP_403_FORBIDDEN)
 
-        lvl = get_object_or_404(Level, id=level_id)
+        level = get_object_or_404(Level, id=level_id)
 
         # Guard: employees assigned to this level
-        emp_count = lvl.employees.count()          # related_name on Employee.level
-        kra_level_count = lvl.kra_levels.count()   # related_name on KRALevel.level
-        ekc_count = lvl.employee_kra_cycles.count() # related_name on EmployeeKRACycle.employee_level
+        emp_count = level.employees.count()          # related_name on Employee.level
+        kra_level_count = level.kra_levels.count()   # related_name on KRALevel.level
+        ekc_count = level.employee_kra_cycles.count() # related_name on EmployeeKRACycle.employee_level
 
         if emp_count or kra_level_count or ekc_count:
             return Response(
@@ -763,12 +771,12 @@ class LevelDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        _audit(request, "LEVEL_DELETED", "Level", lvl.id,
-               old_data=LevelSerializer(lvl).data)
-        lvl.delete()
+        _audit(request, "LEVEL_DELETED", "Level", level.id,
+               old_data=LevelSerializer(level).data)
+        level.delete()
 
         return Response(
-            {"message": f"Level '{lvl.name}' deleted successfully"},
+            {"message": f"Level '{level.name}' deleted successfully"},
             status=status.HTTP_200_OK,
         )
 
@@ -884,28 +892,63 @@ class KRALibraryListCreateView(APIView):
         Error Responses:
             401: Unauthorized
         """
-        qs = KRA.objects.select_related("category").prefetch_related(
-            "kra_levels__level", "kra_levels__category"
-        )
+        sql = """
+            SELECT DISTINCT k.id, k.name, k.description, k.is_standard, k.category_id,
+                   c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
+            FROM kra k
+            LEFT JOIN kra_category c ON k.category_id = c.id
+        """
+        params = []
+        conditions = []
 
         category_id = request.query_params.get("category_id")
         level_id    = request.query_params.get("level_id")
         is_standard = request.query_params.get("is_standard")
         search      = request.query_params.get("search")
 
-        if category_id:
-            qs = qs.filter(category_id=category_id)
         if level_id:
-            qs = qs.filter(kra_levels__level_id=level_id).distinct()
+            sql += " INNER JOIN kra_level kl ON k.id = kl.kra_id"
+            conditions.append("kl.level_id = %s")
+            params.append(int(level_id))
+
+        if category_id:
+            conditions.append("k.category_id = %s")
+            params.append(int(category_id))
+
         if is_standard is not None:
-            qs = qs.filter(is_standard=(is_standard.lower() == "true"))
+            conditions.append("k.is_standard = %s")
+            params.append(is_standard.lower() == "true")
+
         if search:
-            qs = qs.filter(name__icontains=search)
+            conditions.append("LOWER(k.name) LIKE LOWER(%s)")
+            params.append(f"%{search}%")
+
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+
+        raw_qs = KRA.objects.raw(sql, params)
+
+        kras = []
+        for k in raw_qs:
+            if k.category_id:
+                k.category = KRACategory(
+                    id=k.category_id,
+                    name=getattr(k, 'cat_name', None),
+                    description=getattr(k, 'cat_desc', None),
+                    is_standard=getattr(k, 'cat_std', False)
+                )
+            else:
+                k.category = None
+            kras.append(k)
+
+        from django.db.models import prefetch_related_objects
+        prefetch_related_objects(kras, "kra_levels__level", "kra_levels__category")
 
         return Response(
-            {"kras": KRASerializer(qs, many=True).data},
+            {"kras": KRASerializer(kras, many=True).data},
             status=status.HTTP_200_OK,
         )
+
 
     def post(self, request: Request) -> Response:
         """
@@ -980,8 +1023,8 @@ class KRALibraryListCreateView(APIView):
 
         # Validate all level_ids and category_ids in the levels list up front
         if levels_data:
-            submitted_level_ids = {l.get("level_id") for l in levels_data if l.get("level_id")}
-            submitted_cat_ids   = {l.get("category_id") for l in levels_data if l.get("category_id")}
+            submitted_level_ids = {level_item.get("level_id") for level_item in levels_data if level_item.get("level_id")}
+            submitted_cat_ids   = {level_item.get("category_id") for level_item in levels_data if level_item.get("category_id")}
 
             bad_levels = submitted_level_ids - set(
                 Level.objects.filter(id__in=submitted_level_ids).values_list("id", flat=True)
@@ -1012,12 +1055,12 @@ class KRALibraryListCreateView(APIView):
                 category_id=category_id,
             )
 
-            for l in levels_data:
+            for level_item in levels_data:
                 KRALevel.objects.create(
                     kra=kra,
-                    level_id=l.get("level_id"),
-                    name=l.get("name", name),       # inherit KRA name if not given
-                    category_id=l.get("category_id") or category_id,
+                    level_id=level_item.get("level_id"),
+                    name=level_item.get("name", name),       # inherit KRA name if not given
+                    category_id=level_item.get("category_id") or category_id,
                 )
 
         kra.refresh_from_db()
@@ -1067,13 +1110,35 @@ class KRADetailView(APIView):
             404: KRA not found
             401: Unauthorized
         """
-        kra = get_object_or_404(
-            KRA.objects.select_related("category").prefetch_related(
-                "kra_levels__level", "kra_levels__category"
-            ),
-            id=kra_id,
-        )
+        sql = """
+            SELECT k.id, k.name, k.description, k.is_standard, k.category_id,
+                   c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
+            FROM kra k
+            LEFT JOIN kra_category c ON k.category_id = c.id
+            WHERE k.id = %s
+        """
+        raw_qs = KRA.objects.raw(sql, [kra_id])
+        kras = list(raw_qs)
+        if not kras:
+            from django.http import Http404
+            raise Http404("No KRA matches the given query.")
+
+        kra = kras[0]
+        if kra.category_id:
+            kra.category = KRACategory(
+                id=kra.category_id,
+                name=getattr(kra, 'cat_name', None),
+                description=getattr(kra, 'cat_desc', None),
+                is_standard=getattr(kra, 'cat_std', False)
+            )
+        else:
+            kra.category = None
+
+        from django.db.models import prefetch_related_objects
+        prefetch_related_objects([kra], "kra_levels__level", "kra_levels__category")
+
         return Response(KRASerializer(kra).data, status=status.HTTP_200_OK)
+
 
     def put(self, request: Request, kra_id: int) -> Response:
         """
@@ -1274,8 +1339,8 @@ class KRADetailView(APIView):
         if levels_data is not None:
 
             # Validate all level_ids and category_ids before touching the DB
-            submitted_level_ids = {l.get("level_id") for l in levels_data if l.get("level_id")}
-            submitted_cat_ids   = {l.get("category_id") for l in levels_data if l.get("category_id")}
+            submitted_level_ids = {level_item.get("level_id") for level_item in levels_data if level_item.get("level_id")}
+            submitted_cat_ids   = {level_item.get("category_id") for level_item in levels_data if level_item.get("category_id")}
 
             if submitted_level_ids:
                 bad_levels = submitted_level_ids - set(
@@ -1300,7 +1365,7 @@ class KRADetailView(APIView):
                     )
 
             # Check none of the levels being removed are assigned to employees
-            incoming_level_ids = {l.get("level_id") for l in levels_data if l.get("level_id")}
+            incoming_level_ids = {level_item.get("level_id") for level_item in levels_data if level_item.get("level_id")}
             levels_being_removed = kra.kra_levels.exclude(level_id__in=incoming_level_ids)
             actively_assigned = levels_being_removed.filter(
                 employee_kra_levels__isnull=False
@@ -1324,10 +1389,10 @@ class KRADetailView(APIView):
                 levels_being_removed.delete()
 
                 # Upsert each incoming level
-                for l in levels_data:
-                    level_id    = l.get("level_id")
-                    level_name  = l.get("name", kra.name)
-                    category_id = l.get("category_id") or kra.category_id
+                for level_item in levels_data:
+                    level_id    = level_item.get("level_id")
+                    level_name  = level_item.get("name", kra.name)
+                    category_id = level_item.get("category_id") or kra.category_id
 
                     KRALevel.objects.update_or_create(
                         kra=kra,
@@ -1398,7 +1463,42 @@ class KRACloneView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        source_levels = list(source.kra_levels.select_related("level", "category").all())
+        # Fetch level variants using raw SQL
+        sql = """
+            SELECT kl.id, kl.kra_id, kl.level_id, kl.name, kl.category_id,
+                   l.name AS lvl_name, l.description AS lvl_desc, l.min_experience AS lvl_min_exp, l.max_experience AS lvl_max_exp,
+                   c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
+            FROM kra_level kl
+            LEFT JOIN level l ON kl.level_id = l.id
+            LEFT JOIN kra_category c ON kl.category_id = c.id
+            WHERE kl.kra_id = %s
+        """
+        raw_qs = KRALevel.objects.raw(sql, [source.id])
+        source_levels = []
+        for kl in raw_qs:
+            if kl.level_id:
+                kl.level = Level(
+                    id=kl.level_id,
+                    name=getattr(kl, 'lvl_name', None),
+                    description=getattr(kl, 'lvl_desc', None),
+                    min_experience=getattr(kl, 'lvl_min_exp', None),
+                    max_experience=getattr(kl, 'lvl_max_exp', None)
+                )
+            else:
+                kl.level = None
+
+            if kl.category_id:
+                kl.category = KRACategory(
+                    id=kl.category_id,
+                    name=getattr(kl, 'cat_name', None),
+                    description=getattr(kl, 'cat_desc', None),
+                    is_standard=getattr(kl, 'cat_std', False)
+                )
+            else:
+                kl.category = None
+
+            source_levels.append(kl)
+
 
         with transaction.atomic():
             clone = KRA.objects.create(
@@ -1411,11 +1511,11 @@ class KRACloneView(APIView):
             KRALevel.objects.bulk_create([
                 KRALevel(
                     kra=clone,
-                    level_id=kl.level_id,
-                    name=kl.name,
-                    category_id=kl.category_id,
+                    level_id=kra_level.level_id,
+                    name=kra_level.name,
+                    category_id=kra_level.category_id,
                 )
-                for kl in source_levels
+                for kra_level in source_levels
             ])
 
         _audit(request, "KRA_CLONED", "KRA", clone.id,
@@ -1434,7 +1534,6 @@ class KRACloneView(APIView):
 
 
 # KRA LEVEL  (child of KRA — the level-specific variant)
-
 
 class KRALevelListCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1472,11 +1571,46 @@ class KRALevelListCreateView(APIView):
             401: Unauthorized
         """
         kra = get_object_or_404(KRA, id=kra_id)
-        levels = kra.kra_levels.select_related("level", "category").all()
+        sql = """
+            SELECT kl.id, kl.kra_id, kl.level_id, kl.name, kl.category_id,
+                   l.name AS lvl_name, l.description AS lvl_desc, l.min_experience AS lvl_min_exp, l.max_experience AS lvl_max_exp,
+                   c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
+            FROM kra_level kl
+            LEFT JOIN level l ON kl.level_id = l.id
+            LEFT JOIN kra_category c ON kl.category_id = c.id
+            WHERE kl.kra_id = %s
+        """
+        raw_qs = KRALevel.objects.raw(sql, [kra_id])
+        levels = []
+        for kl in raw_qs:
+            if kl.level_id:
+                kl.level = Level(
+                    id=kl.level_id,
+                    name=getattr(kl, 'lvl_name', None),
+                    description=getattr(kl, 'lvl_desc', None),
+                    min_experience=getattr(kl, 'lvl_min_exp', None),
+                    max_experience=getattr(kl, 'lvl_max_exp', None)
+                )
+            else:
+                kl.level = None
+
+            if kl.category_id:
+                kl.category = KRACategory(
+                    id=kl.category_id,
+                    name=getattr(kl, 'cat_name', None),
+                    description=getattr(kl, 'cat_desc', None),
+                    is_standard=getattr(kl, 'cat_std', False)
+                )
+            else:
+                kl.category = None
+
+            levels.append(kl)
+
         return Response(
             {"kra_id": kra_id, "levels": KRALevelSerializer(levels, many=True).data},
             status=status.HTTP_200_OK,
         )
+
 
     def post(self, request: Request, kra_id: int) -> Response:
         """
@@ -1544,27 +1678,62 @@ class KRALevelListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        kl = KRALevel.objects.create(
+        kra_level = KRALevel.objects.create(
             kra=kra,
             level_id=level_id,
             name=data.get("name", kra.name),
             category_id=category_id,
         )
 
-        _audit(request, "KRA_LEVEL_CREATED", "KRALevel", kl.id,
-               new_data=KRALevelSerializer(kl).data)
+        _audit(request, "KRA_LEVEL_CREATED", "KRALevel", kra_level.id,
+               new_data=KRALevelSerializer(kra_level).data)
 
-        return Response(KRALevelSerializer(kl).data, status=status.HTTP_201_CREATED)
+        return Response(KRALevelSerializer(kra_level).data, status=status.HTTP_201_CREATED)
 
 
 class KRALevelDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _get_kra_level(self, kra_id: int, kra_level_id: int) -> KRALevel:
-        return get_object_or_404(
-            KRALevel.objects.select_related("level", "category"),
-            id=kra_level_id, kra_id=kra_id,
-        )
+        sql = """
+            SELECT kl.id, kl.kra_id, kl.level_id, kl.name, kl.category_id,
+                   l.name AS lvl_name, l.description AS lvl_desc, l.min_experience AS lvl_min_exp, l.max_experience AS lvl_max_exp,
+                   c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
+            FROM kra_level kl
+            LEFT JOIN level l ON kl.level_id = l.id
+            LEFT JOIN kra_category c ON kl.category_id = c.id
+            WHERE kl.id = %s AND kl.kra_id = %s
+        """
+        raw_qs = KRALevel.objects.raw(sql, [kra_level_id, kra_id])
+        levels = list(raw_qs)
+        if not levels:
+            from django.http import Http404
+            raise Http404("No KRALevel matches the given query.")
+
+        kra_level = levels[0]
+        if kra_level.level_id:
+            kra_level.level = Level(
+                id=kra_level.level_id,
+                name=getattr(kra_level, 'lvl_name', None),
+                description=getattr(kra_level, 'lvl_desc', None),
+                min_experience=getattr(kra_level, 'lvl_min_exp', None),
+                max_experience=getattr(kra_level, 'lvl_max_exp', None)
+            )
+        else:
+            kra_level.level = None
+
+        if kra_level.category_id:
+            kra_level.category = KRACategory(
+                id=kra_level.category_id,
+                name=getattr(kra_level, 'cat_name', None),
+                description=getattr(kra_level, 'cat_desc', None),
+                is_standard=getattr(kra_level, 'cat_std', False)
+            )
+        else:
+            kra_level.category = None
+
+        return kra_level
+
 
     def get(self, request: Request, kra_id: int, kra_level_id: int) -> Response:
         """
@@ -1593,8 +1762,8 @@ class KRALevelDetailView(APIView):
             404: KRA level variant not found
             401: Unauthorized
         """
-        kl = self._get_kra_level(kra_id, kra_level_id)
-        return Response(KRALevelSerializer(kl).data, status=status.HTTP_200_OK)
+        kra_level = self._get_kra_level(kra_id, kra_level_id)
+        return Response(KRALevelSerializer(kra_level).data, status=status.HTTP_200_OK)
 
     def _update(self, request: Request, kra_id: int, kra_level_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
@@ -1602,12 +1771,12 @@ class KRALevelDetailView(APIView):
             return Response({"error": "Only HR can update KRA level variants"},
                             status=status.HTTP_403_FORBIDDEN)
 
-        kl       = self._get_kra_level(kra_id, kra_level_id)
-        old_data = KRALevelSerializer(kl).data
-        data     = request.data
+        kra_level = self._get_kra_level(kra_id, kra_level_id)
+        old_data  = KRALevelSerializer(kra_level).data
+        data      = request.data
 
         new_level_id = data.get("level_id")
-        if new_level_id and new_level_id != kl.level_id:
+        if new_level_id and new_level_id != kra_level.level_id:
             if not Level.objects.filter(id=new_level_id).exists():
                 return Response(
                     {"error": f"level_id {new_level_id} does not exist"},
@@ -1620,10 +1789,10 @@ class KRALevelDetailView(APIView):
                     {"error": f"A variant for level_id {new_level_id} already exists on this KRA"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            kl.level_id = new_level_id
+            kra_level.level_id = new_level_id
 
         if "name" in data:
-            kl.name = data["name"]
+            kra_level.name = data["name"]
 
         if "category_id" in data and data["category_id"]:
             if not KRACategory.objects.filter(id=data["category_id"]).exists():
@@ -1631,14 +1800,14 @@ class KRALevelDetailView(APIView):
                     {"error": f"category_id {data['category_id']} does not exist"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            kl.category_id = data["category_id"]
+            kra_level.category_id = data["category_id"]
 
-        kl.save()
+        kra_level.save()
 
-        _audit(request, "KRA_LEVEL_UPDATED", "KRALevel", kl.id,
-               old_data=old_data, new_data=KRALevelSerializer(kl).data)
+        _audit(request, "KRA_LEVEL_UPDATED", "KRALevel", kra_level.id,
+               old_data=old_data, new_data=KRALevelSerializer(kra_level).data)
 
-        return Response(KRALevelSerializer(kl).data, status=status.HTTP_200_OK)
+        return Response(KRALevelSerializer(kra_level).data, status=status.HTTP_200_OK)
 
     def put(self, request: Request, kra_id: int, kra_level_id: int) -> Response:
         """
@@ -1738,9 +1907,9 @@ class KRALevelDetailView(APIView):
             return Response({"error": "Only HR can delete KRA level variants"},
                             status=status.HTTP_403_FORBIDDEN)
 
-        kl = self._get_kra_level(kra_id, kra_level_id)
+        kra_level = self._get_kra_level(kra_id, kra_level_id)
 
-        assigned_count = kl.employee_kra_levels.count()   # related_name on EmployeeKRALevel.kra_level
+        assigned_count = kra_level.employee_kra_levels.count()   # related_name on EmployeeKRALevel.kra_level
         if assigned_count:
             return Response(
                 {
@@ -1750,9 +1919,9 @@ class KRALevelDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        _audit(request, "KRA_LEVEL_DELETED", "KRALevel", kl.id,
-               old_data=KRALevelSerializer(kl).data)
-        kl.delete()
+        _audit(request, "KRA_LEVEL_DELETED", "KRALevel", kra_level.id,
+               old_data=KRALevelSerializer(kra_level).data)
+        kra_level.delete()
 
         return Response(
             {"message": "KRA level variant deleted successfully"},
