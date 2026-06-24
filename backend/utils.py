@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional
 from django.db import transaction
 from django.utils.timezone import make_aware
 from datetime import datetime, date, time
@@ -12,6 +13,8 @@ from kra_cycle.models import (
     EmployeeKRALevel,
     KRACategory,
     KRALevel,
+    KRACycle,
+    Stage,
 )
 
 HR_ROLES      = {"Admin", "HR", "Vertical Lead"}
@@ -19,25 +22,47 @@ LEAD_ROLES    = {"Manager", "Team Lead"}
 EMPLOYEE_ROLE = "Employee"
 
 
-def _get_caller(request):
+def _get_caller(request: Any) -> Employee:
+    """
+    Retrieves the employee caller from the request user.
+    """
     return request.user
 
 
-def _is_hr(employee):
+def _is_hr(employee: Employee) -> bool:
+    """
+    Checks if the employee has an HR role.
+    """
     return employee.employee_roles.filter(role__name__in=HR_ROLES).exists()
 
 
-def _is_lead(employee):
+def _is_lead(employee: Employee) -> bool:
+    """
+    Checks if the employee has a Lead/Manager role.
+    """
     return employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists()
 
 
-def _caller_can_act_on(caller, target_employee_id):
+def _caller_can_act_on(caller: Employee, target_employee_id: int) -> bool:
+    """
+    Determines if the caller can act on the target employee's details.
+    """
     if _is_hr(caller):
         return True
     return Employee.objects.filter(id=target_employee_id, manager_id=caller.id).exists()
 
 
-def _audit(request, action, entity, entity_id, old_data=None, new_data=None):
+def _audit(
+    request: Any,
+    action: str,
+    entity: str,
+    entity_id: Optional[int],
+    old_data: Optional[Dict[str, Any]] = None,
+    new_data: Optional[Dict[str, Any]] = None,
+) -> None:
+    """
+    Creates an audit log entry for the performed action.
+    """
     AuditLog.objects.create(
         employee   = _get_caller(request),
         action     = action,
@@ -49,7 +74,11 @@ def _audit(request, action, entity, entity_id, old_data=None, new_data=None):
     )
 
 
-def _clone_assignments(source_cycle, new_cycle, caller):
+def _clone_assignments(
+    source_cycle: KRACycle,
+    new_cycle: KRACycle,
+    caller: Employee,
+) -> Dict[str, Any]:
     """
     Clones all EmployeeKRACycle rows (+ their categories and KRA level rows)
     from source_cycle into new_cycle.
@@ -122,7 +151,7 @@ def _clone_assignments(source_cycle, new_cycle, caller):
     needs_review = []
 
     # Track role changes for informational purposes
-    def _current_roles(emp):
+    def _current_roles(emp: Employee) -> List[str]:
         return list(emp.employee_roles.values_list("name", flat=True))
 
     with transaction.atomic():
@@ -287,7 +316,7 @@ def _clone_assignments(source_cycle, new_cycle, caller):
     }
 
 
-def _parse_date(value):
+def _parse_date(value: str) -> datetime:
     """Accepts '2026-05-13' or '2026-05-13T00:00:00', always returns aware datetime."""
     try:
         d = date.fromisoformat(value)  # handles date-only strings
@@ -296,7 +325,11 @@ def _parse_date(value):
         return make_aware(datetime.fromisoformat(value.replace("Z", "")))
 
 
-def send_stage_override_email(employee, cycle, stage_data):
+def send_stage_override_email(
+    employee: Employee,
+    cycle: KRACycle,
+    stage_data: Any,
+) -> None:
     """
     Sends email for single stage override update.
     Shows only Stage ID (no stage name lookup).
@@ -332,7 +365,11 @@ def send_stage_override_email(employee, cycle, stage_data):
         print(f"Failed to send stage override email: {str(e)}")
 
 
-def send_employee_stage_override_email(employee, cycle, target_stage):
+def send_employee_stage_override_email(
+    employee: Employee,
+    cycle: KRACycle,
+    target_stage: Stage,
+) -> None:
     """
     Email for individual employee stage override.
     """
