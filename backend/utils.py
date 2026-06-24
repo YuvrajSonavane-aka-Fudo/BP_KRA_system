@@ -1,3 +1,5 @@
+from kra_cycle.models import Employee, AuditLog
+
 HR_ROLES      = {"Admin" , "HR" , "Vertical Lead"}
 LEAD_ROLES    = {"Manager" , "Team Lead"}
 EMPLOYEE_ROLE = "Employee"

@@ -11,24 +11,7 @@ from kra_cycle.models import (
     EmployeeKRALevel,
 )
 
-HR_ROLES   = {"Admin", "HR", "Vertical Lead"}
-LEAD_ROLES = {"Manager", "Team Lead"}
-
-
-def _get_caller(request):
-    return request.user
-
-
-def _is_hr(employee):
-    if employee.employee_roles.filter(role__name__in=HR_ROLES).exists():
-        return True
-    return bool(employee.role and employee.role.name in HR_ROLES)
-
-
-def _is_lead(employee):
-    if employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists():
-        return True
-    return bool(employee.role and employee.role.name in LEAD_ROLES)
+from utils import _get_caller, _is_hr, _is_lead
 
 
 def _base_ekc_qs(caller, cycle_ids):

@@ -1,36 +1,24 @@
 """
-KRA Library Management Views
-Covers:
-    - KRACategory  → Create, List, Retrieve, Update, Delete, Clone
-    - Level        → Create, List, Retrieve, Update, Delete, Clone
-    - KRA          → Create, List, Retrieve, Update, Delete, Clone
-                     (KRALevel rows are managed as nested children of KRA)
+File: views.py
+App: kra_library
+Purpose:
+    Handles the HTTP request/response lifecycle for API endpoints.
 
-Add to urls.py:
-    from django.urls import path
-    from . import library_views as v
+Includes:
+    - Category views
+    - Level views
+    - KRA views
+    - KRALevel views
+    - Audit log
 
-    urlpatterns += [
-        # KRA Category 
-        path('api/v1/kra/categories',                  v.KRACategoryListCreateView.as_view()),
-        path('api/v1/kra/categories/<int:category_id>', v.KRACategoryDetailView.as_view()),
-        path('api/v1/kra/categories/<int:category_id>/clone', v.KRACategoryCloneView.as_view()),
+Responsibilities:
+    - Handle the HTTP request/response lifecycle for API endpoints.
 
-        # Level 
-        path('api/v1/levels',                  v.LevelListCreateView.as_view()),
-        path('api/v1/levels/<int:level_id>',   v.LevelDetailView.as_view()),
-        path('api/v1/levels/<int:level_id>/clone', v.LevelCloneView.as_view()),
+Notes:
+    - Keep views thin
+    - No direct DB-heavy logic
+    - Identity source is now Employee (hrflow_employee), not User (hrflow_users).
 
-        # KRA (parent + its KRALevel children) 
-        path('api/v1/kra/library',                 v.KRAListCreateView.as_view()),
-        path('api/v1/kra/library/<int:kra_id>',    v.KRADetailView.as_view()),
-        path('api/v1/kra/library/<int:kra_id>/clone', v.KRACloneView.as_view()),
-
-        # KRALevel (standalone management per KRA) 
-        path('api/v1/kra/library/<int:kra_id>/levels', v.KRALevelListCreateView.as_view()),
-        path('api/v1/kra/library/<int:kra_id>/levels/<int:kra_level_id>', v.KRALevelDetailView.as_view()),
-        path('api/v1/kra/library/<int:kra_id>/levels/<int:kra_level_id>/clone', v.KRALevelCloneView.as_view()),
-    ]
 """
 
 from django.shortcuts import render
@@ -43,6 +31,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.request import Request
 from django.db import transaction
 from kra_cycle.models import (
     Employee,
@@ -59,109 +48,47 @@ from kra_cycle.models import (
     Rating,
     AuditLog,
 )
-
-
-HR_ROLES      = {"Admin" , "HR" , "Vertical Lead"}
-LEAD_ROLES    = {"Manager" , "Team Lead"}
-EMPLOYEE_ROLE = "Employee"
-
-
-def _get_caller(request):
-    return request.user
-
-
-def _is_hr(employee):
-    # Check bridge table first, fall back to direct role FK
-    if employee.employee_roles.filter(role__name__in=HR_ROLES).exists():
-        return True
-    return bool(employee.role and employee.role.name in HR_ROLES)
-
-
-def _is_lead(employee):
-    # Check bridge table first, fall back to direct role FK
-    if employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists():
-        return True
-    return bool(employee.role and employee.role.name in LEAD_ROLES)
-
-
-def _audit(request, action, entity, entity_id, old_data=None, new_data=None):
-    AuditLog.objects.create(
-        employee=_get_caller(request),
-        action=action,
-        entity=entity,
-        entity_id=entity_id,
-        old_data=old_data,
-        new_data=new_data,
-        ip_address=request.META.get("REMOTE_ADDR"),
-    )
-
-
-# Serialiser helpers  (plain dicts — no DRF serialisers needed)
-
-
-def _category_dict(cat):
-    return {
-        "id":          cat.id,
-        "name":        cat.name,
-        "description": cat.description,
-        "is_standard": cat.is_standard,
-    }
-
-
-def _level_dict(lvl):
-    return {
-        "id":             lvl.id,
-        "name":           lvl.name,
-        "description":    lvl.description,
-        "min_experience": lvl.min_experience,
-        "max_experience": lvl.max_experience,
-    }
-
-
-def _kra_level_dict(kl):
-    return {
-        "id":          kl.id,
-        "kra_id":      kl.kra_id,
-        "level_id":    kl.level_id,
-        "level_name":  kl.level.name if kl.level else None,
-        "name":        kl.name,
-        "category_id": kl.category_id,
-        "category_name": kl.category.name if kl.category else None,
-    }
-
-
-def _kra_dict(kra, include_levels=True):
-    d = {
-        "id":            kra.id,
-        "name":          kra.name,
-        "description":   kra.description,
-        "is_standard":   kra.is_standard,
-        "category_id":   kra.category_id,
-        "category_name": kra.category.name if kra.category else None,
-    }
-    if include_levels:
-        d["levels"] = [
-            _kra_level_dict(kl)
-            for kl in kra.kra_levels.select_related("level", "category").all()
-        ]
-    return d
-
+from .serializers import (
+    KRACategorySerializer,
+    LevelSerializer,
+    KRALevelSerializer,
+    KRASerializer,
+)
+from utils import _get_caller, _is_hr, _is_lead, _audit
 
 
 # KRA CATEGORY
 
 class KRACategoryListCreateView(APIView):
-    """
-    GET  /api/v1/kra/categories              – list all categories
-    POST /api/v1/kra/categories              – create a new category (HR only)
-
-    GET query params:
-        is_standard=true|false               – filter by standard flag
-        search=<text>                        – partial match on name
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
+        """
+        API view to list all categories.
+
+        Endpoint: GET /api/v1/kra/categories
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "categories": [
+                    {
+                        "id": 1,
+                        "name": "Core Development",
+                        "description": "...",
+                        "is_standard": true
+                    }
+                ]
+            }
+
+        Error Responses:
+            401: Unauthorized
+        """
         qs = KRACategory.objects.all()
 
         is_standard = request.query_params.get("is_standard")
@@ -173,11 +100,39 @@ class KRACategoryListCreateView(APIView):
             qs = qs.filter(name__icontains=search)
 
         return Response(
-            {"categories": [_category_dict(c) for c in qs]},
+            {"categories": KRACategorySerializer(qs, many=True).data},
             status=status.HTTP_200_OK,
         )
 
-    def post(self, request):
+    def post(self, request: Request) -> Response:
+        """
+        API view to create a new category.
+
+        Endpoint: POST /api/v1/kra/categories
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<category_name>",
+                "description": "<category_description>",
+                "is_standard": false
+            }
+
+        Response (201):
+            {
+                "id": 1,
+                "name": "<category_name>",
+                "description": "<category_description>",
+                "is_standard": false
+            }
+
+        Error Responses:
+            400: Invalid request data or duplicate name
+            403: Only HR can create categories
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response(
@@ -205,34 +160,49 @@ class KRACategoryListCreateView(APIView):
         )
 
         _audit(request, "CATEGORY_CREATED", "KRACategory", cat.id,
-               new_data=_category_dict(cat))
+               new_data=KRACategorySerializer(cat).data)
 
-        return Response(_category_dict(cat), status=status.HTTP_201_CREATED)
+        return Response(KRACategorySerializer(cat).data, status=status.HTTP_201_CREATED)
 
 
 class KRACategoryDetailView(APIView):
-    """
-    GET    /api/v1/kra/categories/{category_id}  – retrieve
-    PUT    /api/v1/kra/categories/{category_id}  – full update  (HR only)
-    PATCH  /api/v1/kra/categories/{category_id}  – partial update (HR only)
-    DELETE /api/v1/kra/categories/{category_id}  – delete (HR only)
-
-    DELETE is blocked if any KRA or KRALevel still references this category.
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, category_id):
-        cat = get_object_or_404(KRACategory, id=category_id)
-        return Response(_category_dict(cat), status=status.HTTP_200_OK)
+    def get(self, request: Request, category_id: int) -> Response:
+        """
+        API view to retrieve a category by ID.
 
-    def _update(self, request, category_id, partial=False):
+        Endpoint: GET /api/v1/kra/categories/<category_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<category_name>",
+                "description": "<category_description>",
+                "is_standard": false
+            }
+
+        Error Responses:
+            404: Category not found
+            401: Unauthorized
+        """
+        cat = get_object_or_404(KRACategory, id=category_id)
+        return Response(KRACategorySerializer(cat).data, status=status.HTTP_200_OK)
+
+    def _update(self, request: Request, category_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can update categories"},
                             status=status.HTTP_403_FORBIDDEN)
 
         cat      = get_object_or_404(KRACategory, id=category_id)
-        old_data = _category_dict(cat)
+        old_data = KRACategorySerializer(cat).data
         data     = request.data
 
         name = data.get("name", "").strip() if not partial else data.get("name", cat.name or "").strip()
@@ -260,17 +230,97 @@ class KRACategoryDetailView(APIView):
         cat.save()
 
         _audit(request, "CATEGORY_UPDATED", "KRACategory", cat.id,
-               old_data=old_data, new_data=_category_dict(cat))
+               old_data=old_data, new_data=KRACategorySerializer(cat).data)
 
-        return Response(_category_dict(cat), status=status.HTTP_200_OK)
+        return Response(KRACategorySerializer(cat).data, status=status.HTTP_200_OK)
 
-    def put(self, request, category_id):
+    def put(self, request: Request, category_id: int) -> Response:
+        """
+        API view to fully update a category.
+
+        Endpoint: PUT /api/v1/kra/categories/<category_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<category_name>",
+                "description": "<category_description>",
+                "is_standard": false
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<category_name>",
+                "description": "<category_description>",
+                "is_standard": false
+            }
+
+        Error Responses:
+            400: Name is required or duplicate name exists
+            403: Only HR can update categories
+            404: Category not found
+            401: Unauthorized
+        """
         return self._update(request, category_id, partial=False)
 
-    def patch(self, request, category_id):
+    def patch(self, request: Request, category_id: int) -> Response:
+        """
+        API view to partially update a category.
+
+        Endpoint: PATCH /api/v1/kra/categories/<category_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<category_name>",
+                "description": "<category_description>",
+                "is_standard": false
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<category_name>",
+                "description": "<category_description>",
+                "is_standard": false
+            }
+
+        Error Responses:
+            400: Duplicate name exists
+            403: Only HR can update categories
+            404: Category not found
+            401: Unauthorized
+        """
         return self._update(request, category_id, partial=True)
 
-    def delete(self, request, category_id):
+    def delete(self, request: Request, category_id: int) -> Response:
+        """
+        API view to delete a category.
+
+        Endpoint: DELETE /api/v1/kra/categories/<category_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "message": "Category '<category_name>' and all related KRAs deleted successfully"
+            }
+
+        Error Responses:
+            403: Only HR can delete categories
+            409: Cannot delete - category contains KRAs assigned to employees
+            404: Category not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
 
         if not _is_hr(caller):
@@ -324,7 +374,7 @@ class KRACategoryDetailView(APIView):
                     "CATEGORY_DELETED",
                     "KRACategory",
                     cat.id,
-                    old_data=_category_dict(cat),
+                    old_data=KRACategorySerializer(cat).data,
                 )
                 cat.delete()
 
@@ -345,16 +395,37 @@ class KRACategoryDetailView(APIView):
 
 
 class KRACategoryCloneView(APIView):
-    """
-    POST /api/v1/kra/categories/{category_id}/clone
-    Clones the category with a new name.
-
-    Body (all optional):
-        { "name": "New Name" }      – defaults to "<original> (Copy)"
-    """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, category_id):
+    def post(self, request: Request, category_id: int) -> Response:
+        """
+        API view to clone a category.
+
+        Endpoint: POST /api/v1/kra/categories/<category_id>/clone
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<new_cloned_name>"
+            }
+
+        Response (201):
+            {
+                "cloned_from": 1,
+                "id": 2,
+                "name": "<new_cloned_name>",
+                "description": "<source_description>",
+                "is_standard": false
+            }
+
+        Error Responses:
+            400: Duplicate name exists
+            403: Only HR can clone categories
+            404: Category not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can clone categories"},
@@ -376,10 +447,10 @@ class KRACategoryCloneView(APIView):
         )
 
         _audit(request, "CATEGORY_CLONED", "KRACategory", clone.id,
-               new_data={"cloned_from": source.id, **_category_dict(clone)})
+               new_data={"cloned_from": source.id, **KRACategorySerializer(clone).data})
 
         return Response(
-            {"cloned_from": source.id, **_category_dict(clone)},
+            {"cloned_from": source.id, **KRACategorySerializer(clone).data},
             status=status.HTTP_201_CREATED,
         )
 
@@ -388,16 +459,36 @@ class KRACategoryCloneView(APIView):
 # LEVEL
 
 class LevelListCreateView(APIView):
-    """
-    GET  /api/v1/levels   – list all levels
-    POST /api/v1/levels   – create a level (HR only)
-
-    GET query params:
-        search=<text>     – partial match on name
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
+        """
+        API view to list all levels.
+
+        Endpoint: GET /api/v1/levels
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "levels": [
+                    {
+                        "id": 1,
+                        "name": "Dev-01",
+                        "description": "...",
+                        "min_experience": 0,
+                        "max_experience": 2
+                    }
+                ]
+            }
+
+        Error Responses:
+            401: Unauthorized
+        """
         qs = Level.objects.all()
 
         search = request.query_params.get("search")
@@ -405,11 +496,41 @@ class LevelListCreateView(APIView):
             qs = qs.filter(name__icontains=search)
 
         return Response(
-            {"levels": [_level_dict(l) for l in qs]},
+            {"levels": LevelSerializer(qs, many=True).data},
             status=status.HTTP_200_OK,
         )
 
-    def post(self, request):
+    def post(self, request: Request) -> Response:
+        """
+        API view to create a level.
+
+        Endpoint: POST /api/v1/levels
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<level_name>",
+                "description": "<level_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Response (201):
+            {
+                "id": 1,
+                "name": "<level_name>",
+                "description": "<level_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Error Responses:
+            400: Name is required, duplicate level name, or invalid experience range
+            403: Only HR can create levels
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can create levels"},
@@ -445,34 +566,50 @@ class LevelListCreateView(APIView):
         )
 
         _audit(request, "LEVEL_CREATED", "Level", lvl.id,
-               new_data=_level_dict(lvl))
+               new_data=LevelSerializer(lvl).data)
 
-        return Response(_level_dict(lvl), status=status.HTTP_201_CREATED)
+        return Response(LevelSerializer(lvl).data, status=status.HTTP_201_CREATED)
 
 
 class LevelDetailView(APIView):
-    """
-    GET    /api/v1/levels/{level_id}   – retrieve
-    PUT    /api/v1/levels/{level_id}   – full update   (HR only)
-    PATCH  /api/v1/levels/{level_id}   – partial update (HR only)
-    DELETE /api/v1/levels/{level_id}   – delete (HR only)
-
-    DELETE is blocked if employees or KRA levels still reference this level.
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, level_id):
-        lvl = get_object_or_404(Level, id=level_id)
-        return Response(_level_dict(lvl), status=status.HTTP_200_OK)
+    def get(self, request: Request, level_id: int) -> Response:
+        """
+        API view to retrieve a level.
 
-    def _update(self, request, level_id, partial=False):
+        Endpoint: GET /api/v1/levels/<level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<level_name>",
+                "description": "<level_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Error Responses:
+            404: Level not found
+            401: Unauthorized
+        """
+        lvl = get_object_or_404(Level, id=level_id)
+        return Response(LevelSerializer(lvl).data, status=status.HTTP_200_OK)
+
+    def _update(self, request: Request, level_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can update levels"},
                             status=status.HTTP_403_FORBIDDEN)
 
         lvl      = get_object_or_404(Level, id=level_id)
-        old_data = _level_dict(lvl)
+        old_data = LevelSerializer(lvl).data
         data     = request.data
 
         name = data.get("name", lvl.name or "").strip()
@@ -508,17 +645,101 @@ class LevelDetailView(APIView):
         lvl.save()
 
         _audit(request, "LEVEL_UPDATED", "Level", lvl.id,
-               old_data=old_data, new_data=_level_dict(lvl))
+               old_data=old_data, new_data=LevelSerializer(lvl).data)
 
-        return Response(_level_dict(lvl), status=status.HTTP_200_OK)
+        return Response(LevelSerializer(lvl).data, status=status.HTTP_200_OK)
 
-    def put(self, request, level_id):
+    def put(self, request: Request, level_id: int) -> Response:
+        """
+        API view to fully update a level.
+
+        Endpoint: PUT /api/v1/levels/<level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<level_name>",
+                "description": "<level_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<level_name>",
+                "description": "<level_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Error Responses:
+            400: Name is required, duplicate name, or invalid experience range
+            403: Only HR can update levels
+            404: Level not found
+            401: Unauthorized
+        """
         return self._update(request, level_id, partial=False)
 
-    def patch(self, request, level_id):
+    def patch(self, request: Request, level_id: int) -> Response:
+        """
+        API view to partially update a level.
+
+        Endpoint: PATCH /api/v1/levels/<level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<level_name>",
+                "description": "<level_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<level_name>",
+                "description": "<level_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Error Responses:
+            400: Duplicate name or invalid experience range
+            403: Only HR can update levels
+            404: Level not found
+            401: Unauthorized
+        """
         return self._update(request, level_id, partial=True)
 
-    def delete(self, request, level_id):
+    def delete(self, request: Request, level_id: int) -> Response:
+        """
+        API view to delete a level.
+
+        Endpoint: DELETE /api/v1/levels/<level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "message": "Level '<level_name>' deleted successfully"
+            }
+
+        Error Responses:
+            400: Cannot delete level - it is still in use
+            403: Only HR can delete levels
+            404: Level not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can delete levels"},
@@ -543,7 +764,7 @@ class LevelDetailView(APIView):
             )
 
         _audit(request, "LEVEL_DELETED", "Level", lvl.id,
-               old_data=_level_dict(lvl))
+               old_data=LevelSerializer(lvl).data)
         lvl.delete()
 
         return Response(
@@ -553,20 +774,40 @@ class LevelDetailView(APIView):
 
 
 class LevelCloneView(APIView):
-    """
-    POST /api/v1/levels/{level_id}/clone
-    Clones a level (does NOT copy employee assignments or KRALevel rows).
-
-    Body (all optional):
-        {
-            "name":           "Dev-03",
-            "min_experience": 5,
-            "max_experience": 8
-        }
-    """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, level_id):
+    def post(self, request: Request, level_id: int) -> Response:
+        """
+        API view to clone a level.
+
+        Endpoint: POST /api/v1/levels/<level_id>/clone
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<new_cloned_name>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Response (201):
+            {
+                "cloned_from": 1,
+                "id": 2,
+                "name": "<new_cloned_name>",
+                "description": "<source_description>",
+                "min_experience": 0,
+                "max_experience": 2
+            }
+
+        Error Responses:
+            400: Duplicate name exists
+            403: Only HR can clone levels
+            404: Level not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can clone levels"},
@@ -589,10 +830,10 @@ class LevelCloneView(APIView):
         )
 
         _audit(request, "LEVEL_CLONED", "Level", clone.id,
-               new_data={"cloned_from": source.id, **_level_dict(clone)})
+               new_data={"cloned_from": source.id, **LevelSerializer(clone).data})
 
         return Response(
-            {"cloned_from": source.id, **_level_dict(clone)},
+            {"cloned_from": source.id, **LevelSerializer(clone).data},
             status=status.HTTP_201_CREATED,
         )
 
@@ -601,39 +842,48 @@ class LevelCloneView(APIView):
 # KRA  (parent record)
 
 class KRALibraryListCreateView(APIView):
-    """
-    GET  /api/v1/kra/library               – list all KRAs with their level variants
-    POST /api/v1/kra/library               – create a KRA + its KRALevel rows (HR only)
-
-    GET query params:
-        category_id=<int>
-        level_id=<int>
-        is_standard=true|false
-        search=<text>
-
-    POST body:
-        {
-            "name":        "Own the implementation of a feature",
-            "description": "...",
-            "is_standard": false,
-            "category_id": 1,
-            "levels": [
-                {
-                    "level_id":    1,
-                    "name":        "Dev-01 specific description",
-                    "category_id": 1        ← optional, inherits from KRA if omitted
-                },
-                {
-                    "level_id":    2,
-                    "name":        "Dev-02 specific description",
-                    "category_id": 1
-                }
-            ]
-        }
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
+        """
+        API view to list all KRAs with level variants.
+
+        Endpoint: GET /api/v1/kra/library_kra
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "kras": [
+                    {
+                        "id": 1,
+                        "name": "KRA name",
+                        "description": "...",
+                        "is_standard": true,
+                        "category_id": 1,
+                        "category_name": "...",
+                        "levels": [
+                            {
+                                "id": 1,
+                                "kra_id": 1,
+                                "level_id": 1,
+                                "level_name": "Dev-01",
+                                "name": "Dev-01 specific desc",
+                                "category_id": 1,
+                                "category_name": "..."
+                            }
+                        ]
+                    }
+                ]
+            }
+
+        Error Responses:
+            401: Unauthorized
+        """
         qs = KRA.objects.select_related("category").prefetch_related(
             "kra_levels__level", "kra_levels__category"
         )
@@ -653,11 +903,60 @@ class KRALibraryListCreateView(APIView):
             qs = qs.filter(name__icontains=search)
 
         return Response(
-            {"kras": [_kra_dict(k) for k in qs]},
+            {"kras": KRASerializer(qs, many=True).data},
             status=status.HTTP_200_OK,
         )
 
-    def post(self, request):
+    def post(self, request: Request) -> Response:
+        """
+        API view to create a KRA and its level variants.
+
+        Endpoint: POST /api/v1/kra/library_kra
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<kra_name>",
+                "description": "<description>",
+                "is_standard": true,
+                "category_id": 1,
+                "levels": [
+                    {
+                        "level_id": 1,
+                        "name": "Level-specific name",
+                        "category_id": 1
+                    }
+                ]
+            }
+
+        Response (201):
+            {
+                "id": 1,
+                "name": "<kra_name>",
+                "description": "<description>",
+                "is_standard": true,
+                "category_id": 1,
+                "category_name": "...",
+                "levels": [
+                    {
+                        "id": 1,
+                        "kra_id": 1,
+                        "level_id": 1,
+                        "level_name": "Dev-01",
+                        "name": "Level-specific name",
+                        "category_id": 1,
+                        "category_name": "..."
+                    }
+                ]
+            }
+
+        Error Responses:
+            400: Name is required, category_id does not exist, or invalid level_id/category_id in level variants
+            403: Only HR can create KRAs
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can create KRAs"},
@@ -721,84 +1020,190 @@ class KRALibraryListCreateView(APIView):
                     category_id=l.get("category_id") or category_id,
                 )
 
-        _audit(request, "KRA_CREATED", "KRA", kra.id,
-               new_data={**_kra_dict(kra), "levels_created": len(levels_data)})
-
-        # Re-fetch with prefetch to return complete response
         kra.refresh_from_db()
-        return Response(_kra_dict(kra), status=status.HTTP_201_CREATED)
+        _audit(request, "KRA_CREATED", "KRA", kra.id,
+               new_data={**KRASerializer(kra).data, "levels_created": len(levels_data)})
+
+        return Response(KRASerializer(kra).data, status=status.HTTP_201_CREATED)
 
 
 class KRADetailView(APIView):
-    """
-    GET    /api/v1/kra/library/{kra_id}   – retrieve KRA + all its level variants
-    PUT    /api/v1/kra/library/{kra_id}   – full update (HR only)
-    PATCH  /api/v1/kra/library/{kra_id}   – partial update (HR only)
-    DELETE /api/v1/kra/library/{kra_id}   – delete KRA + all KRALevel rows (HR only)
-
-    PUT/PATCH only updates the KRA parent fields (name, description, category, is_standard).
-    To manage individual KRALevel rows use the /levels sub-endpoints.
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, kra_id):
+    def get(self, request: Request, kra_id: int) -> Response:
+        """
+        API view to retrieve a KRA with level variants.
+
+        Endpoint: GET /api/v1/kra/library_kra/<kra_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<kra_name>",
+                "description": "<description>",
+                "is_standard": true,
+                "category_id": 1,
+                "category_name": "...",
+                "levels": [
+                    {
+                        "id": 1,
+                        "kra_id": 1,
+                        "level_id": 1,
+                        "level_name": "Dev-01",
+                        "name": "Level-specific name",
+                        "category_id": 1,
+                        "category_name": "..."
+                    }
+                ]
+            }
+
+        Error Responses:
+            404: KRA not found
+            401: Unauthorized
+        """
         kra = get_object_or_404(
             KRA.objects.select_related("category").prefetch_related(
                 "kra_levels__level", "kra_levels__category"
             ),
             id=kra_id,
         )
-        return Response(_kra_dict(kra), status=status.HTTP_200_OK)
-    def put(self, request, kra_id):
+        return Response(KRASerializer(kra).data, status=status.HTTP_200_OK)
+
+    def put(self, request: Request, kra_id: int) -> Response:
+        """
+        API view to fully update a KRA and its level variants.
+
+        Endpoint: PUT /api/v1/kra/library_kra/<kra_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<kra_name>",
+                "description": "<description>",
+                "is_standard": true,
+                "category_id": 1,
+                "levels": [
+                    {
+                        "level_id": 1,
+                        "name": "Level-specific name",
+                        "category_id": 1
+                    }
+                ]
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<kra_name>",
+                "description": "<description>",
+                "is_standard": true,
+                "category_id": 1,
+                "category_name": "...",
+                "levels": [
+                    {
+                        "id": 1,
+                        "kra_id": 1,
+                        "level_id": 1,
+                        "level_name": "Dev-01",
+                        "name": "Level-specific name",
+                        "category_id": 1,
+                        "category_name": "..."
+                    }
+                ]
+            }
+
+        Error Responses:
+            400: Name is required, category_id does not exist, invalid level/category in variants, or active variant removal block
+            403: Only HR can update KRAs
+            404: KRA not found
+            401: Unauthorized
+        """
         return self._update(request, kra_id, partial=False)
 
-    def patch(self, request, kra_id):
+    def patch(self, request: Request, kra_id: int) -> Response:
+        """
+        API view to partially update a KRA and its level variants.
+
+        Endpoint: PATCH /api/v1/kra/library_kra/<kra_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<kra_name>",
+                "description": "<description>",
+                "is_standard": true,
+                "category_id": 1,
+                "levels": [
+                    {
+                        "level_id": 1,
+                        "name": "Level-specific name",
+                        "category_id": 1
+                    }
+                ]
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "name": "<kra_name>",
+                "description": "<description>",
+                "is_standard": true,
+                "category_id": 1,
+                "category_name": "...",
+                "levels": [
+                    {
+                        "id": 1,
+                        "kra_id": 1,
+                        "level_id": 1,
+                        "level_name": "Dev-01",
+                        "name": "Level-specific name",
+                        "category_id": 1,
+                        "category_name": "..."
+                    }
+                ]
+            }
+
+        Error Responses:
+            400: Category_id does not exist, invalid level/category in variants, or active variant removal block
+            403: Only HR can update KRAs
+            404: KRA not found
+            401: Unauthorized
+        """
         return self._update(request, kra_id, partial=True)
 
-    # def _update(self, request, kra_id, partial=False):
-    #     caller = _get_caller(request)
-    #     if not _is_hr(caller):
-    #         return Response({"error": "Only HR can update KRAs"},
-    #                         status=status.HTTP_403_FORBIDDEN)
+    def delete(self, request: Request, kra_id: int) -> Response:
+        """
+        API view to delete a KRA.
 
-    #     kra      = get_object_or_404(KRA, id=kra_id)
-    #     old_data = _kra_dict(kra, include_levels=False)
-    #     data     = request.data
+        Endpoint: DELETE /api/v1/kra/library_kra/<kra_id>
 
-    #     name = data.get("name", kra.name or "").strip()
-    #     if not partial and not name:
-    #         return Response({"error": "name is required"},
-    #                         status=status.HTTP_400_BAD_REQUEST)
+        Request Headers:
+            Authorization: Required
 
-    #     if "category_id" in data and data["category_id"]:
-    #         if not KRACategory.objects.filter(id=data["category_id"]).exists():
-    #             return Response(
-    #                 {"error": f"category_id {data['category_id']} does not exist"},
-    #                 status=status.HTTP_400_BAD_REQUEST,
-    #             )
-    #         kra.category_id = data["category_id"]
+        Request Body:
+            None
 
-    #     if name:
-    #         kra.name = name
-    #     if "description" in data:
-    #         kra.description = data["description"]
-    #     if "is_standard" in data:
-    #         kra.is_standard = data["is_standard"]
+        Response (200):
+            {
+                "message": "KRA and all its level variants deleted successfully"
+            }
 
-    #     kra.save()
-
-    #     _audit(request, "KRA_UPDATED", "KRA", kra.id,
-    #            old_data=old_data, new_data=_kra_dict(kra, include_levels=False))
-
-    #     return Response(_kra_dict(kra), status=status.HTTP_200_OK)
-
-    # def put(self, request, kra_id):
-    #     return self._update(request, kra_id, partial=False)
-
-    # def patch(self, request, kra_id):
-    #     return self._update(request, kra_id, partial=True)
-
-    def delete(self, request, kra_id):
+        Error Responses:
+            403: Only HR can delete KRAs
+            409: Cannot delete - KRA's level variants are assigned to employees
+            404: KRA not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can delete KRAs"},
@@ -821,7 +1226,7 @@ class KRADetailView(APIView):
             )
 
         _audit(request, "KRA_DELETED", "KRA", kra.id,
-               old_data=_kra_dict(kra))
+               old_data=KRASerializer(kra).data)
 
         with transaction.atomic():
             kra.kra_levels.all().delete()   # cascade via related_name
@@ -832,14 +1237,14 @@ class KRADetailView(APIView):
             status=status.HTTP_200_OK,
         )
         
-    def _update(self, request, kra_id, partial=False):
+    def _update(self, request: Request, kra_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can update KRAs"},
                             status=status.HTTP_403_FORBIDDEN)
 
         kra      = get_object_or_404(KRA, id=kra_id)
-        old_data = _kra_dict(kra)
+        old_data = KRASerializer(kra).data
         data     = request.data
 
         #  Parent KRA fields 
@@ -936,26 +1341,48 @@ class KRADetailView(APIView):
             kra.save()
 
         _audit(request, "KRA_UPDATED", "KRA", kra.id,
-            old_data=old_data, new_data=_kra_dict(kra))
+            old_data=old_data, new_data=KRASerializer(kra).data)
 
         kra.refresh_from_db()
-        return Response(_kra_dict(kra), status=status.HTTP_200_OK)
+        return Response(KRASerializer(kra).data, status=status.HTTP_200_OK)
 
 
 class KRACloneView(APIView):
-    """
-    POST /api/v1/kra/library/{kra_id}/clone
-    Deep-clones a KRA: creates a new KRA row AND clones all its KRALevel rows.
-
-    Body (all optional):
-        {
-            "name":        "Cloned KRA name",       ← defaults to "<original> (Copy)"
-            "category_id": 2                         ← override category if needed
-        }
-    """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, kra_id):
+    def post(self, request: Request, kra_id: int) -> Response:
+        """
+        API view to clone a KRA and its level variants.
+
+        Endpoint: POST /api/v1/kra/library_kra/<kra_id>/clone
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "<new_cloned_name>",
+                "category_id": 1
+            }
+
+        Response (201):
+            {
+                "cloned_from": 1,
+                "id": 2,
+                "name": "<new_cloned_name>",
+                "description": "<source_description>",
+                "is_standard": true,
+                "category_id": 1,
+                "category_name": "...",
+                "levels": [...]
+            }
+
+        Error Responses:
+            400: Category_id does not exist
+            403: Only HR can clone KRAs
+            404: KRA not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can clone KRAs"},
@@ -995,12 +1422,12 @@ class KRACloneView(APIView):
                new_data={
                    "cloned_from":   source.id,
                    "levels_cloned": len(source_levels),
-                   **_kra_dict(clone, include_levels=False),
+                   **KRASerializer(clone, context={'include_levels': False}).data,
                })
 
         clone.refresh_from_db()
         return Response(
-            {"cloned_from": source.id, **_kra_dict(clone)},
+            {"cloned_from": source.id, **KRASerializer(clone).data},
             status=status.HTTP_201_CREATED,
         )
 
@@ -1010,28 +1437,80 @@ class KRACloneView(APIView):
 
 
 class KRALevelListCreateView(APIView):
-    """
-    GET  /api/v1/kra/library/{kra_id}/levels       – list all variants for a KRA
-    POST /api/v1/kra/library/{kra_id}/levels       – add a new level variant (HR only)
-
-    POST body:
-        {
-            "level_id":    2,
-            "name":        "Dev-02 specific description",
-            "category_id": 1       ← optional, inherits from KRA if omitted
-        }
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, kra_id):
+    def get(self, request: Request, kra_id: int) -> Response:
+        """
+        API view to list all level variants for a specific KRA.
+
+        Endpoint: GET /api/v1/kra/library/<kra_id>/levels
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "kra_id": 1,
+                "levels": [
+                    {
+                        "id": 1,
+                        "kra_id": 1,
+                        "level_id": 1,
+                        "level_name": "Dev-01",
+                        "name": "Level variant name",
+                        "category_id": 1,
+                        "category_name": "..."
+                    }
+                ]
+            }
+
+        Error Responses:
+            404: KRA not found
+            401: Unauthorized
+        """
         kra = get_object_or_404(KRA, id=kra_id)
         levels = kra.kra_levels.select_related("level", "category").all()
         return Response(
-            {"kra_id": kra_id, "levels": [_kra_level_dict(kl) for kl in levels]},
+            {"kra_id": kra_id, "levels": KRALevelSerializer(levels, many=True).data},
             status=status.HTTP_200_OK,
         )
 
-    def post(self, request, kra_id):
+    def post(self, request: Request, kra_id: int) -> Response:
+        """
+        API view to add a new level variant to a KRA.
+
+        Endpoint: POST /api/v1/kra/library/<kra_id>/levels
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "level_id": 1,
+                "name": "Dev-01 specific name",
+                "category_id": 1
+            }
+
+        Response (201):
+            {
+                "id": 1,
+                "kra_id": 1,
+                "level_id": 1,
+                "level_name": "Dev-01",
+                "name": "Dev-01 specific name",
+                "category_id": 1,
+                "category_name": "..."
+            }
+
+        Error Responses:
+            400: level_id is required, level_id does not exist, category_id does not exist, or variant already exists
+            403: Only HR can add KRA level variants
+            404: KRA not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can add KRA level variants"},
@@ -1073,40 +1552,58 @@ class KRALevelListCreateView(APIView):
         )
 
         _audit(request, "KRA_LEVEL_CREATED", "KRALevel", kl.id,
-               new_data=_kra_level_dict(kl))
+               new_data=KRALevelSerializer(kl).data)
 
-        return Response(_kra_level_dict(kl), status=status.HTTP_201_CREATED)
+        return Response(KRALevelSerializer(kl).data, status=status.HTTP_201_CREATED)
 
 
 class KRALevelDetailView(APIView):
-    """
-    GET    /api/v1/kra/library/{kra_id}/levels/{kra_level_id}  – retrieve
-    PUT    /api/v1/kra/library/{kra_id}/levels/{kra_level_id}  – full update   (HR only)
-    PATCH  /api/v1/kra/library/{kra_id}/levels/{kra_level_id}  – partial update (HR only)
-    DELETE /api/v1/kra/library/{kra_id}/levels/{kra_level_id}  – delete (HR only)
-
-    DELETE is blocked if the KRALevel is currently assigned to any employee.
-    """
     permission_classes = [IsAuthenticated]
 
-    def _get_kra_level(self, kra_id, kra_level_id):
+    def _get_kra_level(self, kra_id: int, kra_level_id: int) -> KRALevel:
         return get_object_or_404(
             KRALevel.objects.select_related("level", "category"),
             id=kra_level_id, kra_id=kra_id,
         )
 
-    def get(self, request, kra_id, kra_level_id):
-        kl = self._get_kra_level(kra_id, kra_level_id)
-        return Response(_kra_level_dict(kl), status=status.HTTP_200_OK)
+    def get(self, request: Request, kra_id: int, kra_level_id: int) -> Response:
+        """
+        API view to retrieve a specific KRA level variant.
 
-    def _update(self, request, kra_id, kra_level_id, partial=False):
+        Endpoint: GET /api/v1/kra/library/<kra_id>/levels/<kra_level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "id": 1,
+                "kra_id": 1,
+                "level_id": 1,
+                "level_name": "Dev-01",
+                "name": "Dev-01 specific name",
+                "category_id": 1,
+                "category_name": "..."
+            }
+
+        Error Responses:
+            404: KRA level variant not found
+            401: Unauthorized
+        """
+        kl = self._get_kra_level(kra_id, kra_level_id)
+        return Response(KRALevelSerializer(kl).data, status=status.HTTP_200_OK)
+
+    def _update(self, request: Request, kra_id: int, kra_level_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can update KRA level variants"},
                             status=status.HTTP_403_FORBIDDEN)
 
         kl       = self._get_kra_level(kra_id, kra_level_id)
-        old_data = _kra_level_dict(kl)
+        old_data = KRALevelSerializer(kl).data
         data     = request.data
 
         new_level_id = data.get("level_id")
@@ -1139,17 +1636,103 @@ class KRALevelDetailView(APIView):
         kl.save()
 
         _audit(request, "KRA_LEVEL_UPDATED", "KRALevel", kl.id,
-               old_data=old_data, new_data=_kra_level_dict(kl))
+               old_data=old_data, new_data=KRALevelSerializer(kl).data)
 
-        return Response(_kra_level_dict(kl), status=status.HTTP_200_OK)
+        return Response(KRALevelSerializer(kl).data, status=status.HTTP_200_OK)
 
-    def put(self, request, kra_id, kra_level_id):
+    def put(self, request: Request, kra_id: int, kra_level_id: int) -> Response:
+        """
+        API view to fully update a specific KRA level variant.
+
+        Endpoint: PUT /api/v1/kra/library/<kra_id>/levels/<kra_level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "level_id": 1,
+                "name": "Dev-01 specific name",
+                "category_id": 1
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "kra_id": 1,
+                "level_id": 1,
+                "level_name": "Dev-01",
+                "name": "Dev-01 specific name",
+                "category_id": 1,
+                "category_name": "..."
+            }
+
+        Error Responses:
+            400: level_id does not exist, category_id does not exist, or variant already exists on this level
+            403: Only HR can update KRA level variants
+            404: KRA level variant not found
+            401: Unauthorized
+        """
         return self._update(request, kra_id, kra_level_id, partial=False)
 
-    def patch(self, request, kra_id, kra_level_id):
+    def patch(self, request: Request, kra_id: int, kra_level_id: int) -> Response:
+        """
+        API view to partially update a specific KRA level variant.
+
+        Endpoint: PATCH /api/v1/kra/library/<kra_id>/levels/<kra_level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "level_id": 1,
+                "name": "Dev-01 specific name",
+                "category_id": 1
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "kra_id": 1,
+                "level_id": 1,
+                "level_name": "Dev-01",
+                "name": "Dev-01 specific name",
+                "category_id": 1,
+                "category_name": "..."
+            }
+
+        Error Responses:
+            400: level_id does not exist, category_id does not exist, or variant already exists on this level
+            403: Only HR can update KRA level variants
+            404: KRA level variant not found
+            401: Unauthorized
+        """
         return self._update(request, kra_id, kra_level_id, partial=True)
 
-    def delete(self, request, kra_id, kra_level_id):
+    def delete(self, request: Request, kra_id: int, kra_level_id: int) -> Response:
+        """
+        API view to delete a KRA level variant.
+
+        Endpoint: DELETE /api/v1/kra/library/<kra_id>/levels/<kra_level_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "message": "KRA level variant deleted successfully"
+            }
+
+        Error Responses:
+            400: Cannot delete - variant is assigned to employees
+            403: Only HR can delete KRA level variants
+            404: KRA level variant not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can delete KRA level variants"},
@@ -1168,7 +1751,7 @@ class KRALevelDetailView(APIView):
             )
 
         _audit(request, "KRA_LEVEL_DELETED", "KRALevel", kl.id,
-               old_data=_kra_level_dict(kl))
+               old_data=KRALevelSerializer(kl).data)
         kl.delete()
 
         return Response(
@@ -1178,28 +1761,45 @@ class KRALevelDetailView(APIView):
 
 
 class KRALevelCloneView(APIView):
-    """
-    POST /api/v1/kra/library/{kra_id}/levels/{kra_level_id}/clone
-
-    Two sub-modes:
-
-    1. Clone within the same KRA onto a different level:
-        { "level_id": 3 }
-
-    2. Clone onto a completely different KRA (and optionally a different level):
-        { "target_kra_id": 15, "level_id": 2 }
-
-    Body:
-        {
-            "level_id":     <int>,          required
-            "target_kra_id": <int>,         optional — defaults to same KRA
-            "name":         "...",          optional — defaults to source name
-            "category_id":  <int>           optional — defaults to source category
-        }
-    """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, kra_id, kra_level_id):
+    def post(self, request: Request, kra_id: int, kra_level_id: int) -> Response:
+        """
+        API view to clone a KRA level variant.
+
+        Endpoint: POST /api/v1/kra/library/<kra_id>/levels/<kra_level_id>/clone
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "level_id": 1,
+                "target_kra_id": 1,
+                "name": "Dev-01 specific name",
+                "category_id": 1
+            }
+
+        Response (201):
+            {
+                "cloned_from": 1,
+                "source_kra_id": 1,
+                "target_kra_id": 1,
+                "id": 2,
+                "kra_id": 1,
+                "level_id": 1,
+                "level_name": "Dev-01",
+                "name": "Dev-01 specific name",
+                "category_id": 1,
+                "category_name": "..."
+            }
+
+        Error Responses:
+            400: level_id is required/does not exist, target_kra_id does not exist, category_id does not exist, or variant already exists
+            403: Only HR can clone KRA level variants
+            404: KRA level variant not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response({"error": "Only HR can clone KRA level variants"},
@@ -1255,7 +1855,7 @@ class KRALevelCloneView(APIView):
                    "cloned_from_kra_level_id": source.id,
                    "source_kra_id":  kra_id,
                    "target_kra_id":  target_kra_id,
-                   **_kra_level_dict(clone),
+                   **KRALevelSerializer(clone).data,
                })
 
         return Response(
@@ -1263,7 +1863,7 @@ class KRALevelCloneView(APIView):
                 "cloned_from": source.id,
                 "source_kra_id": kra_id,
                 "target_kra_id": target_kra_id,
-                **_kra_level_dict(clone),
+                **KRALevelSerializer(clone).data,
             },
             status=status.HTTP_201_CREATED,
         )
