@@ -1,16 +1,38 @@
-from django.shortcuts import render
+"""
+File: views.py
+App: kra_lead_view
 
-# Create your views here.
+Purpose:
+    Handles HTTP request/response lifecycle for lead-facing KRA assessment endpoints.
+
+Includes:
+    - API views for viewing employee KRA progress, submitting lead reviews,
+      and updating KRA descriptions
+
+Responsibilities:
+    - Orchestrate request flow
+    - Delegate validation to serializers
+    - Handle errors gracefully and return consistent responses
+
+Notes:
+    - Keep views thin — no heavy business logic here
+    - Identity source is Employee (hrflow_employee), not User (hrflow_users)
+    - HR users can view all employees; Leads see only their direct reports
+    - Audit logging is performed via _audit() for all mutating operations
+"""
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Prefetch
 from django.core.paginator import Paginator
 
+from typing import Any
 
 from kra_cycle.models import (
     Employee,
@@ -29,12 +51,32 @@ from kra_cycle.models import (
 )
 
 from utils import _get_caller, _is_hr, _is_lead, _caller_can_act_on, _audit
+from .serializers import LeadReviewSerializer, LeadDescriptionSerializer
 
 
 class AssessmentProgressView(APIView):
+    """
+    Returns paginated KRA assessment progress for all employees in a given cycle.
+
+    GET /api/v1/kra/cycles/<cycle_id>/progress
+
+    Access:
+        - HR / Vertical Lead → all enrolled employees in the cycle
+        - Lead / Manager     → only employees whose manager_id = caller.id
+
+    Query Parameters:
+        employee_id (int, optional): Filter to a single employee's record.
+        page (int, optional): Page number for pagination. Defaults to 1.
+        per_page (int, optional): Records per page. Defaults to 20.
+
+    Returns:
+        Paginated list of employees with their KRA rows, ratings, comments,
+        category weightages, and cycle-level stage dates.
+    """
+
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, cycle_id):
+    def get(self, request: Request, cycle_id: int) -> Response:
         caller = _get_caller(request)
         employee_id_filter = request.query_params.get("employee_id")
 
@@ -52,7 +94,7 @@ class AssessmentProgressView(APIView):
                     "kra_level_rows",
                     queryset=EmployeeKRALevel.objects.select_related(
                         "kra_level",
-                        "kra_level__kra",  # ← ADD THIS
+                        "kra_level__kra",
                         "kra_level__kra__category",
                         "kra_level__category",
                         "self_rating",
@@ -74,8 +116,8 @@ class AssessmentProgressView(APIView):
                 )
 
         # Pre-fetch category weightages for all ekc ids in one query
-        ekc_ids = [ekc.id for ekc in ekc_qs]
-        category_map = {}  # ekc_id → { category_id: weightage }
+        ekc_ids: list[int] = [ekc.id for ekc in ekc_qs]
+        category_map: dict[int, dict[int, dict[str, Any]]] = {}  # ekc_id → { category_id: {name, weightage} }
         for cat in EmployeeKRACycleCategory.objects.filter(
             employee_kra_cycle_id__in=ekc_ids
         ).select_related("category"):
@@ -84,7 +126,7 @@ class AssessmentProgressView(APIView):
                 "weightage": cat.weightage,
             }
 
-        employees = []
+        employees: list[dict[str, Any]] = []
         for ekc in ekc_qs:
             cats = category_map.get(ekc.id, {})
             kra_rows = ekc.kra_level_rows.all()
@@ -92,7 +134,7 @@ class AssessmentProgressView(APIView):
             kras = [
                 {
                     "employee_kra_level_id": r.id,
-                    "kra_id": r.kra_level.kra_id if r.kra_level else None,  # ← ADD
+                    "kra_id": r.kra_level.kra_id if r.kra_level else None,
                     "kra_name": (
                         r.kra_level.kra.name
                         if r.kra_level and r.kra_level.kra
@@ -161,7 +203,6 @@ class AssessmentProgressView(APIView):
             ).order_by("id")
         ]
 
-        # ← audit must be BEFORE the return
         _audit(
             request,
             "ASSESSMENT_PROGRESS_VIEWED",
@@ -195,9 +236,23 @@ class AssessmentProgressView(APIView):
 
 
 class LeadReviewView(APIView):
+    """
+    Allows a lead or HR to submit or update their review on a specific KRA row.
+
+    PATCH /api/v1/kra/assessments/<employee_kra_level_id>/lead-review
+
+    All fields are optional in the PATCH — only supplied fields are updated.
+    The endpoint validates that the enrolment is in Stage 3 (Self Assessment)
+    or Stage 4 (Lead / HR Assessment) before accepting the update.
+
+    Access:
+        - Caller must manage the employee associated with this KRA row,
+          or must be HR / Vertical Lead.
+    """
+
     permission_classes = [IsAuthenticated]
 
-    def patch(self, request, employee_kra_level_id):
+    def patch(self, request: Request, employee_kra_level_id: int) -> Response:
         row = get_object_or_404(
             EmployeeKRALevel.objects.select_related("employee_kra_cycle"),
             id=employee_kra_level_id,
@@ -218,18 +273,23 @@ class LeadReviewView(APIView):
         if not _caller_can_act_on(caller, row.employee_id):
             return Response("Forbidden", status=status.HTTP_403_FORBIDDEN)
 
-        #  OLD DATA
+        # Validate request body
+        serializer = LeadReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        # OLD DATA
         old_data = {
             "lead_rating_id": row.lead_rating_id,
             "lead_comment": row.lead_comment,
             "lead_progress_notes": row.lead_progress_notes,
         }
 
-        updated_fields = {}
+        updated_fields: dict[str, Any] = {}
 
-        lead_rating_id = request.data.get("lead_rating_id")
-        lead_comment = request.data.get("lead_comment")
-        lead_progress_notes = request.data.get("lead_progress_notes")
+        lead_rating_id = validated.get("lead_rating_id")
+        lead_comment = validated.get("lead_comment")
+        lead_progress_notes = validated.get("lead_progress_notes")
 
         if lead_rating_id is not None:
             if not Rating.objects.filter(id=lead_rating_id).exists():
@@ -249,7 +309,7 @@ class LeadReviewView(APIView):
 
         row.save()
 
-        #  AUDIT
+        # AUDIT
         _audit(
             request,
             "LEAD_REVIEW_UPDATED",
@@ -278,15 +338,24 @@ class LeadReviewView(APIView):
 
 
 class LeadDescriptionView(APIView):
+    """
+    Allows a lead to set the descriptive text for a specific KRA row.
+
+    PATCH /api/v1/kra/assessments/<employee_kra_level_id>/description
+
+    The description_by_lead field is required. The caller must manage
+    the employee associated with this KRA row, or must be HR / Vertical Lead.
+    """
+
     permission_classes = [IsAuthenticated]
 
-    def patch(self, request, employee_kra_level_id):
-        description = request.data.get("description_by_lead")
-        if description is None:
-            return Response(
-                "description_by_lead is required",
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+    def patch(self, request: Request, employee_kra_level_id: int) -> Response:
+        # Validate request body
+        serializer = LeadDescriptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        description: str = validated["description_by_lead"]
 
         caller = _get_caller(request)
         row = get_object_or_404(
@@ -314,7 +383,7 @@ class LeadDescriptionView(APIView):
         row.description_by_lead = description
         row.save()
 
-        #  AUDIT
+        # AUDIT
         _audit(
             request,
             "LEAD_DESCRIPTION_UPDATED",

@@ -1,15 +1,42 @@
-from collections import defaultdict
-from django.db import transaction
-from django.shortcuts import get_object_or_404
+"""
+File: views.py
+App: kra_assignment
 
-from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from django.core.mail import send_mail
+Purpose:
+    Handles HTTP request/response lifecycle for KRA assignment API endpoints.
+
+Includes:
+    - API views for employee listing, bulk KRA enrolment, assignment update/delete,
+      and KRA cloning across enrolments
+
+Responsibilities:
+    - Orchestrate request flow
+    - Delegate validation to serializers
+    - Delegate business logic to ORM / transaction blocks
+    - Handle errors gracefully and return consistent responses
+
+Notes:
+    - Keep views thin — no heavy business logic here
+    - Identity source is Employee (hrflow_employee), not User (hrflow_users)
+    - Permission checks use helper utilities from utils.py (_is_hr, _caller_can_act_on)
+    - Audit logging is performed via _audit() for all mutating operations
+"""
+
+from collections import defaultdict
+from typing import Any
+
 from django.conf import settings
+from django.core.mail import send_mail
+from django.db import transaction
+from django.db.models import F, Q
+from django.shortcuts import get_object_or_404
 import threading
 
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from kra_cycle.models import (
     Employee,
@@ -28,8 +55,34 @@ from kra_cycle.models import (
 )
 
 from utils import _get_caller, _is_hr, _is_lead, _caller_can_act_on, _audit
+from .serializers import (
+    BulkAssignmentEnrolSerializer,
+    AssignmentUpdateSerializer,
+    CloneAssignmentSerializer,
+)
 
-def send_bulk_kra_emails(enrolled, employee_map, cycle):
+
+# ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+def send_bulk_kra_emails(
+    enrolled: list[dict[str, Any]],
+    employee_map: dict[int, Employee],
+    cycle: KRACycle,
+) -> None:
+    """
+    Sends KRA assignment notification emails to all successfully enrolled employees.
+
+    Fetches KRA names from DB in one query using prefetch_related, then iterates
+    over enrolled entries to build and dispatch individual emails.
+
+    Args:
+        enrolled: List of enrolment result dicts (each contains employee_id and
+                  employee_kra_cycle_id).
+        employee_map: Mapping of employee_id → Employee instance (pre-fetched).
+        cycle: The KRACycle that was assigned.
+    """
     ekc_ids = [e["employee_kra_cycle_id"] for e in enrolled]
 
     ekcs = (
@@ -89,23 +142,36 @@ HR Team
         except Exception as e:
             print(e)
 
+
+# ---------------------------------------------------------------------------
+# Views
+# ---------------------------------------------------------------------------
+
 class EmployeeListView(APIView):
     """
-    GET /api/v1/employees?cycle_id=
-    HR / VL → all active employees.
-    Lead / Manager → only direct reports (manager_id = caller.id).
+    Returns a list of employees with their KRA assignment status for a given cycle.
 
-    PERFORMANCE NOTES
-    -----------------
-    - employee_roles prefetched with role names in one query via values()
-    - cycle_map, kra_map, category_map all built in bulk queries before the
-      Python loop — no per-employee DB hits inside the loop
-    - _is_hr check on caller done once outside the loop
+    GET /api/v1/employees?cycle_id=<id>
+
+    Access:
+        - HR / Vertical Lead → all active employees
+        - Lead / Manager     → only direct reports (manager_id = caller.id)
+
+    Query Parameters:
+        cycle_id (int, optional): When supplied, enriches each employee record with
+            their enrolment status, assigned KRA levels, and category weightages
+            for that specific cycle.
+
+    Performance Notes:
+        - employee_roles prefetched with role names in one query via values()
+        - cycle_map, kra_map, category_map built in bulk queries before the
+          Python loop — no per-employee DB hits inside the loop
+        - _is_hr check on caller done once outside the loop
     """
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
         caller = _get_caller(request)
         cycle_id = request.query_params.get("cycle_id")
 
@@ -129,7 +195,6 @@ class EmployeeListView(APIView):
         employee_ids = [e.id for e in employees_list]
 
         # 2. Roles — one query for all employees, no per-row hit
-        from django.db.models import F
         roles_qs = (
             Employee.objects
             .filter(id__in=employee_ids)
@@ -137,15 +202,15 @@ class EmployeeListView(APIView):
             .annotate(role_name=F("employee_roles__role__name"))
             .values_list("id", "role_name")
         )
-        roles_map = defaultdict(list)  # employee_id → [role_name, ...]
+        roles_map: dict[int, list[str]] = defaultdict(list)  # employee_id → [role_name, ...]
         for emp_id, role_name in roles_qs:
             if role_name:
                 roles_map[emp_id].append(role_name)
 
         #  3. Cycle data — all in bulk if cycle_id provided
-        cycle_map = {}     # employee_id → employee_kra_cycle_id
-        kra_map = {}       # employee_id → [{kra_level_id, kra_id, name}, ...]
-        category_map = {}  # employee_id → [{category_id, weightage}, ...]
+        cycle_map: dict[int, int] = {}     # employee_id → employee_kra_cycle_id
+        kra_map: dict[int, list[dict[str, Any]]] = {}       # employee_id → [{kra_level_id, kra_id, name}, ...]
+        category_map: dict[int, list[dict[str, Any]]] = {}  # employee_id → [{category_id, weightage}, ...]
 
         if cycle_id:
             # 3a. Enrolled employees
@@ -195,14 +260,14 @@ class EmployeeListView(APIView):
         # 4. Cycle membership — one bulk query across ALL cycles for this employee set
         #    Returns cycle_ids list on every employee so the frontend can filter
         #    the employee dropdown to only those enrolled in selected cycles.
-        all_cycle_ids_map = defaultdict(list)  # employee_id → [cycle_id, ...]
+        all_cycle_ids_map: dict[int, list[int]] = defaultdict(list)  # employee_id → [cycle_id, ...]
         for row in EmployeeKRACycle.objects.filter(
             employee_id__in=employee_ids
         ).values("employee_id", "kra_cycle_id"):
             all_cycle_ids_map[row["employee_id"]].append(row["kra_cycle_id"])
 
         #  5. Build response — pure Python, zero DB hits
-        result = []
+        result: list[dict[str, Any]] = []
         for e in employees_list:
             result.append({
                 "employee_id":           e.id,
@@ -226,41 +291,47 @@ class EmployeeListView(APIView):
 
 
 class KRABulkAssignmentEnrolView(APIView):
+    """
+    Bulk-enrolls one or more employees into a KRA cycle and assigns KRAs.
+
+    POST /api/v1/kra/cycles/<cycle_id>/assignments/bulk
+
+    Supports two assignment modes:
+        - Mode A (shared): All employees receive the same KRAs and categories
+          (when the 'shared' key is present in the request body).
+        - Mode B (per-employee): Each assignment entry carries its own
+          categories and kra_level_ids.
+
+    Enrolment behaviour is controlled by 'enrol_mode':
+        - 'skip'      — skip employees already enrolled (default)
+        - 'overwrite' — replace existing KRAs and categories
+        - 'append'    — add new KRAs/categories without removing existing ones
+
+    Returns:
+        207 Multi-Status when some records enrolled and some were skipped/failed.
+        400 Bad Request when all records failed.
+        201 Created when all records were successfully enrolled.
+    """
+
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, cycle_id):
+    def post(self, request: Request, cycle_id: int) -> Response:
         caller = _get_caller(request)
         caller_role = caller.role.name if caller.role else "Unknown"
-        data = request.data
 
-        assignments = data.get("assignments", [])
-        shared = data.get("shared")
-        enrol_mode = data.get("enrol_mode", "skip")
+        # Validate top-level request body
+        serializer = BulkAssignmentEnrolSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
 
-        if enrol_mode not in ("skip", "overwrite", "append"):
-            return Response(
-                {"error": "enrol_mode must be one of: 'skip', 'overwrite', 'append'"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not assignments:
-            return Response(
-                {"error": "assignments list is required and cannot be empty"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        assignments: list[dict[str, Any]] = validated["assignments"]
+        shared: dict[str, Any] | None = validated.get("shared")
+        enrol_mode: str = validated["enrol_mode"]
 
         cycle = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
 
         # 1. Collect all employee IDs
-        employee_ids = []
-        for idx, a in enumerate(assignments):
-            eid = a.get("employee_id")
-            if not eid:
-                return Response(
-                    {"error": f"assignments[{idx}] is missing employee_id"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            employee_ids.append(eid)
+        employee_ids: list[int] = [a["employee_id"] for a in assignments]
 
         # 2. Verify caller permissions — bulk check instead of per-employee query
         if not _is_hr(caller):
@@ -282,7 +353,7 @@ class KRABulkAssignmentEnrolView(APIView):
                 )
 
         # 3. Find already enrolled employees — one query
-        already_enrolled = {
+        already_enrolled: dict[int, EmployeeKRACycle] = {
             ekc.employee_id: ekc
             for ekc in EmployeeKRACycle.objects.filter(
                 kra_cycle_id=cycle_id,
@@ -291,17 +362,18 @@ class KRABulkAssignmentEnrolView(APIView):
         }
 
         # 4. Bulk-fetch employee records — one query
-        employee_map = {
+        employee_map: dict[int, Employee] = {
             e.id: e
             for e in Employee.objects.filter(id__in=employee_ids).select_related("manager")
         }
 
         # 5. Validate shared weightage once if Mode A
-        shared_categories = []
-        shared_kra_level_ids = []
-        shared_kra_selections = []
-        shared_is_date_based = False
-        shared_weight = 0
+        shared_categories: list[dict[str, Any]] = []
+        shared_kra_level_ids: list[int] = []
+        shared_kra_selections: list[dict[str, Any]] = []
+        shared_is_date_based: bool = False
+        shared_weight: int = 0
+        kra_level_lookup: dict[tuple[int, int], int] = {}
 
         if shared:
             shared_categories = shared.get("categories", [])
@@ -317,7 +389,7 @@ class KRABulkAssignmentEnrolView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            #  Pre-resolve ALL KRALevel lookups in one query 
+            #  Pre-resolve ALL KRALevel lookups in one query
             # Previously this was one query per selection per employee (N*M queries).
             # Now: collect all (kra_id, level_id) pairs, fetch in bulk, build a map.
             if shared_kra_selections:
@@ -325,8 +397,6 @@ class KRABulkAssignmentEnrolView(APIView):
                     (sel.get("kra_id"), sel.get("kra_level_id"))
                     for sel in shared_kra_selections
                 ]
-                from django.db.models import Q
-                kra_level_lookup = {}  # (kra_id, level_id) → kra_level_id
                 q = Q()
                 for kra_id, level_id in lookup_pairs:
                     q |= Q(kra_id=kra_id, level_id=level_id)
@@ -334,13 +404,13 @@ class KRABulkAssignmentEnrolView(APIView):
                     kra_level_lookup[(kl["kra_id"], kl["level_id"])] = kl["id"]
 
         # Process each assignment
-        enrolled = []
-        skipped = []
-        failed = []
+        enrolled: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+        failed: list[dict[str, Any]] = []
 
         with transaction.atomic():
             for a in assignments:
-                eid = a["employee_id"]
+                eid: int = a["employee_id"]
 
                 emp = employee_map.get(eid)
                 if not emp:
@@ -354,7 +424,7 @@ class KRABulkAssignmentEnrolView(APIView):
                     total_weight = shared_weight
 
                     if shared_kra_selections:
-                        kra_level_ids = []
+                        kra_level_ids: list[int] = []
                         for sel in shared_kra_selections:
                             kra_id = sel.get("kra_id")
                             level_id = sel.get("kra_level_id")
@@ -402,8 +472,8 @@ class KRABulkAssignmentEnrolView(APIView):
                         update_fields.append("employee_level_id")
                     ekc.save(update_fields=update_fields)
 
-                    skipped_cats = []
-                    kras_added = 0
+                    skipped_cats: list[dict[str, Any]] = []
+                    kras_added: int = 0
 
                     if enrol_mode == "overwrite":
                         ekc.categories.all().delete()
@@ -432,7 +502,7 @@ class KRABulkAssignmentEnrolView(APIView):
                         existing_cats = {c.category_id: c for c in ekc.categories.all()}
                         current_total = sum(int(c.weightage) for c in existing_cats.values())
                         remaining = 100 - current_total
-                        new_cat_rows = []
+                        new_cat_rows: list[EmployeeKRACycleCategory] = []
                         skipped_cats = []
                         for cat in categories:
                             cid = cat["category_id"]
@@ -567,16 +637,12 @@ class KRABulkAssignmentEnrolView(APIView):
             },
         )
 
-         
-
         # if enrolled:
         #     threading.Thread(
         #         target=send_bulk_kra_emails,
         #         args=(enrolled, employee_map, cycle),
         #         daemon=True,
         #     ).start()
-
-        
 
         if enrolled and (skipped or failed):
             http_status = status.HTTP_207_MULTI_STATUS
@@ -606,19 +672,34 @@ class KRABulkAssignmentEnrolView(APIView):
 
 class KRAAssignmentUpdateDeleteView(APIView):
     """
-    PUT    /api/v1/kra/assignments/{employee_kra_cycle_id}  – update (Stage 1 only)
-    DELETE /api/v1/kra/assignments/{employee_kra_cycle_id}  – remove (Stage 1 only)
+    Updates or removes a single KRA enrolment record.
+
+    PUT    /api/v1/kra/assignments/<employee_kra_cycle_id>  — replace categories and KRA levels
+    DELETE /api/v1/kra/assignments/<employee_kra_cycle_id>  — remove the enrolment entirely
+
+    Access:
+        - HR / Vertical Lead → any employee
+        - Lead / Manager     → only their direct reports
+
+    Notes:
+        - PUT replaces all categories and KRA level rows atomically (delete-then-insert)
+        - DELETE cascades to kra_level_rows and categories before removing the record
     """
 
     permission_classes = [IsAuthenticated]
 
-    def put(self, request, employee_kra_cycle_id):
+    def put(self, request: Request, employee_kra_cycle_id: int) -> Response:
         caller = _get_caller(request)
         caller_role = caller.role.name if caller.role else "Unknown"
         ekc = get_object_or_404(EmployeeKRACycle, id=employee_kra_cycle_id)
-        data = request.data
-        categories = data.get("categories", [])
-        kra_level_ids = data.get("kra_level_ids", [])
+
+        # Validate request body
+        serializer = AssignmentUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        categories: list[dict[str, Any]] = validated["categories"]
+        kra_level_ids: list[int] = validated["kra_level_ids"]
 
         old_data = {
             "employee_level_id": ekc.employee_level_id,
@@ -636,11 +717,11 @@ class KRAAssignmentUpdateDeleteView(APIView):
             return Response("Invalid weightage value", status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            new_level_id = data.get("employee_level_id")
+            new_level_id = validated.get("employee_level_id")
             if new_level_id is not None:
                 ekc.employee_level_id = new_level_id
-            if "is_date_based" in data:
-                ekc.is_date_based = data["is_date_based"]
+            if "is_date_based" in request.data:
+                ekc.is_date_based = validated["is_date_based"]
             ekc.save()
 
             existing_cats = {
@@ -663,12 +744,12 @@ class KRAAssignmentUpdateDeleteView(APIView):
                 for cat in categories
             ])
 
-            existing_kra_roles = {
+            existing_kra_roles: dict[int, str] = {
                 row.kra_level_id: row.assigned_by_role
                 for row in ekc.kra_level_rows.all()
             }
             ekc.kra_level_rows.all().delete()
-            EmployeeKRALevel.objects.bulk_create([  
+            EmployeeKRALevel.objects.bulk_create([
                 EmployeeKRALevel(
                     employee_id=ekc.employee_id,
                     kra_level_id=kl_id,
@@ -701,7 +782,7 @@ class KRAAssignmentUpdateDeleteView(APIView):
             status=status.HTTP_200_OK,
         )
 
-    def delete(self, request, employee_kra_cycle_id):
+    def delete(self, request: Request, employee_kra_cycle_id: int) -> Response:
         caller = _get_caller(request)
         ekc = get_object_or_404(EmployeeKRACycle, id=employee_kra_cycle_id)
 
@@ -736,60 +817,39 @@ class KRAAssignmentUpdateDeleteView(APIView):
 
 class KRAAssignmentCloneView(APIView):
     """
+    Clones KRA level rows from one source enrolment into one or more target enrolments.
+
     POST /api/v1/kra/assignments/clone-from
 
-    Clones KRA level rows from one source enrolment into one or more targets.
-    Ratings and comments are intentionally nulled on every clone.
+    Ratings and comments are intentionally nulled on every clone — only the
+    KRA level assignments themselves are copied.
 
-    Request body:
-        {
-            "source_employee_kra_cycle_id": 8,
-            "target_employee_kra_cycle_ids": [12, 15, 19],
-            "mode": "append"        ← optional, default is "skip"
-        }
+    Request Body:
+        source_employee_kra_cycle_id (int): The enrolment to clone from.
+        target_employee_kra_cycle_ids (list[int]): Enrolments to clone into.
+        mode (str, optional): Clone behaviour — 'skip' (default), 'append', or 'overwrite'.
 
-    mode options:
-        "skip"      – (default) skip targets that already have KRA rows
-        "append"    – add only the KRA rows not already present on the target
-        "overwrite" – delete all existing KRA rows on target then clone fresh
+    Mode Options:
+        'skip'      — skip targets that already have KRA rows
+        'append'    — add only the KRA rows not already present on the target
+        'overwrite' — delete all existing KRA rows on target, then clone fresh
+
+    Returns:
+        207 Multi-Status when some targets cloned and some were skipped/failed.
+        400 Bad Request when all targets failed.
+        201 Created when all targets were successfully cloned.
     """
 
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        source_id = request.data.get("source_employee_kra_cycle_id")
-        target_ids = request.data.get("target_employee_kra_cycle_ids", [])
-        mode = request.data.get("mode", "skip")
+    def post(self, request: Request) -> Response:
+        serializer = CloneAssignmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
 
-        if not source_id:
-            return Response(
-                {"error": "source_employee_kra_cycle_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not target_ids:
-            return Response(
-                {"error": "target_employee_kra_cycle_ids is required and cannot be empty"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not isinstance(target_ids, list):
-            return Response(
-                {"error": "target_employee_kra_cycle_ids must be a list"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if mode not in ("skip", "overwrite", "append"):
-            return Response(
-                {"error": "mode must be one of: 'skip', 'overwrite', 'append'"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if source_id in target_ids:
-            return Response(
-                {"error": "source cannot also be a target"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        source_id: int = validated["source_employee_kra_cycle_id"]
+        target_ids: list[int] = validated["target_employee_kra_cycle_ids"]
+        mode: str = validated["mode"]
 
         source_levels = list(
             EmployeeKRALevel.objects.filter(employee_kra_cycle_id=source_id)
@@ -800,7 +860,7 @@ class KRAAssignmentCloneView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        existing_targets = {
+        existing_targets: dict[int, EmployeeKRACycle] = {
             ekc.id: ekc for ekc in EmployeeKRACycle.objects.filter(id__in=target_ids)
         }
         missing = set(target_ids) - set(existing_targets.keys())
@@ -813,9 +873,9 @@ class KRAAssignmentCloneView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cloned = []
-        skipped = []
-        failed = []
+        cloned: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+        failed: list[dict[str, Any]] = []
 
         for target_id in target_ids:
             target = existing_targets[target_id]
