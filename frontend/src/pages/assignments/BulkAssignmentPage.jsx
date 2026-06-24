@@ -8,7 +8,7 @@ import {
   TableSortLabel,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import LockIcon from '@mui/icons-material/Lock';
@@ -106,13 +106,13 @@ function CycleBanner({ cycle, allCycles, onCycleChange, isReadOnly }) {
   return (
     <Paper elevation={0} sx={{ borderRadius: 2.5, overflow: 'hidden', border: '1px solid rgba(30,58,138,0.15)', flexShrink: 0 }}>
       <Box sx={{ background: G, color: '#fff', px: 2.5, py: 1.75 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-          <Stack direction="row" alignItems="center" gap={1.5} minWidth={0}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2 }}   >
+          <Stack direction="row" sx={{ alignItems: 'center', minWidth: 0, gap: 1.5 }}   >
             <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <AssignmentIcon sx={{ fontSize: 20 }} />
             </Box>
-            <Box minWidth={0}>
-              <Stack direction="row" alignItems="center" gap={0.75} mb={0.25} flexWrap="wrap">
+            <Box sx={{ minWidth: 0 }} >
+              <Stack direction="row" sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 0.75, mb: 0.25 }}    >
                 <Chip
                   label={cycle?.status?.replace('_', ' ') ?? '—'}
                   size="small"
@@ -135,8 +135,8 @@ function CycleBanner({ cycle, allCycles, onCycleChange, isReadOnly }) {
                     size="small" sx={{ height: 17, fontSize: 9, fontWeight: 700, bgcolor: 'rgba(96,165,250,0.2)', color: '#bfdbfe' }} />
                 )}
               </Stack>
-              <Typography fontWeight={800} fontSize="1rem" noWrap lineHeight={1.2}>{cycle?.name ?? 'No Active Cycle'}</Typography>
-              <Typography fontSize={10.5} sx={{ opacity: 0.65, mt: 0.15 }}>{fmtDate(cycle?.start_date)} — {fmtDate(cycle?.end_date)}</Typography>
+              <Typography   noWrap sx={{ lineHeight: 1.2, fontSize: '1rem', fontWeight: 800 }} >{cycle?.name ?? 'No Active Cycle'}</Typography>
+              <Typography  sx={{ opacity: 0.65, mt: 0.15, fontSize: 10.5 }}>{fmtDate(cycle?.start_date)} — {fmtDate(cycle?.end_date)}</Typography>
             </Box>
           </Stack>
           <FormControl size="small" sx={{ minWidth: 190, flexShrink: 0 }}>
@@ -279,14 +279,14 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
-        <Stack direction="row" alignItems="center" gap={1}>
-          <Typography fontWeight={800} fontSize={13} color="#0f172a">KRA Library</Typography>
-          <Box component="span" color="#3730a3" fontSize={13} fontWeight={700}>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}   >
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}  >
+          <Typography sx={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}   >KRA Library</Typography>
+          <Box component="span" sx={{ fontSize: 13, fontWeight: 700, color: '#3730a3' }}   >
             ({categories.length})
           </Box>
         </Stack>
-        <Stack direction="row" gap={1} alignItems="center">
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}  >
           <Chip icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ORG_COLOR.icon, ml: '6px !important' }} />} label="Org" size="small" sx={{ height: 20, fontSize: 9.5, fontWeight: 700, bgcolor: ORG_COLOR.chip, color: ORG_COLOR.text, cursor: 'default' }} />
           <Chip icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: PROJ_COLOR.icon, ml: '6px !important' }} />} label="Project" size="small" sx={{ height: 20, fontSize: 9.5, fontWeight: 700, bgcolor: PROJ_COLOR.chip, color: PROJ_COLOR.text, cursor: 'default' }} />
           {selectedKraSet.size > 0 && (
@@ -297,10 +297,10 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
 
       {/*  value={searchRaw} — raw state updates instantly for responsive feel */}
       <TextField size="small" placeholder="Search KRAs…" value={searchRaw} onChange={e => setSearchRaw(e.target.value)}
-        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: '#94a3b8' }} /></InputAdornment>, endAdornment: searchRaw ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearchRaw('')}><ClearIcon sx={{ fontSize: 13 }} /></IconButton></InputAdornment> : null }}
+        slotProps={{ input: { startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 15, color: '#94a3b8', position: 'end' }} /></InputAdornment>, endAdornment: searchRaw ? <InputAdornment ><IconButton size="small" onClick={() => setSearchRaw('')}><ClearIcon sx={{ fontSize: 13 }} /></IconButton></InputAdornment> : null } }}
         sx={{ mb: 1, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36, bgcolor: '#f8fafc' } }} />
 
-      <Stack direction="row" gap={1} mb={1.5} alignItems="center">
+      <Stack direction="row" sx={{ alignItems: 'center', gap: 1, mb: 1.5 }}   >
         <Stack direction="row" sx={{ border: '1px solid #e2e8f0', borderRadius: 1.5, overflow: 'hidden', flexShrink: 0, height: 30 }}>
           {[{ v: 'all', l: 'All' }, { v: 'org', l: `Org (${orgCount})` }, { v: 'project', l: `Proj (${projectCount})` }].map(t => (
             <Box key={t.v} onClick={() => setTypeFilter(t.v)} sx={{ px: 2, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, cursor: 'pointer', userSelect: 'none', bgcolor: typeFilter === t.v ? '#1E3A8A' : 'transparent', color: typeFilter === t.v ? '#fff' : '#64748b', '&:hover': { bgcolor: typeFilter === t.v ? '#1E3A8A' : '#f1f5f9' } }}>{t.l}</Box>
@@ -310,16 +310,16 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
 
       <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.5, mb: 0.5, borderRadius: 1.5, bgcolor: someSelected ? '#f0f9ff' : '#fafafa', border: `1px solid ${someSelected ? '#bae6fd' : '#f1f5f9'}` }}>
         <Checkbox size="small" disabled={isReadOnly || allVisibleIds.length === 0} indeterminate={someSelected && !allSelected} checked={allSelected} onChange={() => { }} onClick={() => { if (isReadOnly || allVisibleIds.length === 0) return; onToggleKRA(allVisibleIds, allSelected ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5 }} />
-        <Typography fontSize={10} fontWeight={700} color="#475569" textTransform="uppercase" letterSpacing="0.06em" ml={0.75}>Select All Visible ({allVisibleIds.length})</Typography>
-        {someSelected && <Typography fontSize={10} color="#0284c7" fontWeight={700} ml="auto">{selectedKraSet.size} / {totalKraLevelCount} total</Typography>}
+        <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', ml: 0.75, fontSize: 10, fontWeight: 700, color: '#475569' }}      >Select All Visible ({allVisibleIds.length})</Typography>
+        {someSelected && <Typography sx={{ ml: 'auto', fontSize: 10, fontWeight: 700, color: '#0284c7' }}    >{selectedKraSet.size} / {totalKraLevelCount} total</Typography>}
       </Box>
 
       <Box sx={{ flex: 1, overflow: 'auto', pr: 0.5, ...SX.scrollbar }}>
         {groupedWithRows.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 6 }}>
             <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}><AssignmentIcon sx={{ fontSize: 24, color: '#cbd5e1' }} /></Box>
-            <Typography fontSize={13} fontWeight={600} color="#94a3b8">No KRAs found</Typography>
-            <Typography fontSize={11} color="#cbd5e1" mt={0.25}>Try adjusting your filters</Typography>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}   >No KRAs found</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 11, color: '#cbd5e1' }}   >Try adjusting your filters</Typography>
           </Box>
         ) : groupedWithRows.map(group => {
           const catLevelIds = group.rows.map(r => r.kraLevelId);
@@ -332,11 +332,11 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
             <Box key={group.cid} sx={{ mb: 0.75 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 0.85, borderRadius: 1.5, bgcolor: tc.bg, border: `1px solid ${tc.border}`, mb: 0.4 }}>
                 <Checkbox size="small" disabled={isReadOnly || (isManager && group.isStd)} indeterminate={catSome && !catAll} checked={catAll && catLevelIds.length > 0} onChange={() => {}} onClick={e => { e.stopPropagation(); if (isReadOnly || (isManager && group.isStd)) return; onToggleKRA(catLevelIds, catAll ? 'deselect_all' : 'select_all'); }} sx={{ p: 0.5, mr: 0.5, flexShrink: 0, color: tc.text, '&.Mui-checked': { color: tc.text } }} />
-                <Box flex={1} minWidth={0} onClick={() => toggleExpand(group.cid)} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', userSelect: 'none' }}>
-                  <Typography fontSize={12} fontWeight={800} color={tc.text} noWrap>{group.name}</Typography>
-                  <Typography fontSize={11} fontWeight={600} color={tc.text} sx={{ opacity: 0.7 }}>({group.rows.length})</Typography>
+                <Box   onClick={() => toggleExpand(group.cid)} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer', userSelect: 'none', flex: 1, minWidth: 0 }}>
+                  <Typography    noWrap sx={{ fontSize: 12, fontWeight: 800, color: tc.text }}>{group.name}</Typography>
+                  <Typography    sx={{ opacity: 0.7, fontSize: 11, fontWeight: 600, color: tc.text }}>({group.rows.length})</Typography>
                   {selCount > 0 && <Chip label={`${selCount} ✓`} size="small" sx={{ height: 15, fontSize: 8, fontWeight: 800, bgcolor: '#fef3c7', color: '#92400e', borderRadius: 0.75 }} />}
-                  <Box flex={1} />
+                  <Box sx={{ flex: 1 }}  />
                   <Box sx={{ color: '#94a3b8', display: 'flex', alignItems: 'center', flexShrink: 0 }}>{isOpen ? <ExpandLessIcon sx={{ fontSize: 15 }} /> : <ExpandMoreIcon sx={{ fontSize: 15 }} />}</Box>
                 </Box>
               </Box>
@@ -359,12 +359,12 @@ const KRAPanel = memo(function KRAPanel({ kras, categories, selectedKraSet, onTo
                         '&:hover': { bgcolor: isReadOnly || isOrgLocked ? 'transparent' : isSelected ? '#dbeafe' : '#f8fafc', border: `1px solid ${isReadOnly || isOrgLocked ? 'transparent' : isSelected ? '#93c5fd' : '#e2e8f0'}` },
                       }}>
                         <Checkbox size="small" checked={isSelected} disabled={isReadOnly || isOrgLocked} onChange={() => {}} onClick={e => { e.stopPropagation(); toggle(); }} sx={{ p: 0, mr: 1.25, flexShrink: 0 }} />
-                        <Box flex={1} minWidth={0}>
-                          <Stack direction="row" alignItems="center" gap={1}>
-                            <Typography fontSize={12} fontWeight={isSelected ? 700 : 500} color="#1e293b" noWrap>
+                        <Box sx={{ flex: 1, minWidth: 0 }}  >
+                          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}  >
+                            <Typography    noWrap sx={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: '#1e293b' }}>
                               {kra.name}
                             </Typography>
-                            <Typography fontSize={10.5} fontWeight={600} color="#94a3b8" noWrap flexShrink={0}>
+                            <Typography    noWrap sx={{ flexShrink: 0, fontSize: 10.5, fontWeight: 600, color: '#94a3b8' }} >
                               {level.level_name}
                             </Typography>
                             {hasDup && (
@@ -446,15 +446,15 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
                 <Checkbox size="small" checked={isSel} disabled={isReadOnly}
                   onChange={() => !isReadOnly && onToggleEmployee([emp.employee_id], isSel ? 'deselect' : 'select')}
                   sx={{ p: 0.5, flexShrink: 0, mr: 0.25 }} />
-                <Typography fontSize={10.5} fontWeight={600} color="#94a3b8" sx={COL_SX.id}>
+                <Typography    sx={COL_SX.id} sx={{ fontSize: 10.5, fontWeight: 600, color: '#94a3b8' }}>
                   {emp.employee_id}
                 </Typography>
                 <Box sx={{ ...COL_SX.name, ml: 1, minWidth: 0 }}
                   onClick={() => isAssigned && onView(emp)}
                   style={{ cursor: isAssigned ? 'pointer' : 'default' }}>
-                  <Stack direction="row" alignItems="center" gap={0.5}>
-                    <Typography fontSize={12.5} fontWeight={600} color={isAssigned ? '#1d4ed8' : '#1e293b'} noWrap
-                      sx={isAssigned ? { '&:hover': { textDecoration: 'underline' } } : {}}>
+                  <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}  >
+                    <Typography    noWrap
+                      sx={isAssigned ? { '&:hover': { textDecoration: 'underline' } } : {}} sx={{ fontSize: 12.5, fontWeight: 600, color: isAssigned ? '#1d4ed8' : '#1e293b' }}>
                       {emp.full_name}
                     </Typography>
                     {isAssigned && (
@@ -463,11 +463,11 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
                       </Tooltip>
                     )}
                   </Stack>
-                  <Typography fontSize={10} color="#94a3b8" noWrap>{emp.email}</Typography>
+                  <Typography   noWrap sx={{ fontSize: 10, color: '#94a3b8' }}>{emp.email}</Typography>
                 </Box>
                 <Box sx={{ ...COL_SX.role, ml: 1, minWidth: 0 }}>
-                  <Typography fontSize={11} color="#374151" noWrap fontWeight={500}>{emp.title || '—'}</Typography>
-                  <Typography fontSize={10} color="#94a3b8" noWrap>{[emp.department, emp.level].filter(Boolean).join(' · ')}</Typography>
+                  <Typography   noWrap sx={{ fontSize: 11, fontWeight: 500, color: '#374151' }} >{emp.title || '—'}</Typography>
+                  <Typography   noWrap sx={{ fontSize: 10, color: '#94a3b8' }}>{[emp.department, emp.level].filter(Boolean).join(' · ')}</Typography>
                 </Box>
               </Box>
             );
@@ -573,9 +573,9 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
-        <Stack direction="row" alignItems="center" gap={1}>
-          <Typography fontWeight={800} fontSize={13} color="#0f172a">Target Employees</Typography>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}   >
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}  >
+          <Typography sx={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}   >Target Employees</Typography>
           {selectedEmpSet.size > 0 && (
             <Chip label={`${selectedEmpSet.size} selected`} size="small"
               deleteIcon={<ClearIcon sx={{ fontSize: '13px !important' }} />}
@@ -583,7 +583,7 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
               sx={{ height: 18, fontSize: 9.5, fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e' }} />
           )}
         </Stack>
-        <Stack direction="row" gap={0.5}>
+        <Stack direction="row" sx={{ gap: 0.5 }} >
           {[{ l: 'All', c: employees.length, v: 0 }, { l: 'Assigned', c: assigned, v: 1 }, { l: 'Unassigned', c: unassigned, v: 2 }].map(t => (
             <Chip key={t.v} label={`${t.l} (${t.c})`} size="small" onClick={() => setTab(t.v)}
               sx={{ height: 22, fontSize: 10, fontWeight: 700, cursor: 'pointer', borderRadius: 1.5, bgcolor: tab === t.v ? '#1E3A8A' : '#f1f5f9', color: tab === t.v ? '#fff' : '#64748b' }} />
@@ -592,13 +592,13 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
       </Stack>
 
       <TextField size="small" placeholder="Search anything…" value={searchRaw} onChange={e => setSearchRaw(e.target.value)}
-        InputProps={{
-          startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: '#94a3b8' }} /></InputAdornment>,
-          endAdornment: searchRaw ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearchRaw('')}><ClearIcon sx={{ fontSize: 13 }} /></IconButton></InputAdornment> : null,
-        }}
+        slotProps={{ input: {
+          startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 15, color: '#94a3b8', position: 'end' }} /></InputAdornment>,
+          endAdornment: searchRaw ? <InputAdornment ><IconButton size="small" onClick={() => setSearchRaw('')}><ClearIcon sx={{ fontSize: 13 }} /></IconButton></InputAdornment> : null,
+        } }}
         sx={{ mb: 1, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 36, bgcolor: '#f8fafc' } }} />
 
-      <Stack direction="row" gap={1} mb={1.25}>
+      <Stack direction="row" sx={{ gap: 1, mb: 1.25 }}  >
         <FormControl size="small" sx={{ flex: 1 }}>
           <Select value={deptFilter} onChange={e => setDept(e.target.value)} displayEmpty
             sx={{ fontSize: 10.5, height: 30, borderRadius: 1.5, bgcolor: deptFilter ? '#eff6ff' : '#f8fafc' }}>
@@ -644,7 +644,7 @@ const EmployeePanel = memo(function EmployeePanel({ employees, selectedEmpSet, o
           <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
             <PersonIcon sx={{ fontSize: 24, color: '#cbd5e1' }} />
           </Box>
-          <Typography fontSize={13} fontWeight={600} color="#94a3b8">No employees found</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}   >No employees found</Typography>
         </Box>
       ) : (
         //  virtualised list — only DOM nodes for visible rows are created
@@ -738,16 +738,16 @@ function PreviewAssignModal({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
-      PaperProps={{ sx: { borderRadius: 3, height: '82vh', maxHeight: '82vh', display: 'flex', flexDirection: 'column' } }}>
+    <Dialog open={open} onClose={onClose}  fullWidth
+      PaperProps={{ sx: { borderRadius: 3, height: '82vh', maxHeight: '82vh', display: 'flex', flexDirection: 'column' } }} sx={{ maxWidth: 'md' }}>
 
       <Box sx={{ background: G, px: 3, py: 2, color: '#fff', flexShrink: 0 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}  >
           <Box>
-            <Typography fontWeight={800} fontSize={15}>Assignment Preview</Typography>
-            <Typography fontSize={11} sx={{ opacity: 0.7, mt: 0.15 }}>Review selections — deselect any you don't want, then assign</Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 800 }}  >Assignment Preview</Typography>
+            <Typography  sx={{ opacity: 0.7, mt: 0.15, fontSize: 11 }}>Review selections — deselect any you don't want, then assign</Typography>
           </Box>
-          <Stack direction="row" gap={1} alignItems="center" sx={{ ml: 'auto', mr: 2 }}>
+          <Stack direction="row"   sx={{ ml: 'auto', mr: 2, alignItems: 'center', gap: 1 }}>
             <Chip label={`${localKraIds.length} KRA${localKraIds.length !== 1 ? 's' : ''}`} size="small" sx={{ height: 20, fontSize: 12, fontWeight: 700, bgcolor: 'rgba(255,255,255,0.15)', color: '#fff' }} />
             <Chip label={`${localEmpIds.length} employee${localEmpIds.length !== 1 ? 's' : ''}`} size="small" sx={{ height: 20, fontSize: 12, fontWeight: 700, bgcolor: 'rgba(255,255,255,0.15)', color: '#fff' }} />
             {selectedEmps.some(e => e.assigned_to_cycle) && (
@@ -761,22 +761,22 @@ function PreviewAssignModal({
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', height: '100%', width: '100%' }}>
           <Box sx={{ borderRight: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <Box sx={{ px: 2, pt: 1.75, pb: 1, borderBottom: '1px solid #f8fafc', flexShrink: 0 }}>
-              <Typography fontWeight={700} fontSize={12} color="#475569" textTransform="uppercase" letterSpacing="0.05em">KRAs</Typography>
+              <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 12, fontWeight: 700, color: '#475569' }}     >KRAs</Typography>
             </Box>
             <Box sx={{ flex: 1, overflow: 'auto', px: 1.5, py: 1, ...SX.scrollbar }}>
               {localKraIds.length === 0 ? (
-                <Box sx={{ py: 4, textAlign: 'center' }}><Typography fontSize={12} color="#94a3b8">No KRAs selected</Typography></Box>
+                <Box sx={{ py: 4, textAlign: 'center' }}><Typography sx={{ fontSize: 12, color: '#94a3b8' }}  >No KRAs selected</Typography></Box>
               ) : groupedKras.map(group => {
                 const tc = group.isStd ? ORG_COLOR : PROJ_COLOR;
                 return (
                   <Box key={group.name} sx={{ mb: 1 }}>
-                    <Stack direction="row" alignItems="center" gap={0.5} sx={{ px: 0.75, py: 0.4, mb: 0.25, borderRadius: 1, bgcolor: tc.bg, border: `1px solid ${tc.border}` }}>
-                      <Typography fontSize={10} fontWeight={800} color={tc.text} noWrap>{group.name}</Typography>
+                    <Stack direction="row"   sx={{ px: 0.75, py: 0.4, mb: 0.25, borderRadius: 1, bgcolor: tc.bg, border: `1px solid ${tc.border}`, alignItems: 'center', gap: 0.5 }}>
+                      <Typography    noWrap sx={{ fontSize: 10, fontWeight: 800, color: tc.text }}>{group.name}</Typography>
                       <Chip label={group.isStd ? 'Org' : 'Proj'} size="small" sx={{ height: 13, fontSize: 7.5, fontWeight: 700, bgcolor: tc.chip, color: tc.text, borderRadius: 0.5 }} />
                     </Stack>
                     {group.items.map(({ kra, level, key }) => (
-                      <Stack key={key} direction="row" alignItems="center" gap={0.75} sx={{ px: 0.75, py: 0.60, borderRadius: 1, mb: 0.2, bgcolor: '#fafafa', border: '1px solid transparent', '&:hover': { bgcolor: '#f1f5f9', border: '1px solid #e2e8f0' }, transition: 'all 0.1s' }}>
-                        <Typography fontSize={12} fontWeight={500} color="#1e293b" noWrap sx={{ flex: 1, minWidth: 0 }}>{kra.name}</Typography>
+                      <Stack key={key} direction="row"   sx={{ px: 0.75, py: 0.60, borderRadius: 1, mb: 0.2, bgcolor: '#fafafa', border: '1px solid transparent', '&:hover': { bgcolor: '#f1f5f9', border: '1px solid #e2e8f0' }, transition: 'all 0.1s', alignItems: 'center', gap: 0.75 }}>
+                        <Typography    noWrap sx={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 500, color: '#1e293b' }}>{kra.name}</Typography>
                         <Chip label={level.level_name} size="small" sx={{ height: 15, fontSize: 8, fontWeight: 600, bgcolor: '#f0f9ff', color: '#0369a1', flexShrink: 0 }} />
                         <IconButton size="small" onClick={() => setLocalKraIds(p => p.filter(k => k !== key))}
                           sx={{ p: 0.3, flexShrink: 0, color: '#cbd5e1', '&:hover': { color: '#ef4444', bgcolor: '#fef2f2' } }}>
@@ -792,28 +792,28 @@ function PreviewAssignModal({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <Box sx={{ px: 2, pt: 1.75, pb: 1, borderBottom: '1px solid #f8fafc', flexShrink: 0 }}>
-              <Typography fontWeight={700} fontSize={12} color="#475569" textTransform="uppercase" letterSpacing="0.05em">Employees</Typography>
+              <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 12, fontWeight: 700, color: '#475569' }}     >Employees</Typography>
             </Box>
             <Box sx={{ flex: 1, overflow: 'auto', px: 1.5, py: 1, ...SX.scrollbar }}>
               {localEmpIds.length === 0 ? (
-                <Box sx={{ py: 4, textAlign: 'center' }}><Typography fontSize={12} color="#94a3b8">No employees selected</Typography></Box>
+                <Box sx={{ py: 4, textAlign: 'center' }}><Typography sx={{ fontSize: 12, color: '#94a3b8' }}  >No employees selected</Typography></Box>
               ) : selectedEmps.map(emp => {
                 const hasExisting = emp.assigned_to_cycle;
                 return (
-                  <Stack key={emp.employee_id} direction="row" alignItems="center" gap={0.75} sx={{ px: 0.75, py: 0.65, borderRadius: 1, mb: 0.3, bgcolor: hasExisting ? '#fffbeb' : '#fafafa', border: `1px solid ${hasExisting ? '#fde68a' : 'transparent'}`, '&:hover': { bgcolor: hasExisting ? '#fef9c3' : '#f1f5f9', border: `1px solid ${hasExisting ? '#fbbf24' : '#e2e8f0'}` }, transition: 'all 0.1s' }}>
+                  <Stack key={emp.employee_id} direction="row"   sx={{ px: 0.75, py: 0.65, borderRadius: 1, mb: 0.3, bgcolor: hasExisting ? '#fffbeb' : '#fafafa', border: `1px solid ${hasExisting ? '#fde68a' : 'transparent'}`, '&:hover': { bgcolor: hasExisting ? '#fef9c3' : '#f1f5f9', border: `1px solid ${hasExisting ? '#fbbf24' : '#e2e8f0'}` }, transition: 'all 0.1s', alignItems: 'center', gap: 0.75 }}>
                     <Box sx={{ width: 24, height: 24, borderRadius: 0.75, background: G, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>
                       {initials(emp.full_name)}
                     </Box>
-                    <Box flex={1} minWidth={0}>
-                      <Stack direction="row" alignItems="center" gap={0.5}>
-                        <Typography fontSize={12} fontWeight={600} color="#1e293b" noWrap>{emp.full_name}</Typography>
+                    <Box sx={{ flex: 1, minWidth: 0 }}  >
+                      <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}  >
+                        <Typography    noWrap sx={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>{emp.full_name}</Typography>
                         {hasExisting && (
                           <Tooltip title="Already has KRAs — new ones will be appended">
                             <CheckCircleIcon sx={{ fontSize: 11, color: '#f59e0b', flexShrink: 0 }} />
                           </Tooltip>
                         )}
                       </Stack>
-                      <Typography fontSize={10} color="#94a3b8" noWrap>{[emp.department, emp.level].filter(Boolean).join(' · ')}</Typography>
+                      <Typography   noWrap sx={{ fontSize: 10, color: '#94a3b8' }}>{[emp.department, emp.level].filter(Boolean).join(' · ')}</Typography>
                     </Box>
                     <IconButton size="small" onClick={() => setLocalEmpIds(p => p.filter(id => id !== emp.employee_id))}
                       sx={{ p: 0.3, flexShrink: 0, color: '#cbd5e1', '&:hover': { color: '#ef4444', bgcolor: '#fef2f2' } }}>
@@ -846,7 +846,7 @@ function SelectionBar({ selectedKraIds, selectedEmpIds, onClearAll, onPreview, o
   return (
     <Paper elevation={0} sx={{ position: 'sticky', bottom: 0, zIndex: 10, borderRadius: 2, border: '1px solid #bfdbfe', bgcolor: '#fff', boxShadow: '0 -4px 20px -4px rgba(30,58,138,0.12)', overflow: 'hidden', alignSelf: 'flex-end' }}>
       <Box sx={{ px: 2, py: 0.85 }}>
-        <Stack direction="row" alignItems="center" gap={1.5}>
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5 }}  >
           <Button size="small" onClick={onClearAll} startIcon={<ClearIcon sx={{ fontSize: 12 }} />}
             sx={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 1.5, height: 30, px: 1.25, flexShrink: 0, '&:hover': { color: '#ef4444', bgcolor: '#fef2f2', borderColor: '#fecaca' } }}>
             Clear all
@@ -1466,7 +1466,7 @@ export default function BulkAssignmentPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 2, bgcolor: '#f8fafc' }}>
       <Box sx={{ width: 56, height: 56, borderRadius: 2, background: G, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(30,58,138,0.3)' }}><AssignmentIcon sx={{ fontSize: 28, color: '#fff' }} /></Box>
       <CircularProgress size={20} sx={{ color: '#1E3A8A' }} />
-      <Typography fontSize={13} color="#94a3b8" fontWeight={500}>Loading KRA Assignment…</Typography>
+      <Typography sx={{ fontSize: 13, fontWeight: 500, color: '#94a3b8' }}   >Loading KRA Assignment…</Typography>
     </Box>
   );
 
@@ -1477,12 +1477,12 @@ export default function BulkAssignmentPage() {
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#f8fafc', overflow: 'hidden' }}>
       <Box sx={{ px: 3, pt: 2.5, pb: 1.5, flexShrink: 0 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}  >
           <Box>
-            <Typography fontWeight={900} color="#0f172a" fontSize="1.1rem" letterSpacing="-0.02em" lineHeight={1.2}>KRA Assignment</Typography>
-            <Typography fontSize={12} color="#94a3b8" mt={0.25}>Assign performance targets to employees for the active cycle</Typography>
+            <Typography sx={{ lineHeight: 1.2, letterSpacing: '-0.02em', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}     >KRA Assignment</Typography>
+            <Typography sx={{ mt: 0.25, fontSize: 12, color: '#94a3b8' }}   >Assign performance targets to employees for the active cycle</Typography>
           </Box>
-          <Stack direction="row" gap={1} alignItems="center">
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}  >
             {selectedAssigned.length > 0 && canEdit && (
               <Button size="small" startIcon={<DeleteOutlineIcon sx={{ fontSize: 13 }} />} onClick={handleBulkDelete}
                 sx={{ fontSize: 11, fontWeight: 700, color: '#ef4444', border: '1px solid #fecaca', borderRadius: 1.5, height: 32, px: 1.5, '&:hover': { bgcolor: '#fef2f2', border: '1px solid #f87171' } }}>
@@ -1492,7 +1492,7 @@ export default function BulkAssignmentPage() {
             <Tooltip title="Refresh KRAs and employees">
               <IconButton size="small" onClick={handleManualRefresh} disabled={refetching}
                 sx={{ border: '1px solid #e2e8f0', borderRadius: 1.5, width: 32, height: 32, color: '#64748b', '&:hover': { color: '#1E3A8A', border: '1px solid #bfdbfe', bgcolor: '#eff6ff' } }}>
-                <RefreshIcon fontSize="small" sx={{ animation: refetching ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } }} />
+                <RefreshIcon  sx={{ animation: refetching ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } }, fontSize: 'small' }} />
               </IconButton>
             </Tooltip>
           </Stack>
@@ -1501,7 +1501,7 @@ export default function BulkAssignmentPage() {
 
       <Box sx={{ flex: 1, overflow: 'auto', px: 3, pb: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         <CycleBanner cycle={activeCycle} allCycles={allCycles} onCycleChange={handleCycleChange} isReadOnly={isReadOnly} />
-        {isReadOnly && activeCycle && <Alert severity="info" icon={<LockIcon fontSize="small" />} sx={{ borderRadius: 2, fontSize: 12, py: 0.5 }}><strong>View Only.</strong> This cycle is {activeCycle.status?.toLowerCase()}.</Alert>}
+        {isReadOnly && activeCycle && <Alert severity="info" icon={<LockIcon  />} sx={{ borderRadius: 2, fontSize: 12, py: 0.5, fontSize: 'small' }}><strong>View Only.</strong> This cycle is {activeCycle.status?.toLowerCase()}.</Alert>}
         {refetching && <LinearProgress sx={{ borderRadius: 1, height: 2 }} />}
 
         {activeCycle ? (
@@ -1545,8 +1545,8 @@ export default function BulkAssignmentPage() {
         ) : (
           <Paper elevation={0} sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', p: 6, textAlign: 'center', bgcolor: '#fff' }}>
             <Box sx={{ width: 64, height: 64, borderRadius: 2.5, bgcolor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}><AssignmentIcon sx={{ fontSize: 32, color: '#cbd5e1' }} /></Box>
-            <Typography fontSize={15} fontWeight={800} color="#374151">No Active Cycle</Typography>
-            <Typography fontSize={13} color="#94a3b8" mt={0.5}>Activate a KRA cycle to start assigning KRAs to employees.</Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#374151' }}   >No Active Cycle</Typography>
+            <Typography sx={{ mt: 0.5, fontSize: 13, color: '#94a3b8' }}   >Activate a KRA cycle to start assigning KRAs to employees.</Typography>
           </Paper>
         )}
 
@@ -1611,7 +1611,7 @@ export default function BulkAssignmentPage() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
           }}>
             <CircularProgress size={36} sx={{ color: '#1E3A8A' }} />
-            <Typography fontSize={13.5} fontWeight={600} color="#1e293b">
+            <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: '#1e293b' }}   >
               {globalLoadingMsg || 'Processing…'}
             </Typography>
           </Paper>

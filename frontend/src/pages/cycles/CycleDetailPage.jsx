@@ -9,7 +9,7 @@ import ArrowBackIcon        from '@mui/icons-material/ArrowBack';
 import ContentCopyIcon      from '@mui/icons-material/ContentCopy';
 import AssignmentIndIcon    from '@mui/icons-material/AssignmentInd';
 import RateReviewIcon       from '@mui/icons-material/RateReview';
-import DeleteOutlineIcon    from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon    from '@mui/icons-material/DeleteOutlined';
 import CheckCircleIcon      from '@mui/icons-material/CheckCircle';
 import SaveIcon             from '@mui/icons-material/Save';
 import CalendarMonthIcon    from '@mui/icons-material/CalendarMonth';
@@ -51,10 +51,10 @@ const STATUS_ACTIONS = {
   CANCELLED: [],
 };
 const ACTION_CONFIG = {
-  ACTIVE:    { label: 'Activate',    icon: <PlayArrowIcon fontSize="small" />,   confirmColor: '#15803d' },
-  ON_HOLD:   { label: 'Put On Hold', icon: <PauseIcon fontSize="small" />,       confirmColor: '#9a3412' },
-  CLOSED:    { label: 'Close Cycle', icon: <CheckCircleIcon fontSize="small" />, confirmColor: '#1E3A8A' },
-  CANCELLED: { label: 'Cancel Cycle',icon: <BlockIcon fontSize="small" />,       confirmColor: '#dc2626' },
+  ACTIVE:    { label: 'Activate',    icon: <PlayArrowIcon sx={{ fontSize: 'small' }}  />,   confirmColor: '#15803d' },
+  ON_HOLD:   { label: 'Put On Hold', icon: <PauseIcon sx={{ fontSize: 'small' }}  />,       confirmColor: '#9a3412' },
+  CLOSED:    { label: 'Close Cycle', icon: <CheckCircleIcon sx={{ fontSize: 'small' }}  />, confirmColor: '#1E3A8A' },
+  CANCELLED: { label: 'Cancel Cycle',icon: <BlockIcon sx={{ fontSize: 'small' }}  />,       confirmColor: '#dc2626' },
 };
 const ACTION_DIALOG_CONFIG = {
   ACTIVE: { title: 'Activate Cycle', confirmLabel: 'Activate Cycle', cancelLabel: 'Not Now',},
@@ -135,8 +135,8 @@ function RangePicker({ startDate, endDate, onChange, minDate, maxDate, onClose }
       boxShadow: '0 12px 40px -4px rgba(15,23,42,0.18), 0 2px 8px -2px rgba(15,23,42,0.08)',
       border: '1px solid #e2e8f0',
     }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between"
-        sx={{ px: 1.25, py: 0.75, background: gradient }}>
+      <Stack direction="row"  
+        sx={{ px: 1.25, py: 0.75, background: gradient, alignItems: 'center', justifyContent: 'space-between' }}>
         <IconButton size="small"
           disabled={minD && new Date(vy, vm, 1) <= new Date(minD.getFullYear(), minD.getMonth(), 1)}
           onClick={() => vm===0 ? (setVm(11),setVy(y=>y-1)) : setVm(m=>m-1)}
@@ -150,7 +150,7 @@ function RangePicker({ startDate, endDate, onChange, minDate, maxDate, onClose }
           sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 }, '&.Mui-disabled': { opacity: 0.3 } }}>
           <ChevronRightIcon sx={{ fontSize: 14 }} />
         </IconButton>
-        <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml: 0.5 }}>
+        <Stack direction="row"  spacing={0.4} sx={{ ml: 0.5, alignItems: 'center' }}>
           {[{ key:'start', val: startDate }, { key:'end', val: endDate }].map(({ key, val }, i) => (
             <React.Fragment key={key}>
               {i === 1 && <Typography sx={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>→</Typography>}
@@ -178,7 +178,7 @@ function RangePicker({ startDate, endDate, onChange, minDate, maxDate, onClose }
         </Stack>
       </Stack>
       <Box sx={{ px: 1.25, pt: 0.75, pb: 0.75 }}>
-        <Stack direction="row" mb={0.4}>
+        <Stack direction="row" sx={{ mb: 0.4 }} >
           {WEEK_DAYS.map(d => (
             <Box key={d} sx={{ flex:1, textAlign:'center' }}>
               <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', letterSpacing: '0.02em' }}>{d}</Typography>
@@ -306,19 +306,19 @@ function DateRangeField({ startDate, endDate, onChange, minDate, maxDate, disabl
 /* ─────────────── ConfirmDialog ─────────────── */
 function ConfirmDialog({ open, title, message, warning, confirmLabel,cancelLabel = 'Cancel', confirmColor, onClose, onConfirm, loading, error }) {
   return (
-    <Dialog open={open} onClose={() => !loading && onClose()} maxWidth="xs" fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
+    <Dialog open={open} onClose={() => !loading && onClose()}  fullWidth
+      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid #fde68a' }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
           <WarningAmberIcon sx={{ color: '#d97706', fontSize: 18 }} />
-          <Typography fontWeight={700} fontSize={14} color="#92400e">{title}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}   >{title}</Typography>
         </Stack>
       </Box>
       <DialogContent sx={{ pt: 2, pb: 1 }}>
-        <Typography fontSize={13} color="#374151" mb={warning ? 1.5 : 0}>{message}</Typography>
+        <Typography sx={{ mb: warning ? 1.5 : 0, fontSize: 13, color: '#374151' }}   >{message}</Typography>
         {warning && (
           <Box sx={{ px: 1.5, py: 1, bgcolor: '#fef2f2', borderRadius: 1.5, border: '1px solid #fecaca' }}>
-            <Typography fontSize={12} color="#991b1b">{warning}</Typography>
+            <Typography sx={{ fontSize: 12, color: '#991b1b' }}  >{warning}</Typography>
           </Box>
         )}
         {error && <Alert severity="error" sx={{ mt: 1.5, fontSize: 12, borderRadius: 1.5 }}>{error}</Alert>}
@@ -329,12 +329,10 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel,cancelLabel
           {cancelLabel}
         </Button>
         <Button onClick={onConfirm} disabled={loading} variant="contained"
-          startIcon={loading ? <CircularProgress size={12} color="inherit" /> : null}
-          sx={{
-            textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
+          startIcon={loading ? <CircularProgress size={12}  /> : null}
+          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
             bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 },
-            '&:disabled': { opacity: 0.6 },
-          }}>
+            '&:disabled': { opacity: 0.6 }, color: 'inherit' }}>
           {loading ? 'Processing…' : confirmLabel}
         </Button>
       </DialogActions>
@@ -948,7 +946,7 @@ export default function CycleDetailPage() {
 
       {/* ────────────── TOP BAR ────────────── */}
       <Box sx={{ flexShrink: 0, bgcolor: '#fff', borderBottom: '1px solid #e2e8f0', px: 2.5, py: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
           <IconButton
             onClick={() => {
               if (isDirty && isEditMode && !isNew) {
@@ -960,9 +958,9 @@ export default function CycleDetailPage() {
             }}
             size="small"
             sx={{ color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 1.5, p: 0.5, '&:hover': { bgcolor: '#f1f5f9', color: '#1E3A8A' } }}>
-            <ArrowBackIcon fontSize="small" />
+            <ArrowBackIcon sx={{ fontSize: 'small' }}  />
           </IconButton>
-          <Typography fontWeight={800} color="#0f172a" sx={{ fontSize: '1.05rem', lineHeight: 1.2 }}>
+          <Typography   sx={{ fontSize: '1.05rem', lineHeight: 1.2, fontWeight: 800, color: '#0f172a' }}>
             {isCreate ? 'Create New Cycle' : isClone ? 'Clone Cycle' : 'Cycle Details'}
           </Typography>
         </Stack>
@@ -975,17 +973,15 @@ export default function CycleDetailPage() {
             <Box sx={{ px: 2.5, pt: 2, pb: 2, background: gradient, color: '#fff' }}>
 
               {/* Top row: LIVE chip + status badge + action buttons (right) */}
-              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}   >
                 {/* Left: LIVE + cycle info */}
                 <Stack
                   direction="row"
-                  alignItems="center"
+                  
                   spacing={1.5}
-                  sx={{
-                    flex: 1,
+                  sx={{ flex: 1,
                     minWidth: 0,
-                    overflow: 'hidden',
-                  }}
+                    overflow: 'hidden', alignItems: 'center' }}
                 >
                   {currentStatus === 'ACTIVE' && (
                     <Chip
@@ -1047,7 +1043,7 @@ export default function CycleDetailPage() {
                 </Stack>
 
                 {/* Right: Edit (always visible outside), then 3-dot with everything else */}
-                <Stack direction="row" spacing={0.75} alignItems="center">
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }} >
 
                   {/* Primary status action (Activate) */}
                   {canManageCycles && primaryAction && (
@@ -1177,7 +1173,7 @@ export default function CycleDetailPage() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
               <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
-                <Typography fontWeight={700} fontSize={13} color="#1e293b">
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}   >
                   {isNew ? (isClone ? 'Clone Settings' : 'Cycle Information') : 'Cycle Details'}
                 </Typography>
               </Box>
@@ -1202,8 +1198,8 @@ export default function CycleDetailPage() {
                     </Box>
                   ) : (
                     <Box>
-                      <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.05em" mb={0.4}>Cycle Name</Typography>
-                      <Typography fontSize={14} fontWeight={700} color="#0f172a">{editName}</Typography>
+                      <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.4, fontSize: 10, fontWeight: 700, color: '#94a3b8' }}      >Cycle Name</Typography>
+                      <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}   >{editName}</Typography>
                     </Box>
                   )}
 
@@ -1222,14 +1218,14 @@ export default function CycleDetailPage() {
                     </Box>
                   ) : cycle?.description ? (
                     <Box>
-                      <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.05em" mb={0.4}>Description</Typography>
-                      <Typography fontSize={13} color="#374151">{cycle.description}</Typography>
+                      <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.4, fontSize: 10, fontWeight: 700, color: '#94a3b8' }}      >Description</Typography>
+                      <Typography sx={{ fontSize: 13, color: '#374151' }}  >{cycle.description}</Typography>
                     </Box>
                   ) : null}
 
                   {/* Cycle period */}
                   <Box>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
+                    <Stack direction="row"   sx={{ mb: 0.75, alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         Cycle Period {formEditable && <Box component="span" sx={{ color: '#ef4444' }}>*</Box>}
                       </Typography>
@@ -1255,7 +1251,7 @@ export default function CycleDetailPage() {
                         )}
                       </>
                     ) : (
-                      <Typography fontSize={13} color="#374151" fontWeight={500}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 500, color: '#374151' }}   >
                         {fmt(editStart)} — {fmt(editEnd)}
                         {durationDays && (
                           <Box component="span" sx={{ ml: 1, fontSize: 11, color: '#64748b', fontWeight: 400 }}>
@@ -1269,23 +1265,23 @@ export default function CycleDetailPage() {
                   {/* Status/stage info */}
                   {!isNew && (
                     <Stack direction="row" spacing={3}>
-                      <Box flex={1}>
-                        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.05em" mb={0.4}>Status</Typography>
+                      <Box sx={{ flex: 1 }} >
+                        <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.4, fontSize: 10, fontWeight: 700, color: '#94a3b8' }}      >Status</Typography>
                         <Chip label={currentStatus?.replace('_', ' ')} size="small"
                           sx={{ fontWeight: 700, borderRadius: 99, ...(STATUS_STYLES[currentStatus] ?? STATUS_STYLES.DRAFT) }} />
                       </Box>
-                      <Box flex={1}>
-                        <Typography fontSize={10} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.05em" mb={0.4}>Current Stage</Typography>
+                      <Box sx={{ flex: 1 }} >
+                        <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.4, fontSize: 10, fontWeight: 700, color: '#94a3b8' }}      >Current Stage</Typography>
                         {cycle?.current_stage ? (
-                          <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <Stack direction="row"  spacing={0.75} sx={{ alignItems: 'center' }}>
                             <Box sx={{ width: 20, height: 20, borderRadius: '50%', background: gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                               <Typography sx={{ fontSize: 9, fontWeight: 800, color: '#fff' }}>{cycle.current_stage.id}</Typography>
                             </Box>
-                            <Typography fontSize={13} color="#374151">
+                            <Typography sx={{ fontSize: 13, color: '#374151' }}  >
                               {stages.find(s => s.id === cycle.current_stage.id)?.name ?? cycle.current_stage.name}
                             </Typography>
                           </Stack>
-                        ) : <Typography fontSize={13} color="#94a3b8">—</Typography>}
+                        ) : <Typography sx={{ fontSize: 13, color: '#94a3b8' }}  >—</Typography>}
                       </Box>
                     </Stack>
                   )}
@@ -1295,7 +1291,7 @@ export default function CycleDetailPage() {
               {!isNew && isFrozen && (
                 <Box sx={{ px: 2, pb: 2 }}>
                   <Box sx={{ px: 1.5, py: 1, bgcolor: '#f8fafc', borderRadius: 1.5, border: '1px solid #e2e8f0' }}>
-                    <Typography fontSize={12} color="#94a3b8">
+                    <Typography sx={{ fontSize: 12, color: '#94a3b8' }}  >
                       This cycle is <strong>{currentStatus?.toLowerCase().replace('_', ' ')}</strong>. No further changes allowed.
                     </Typography>
                   </Box>
@@ -1305,7 +1301,7 @@ export default function CycleDetailPage() {
 
             {/* Create new cycle actions */}
             {isNew && (
-              <Stack direction="row" spacing={1} justifyContent="flex-end">
+              <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }} >
                 <Button onClick={() => navigate(ROUTES.DASHBOARD)}
                   sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, fontSize: 13, borderRadius: 1.5, border: '1px solid #e2e8f0', px: 2 }}>
                   Cancel
@@ -1315,8 +1311,8 @@ export default function CycleDetailPage() {
                   onClick={handleSubmit}
                   variant="contained"
                   startIcon={submitting
-                    ? <CircularProgress size={13} color="inherit" />
-                    : isClone ? <ContentCopyIcon sx={{ fontSize: 14 }} /> : null}
+                    ? <CircularProgress size={13}  />
+                    : isClone ? <ContentCopyIcon sx={{ fontSize: 14, color: 'inherit' }} /> : null}
                   sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, background: gradient, 
                     '&:hover': { background: gradient, opacity: 0.9 }, 
                     '&.Mui-disabled': {
@@ -1332,11 +1328,11 @@ export default function CycleDetailPage() {
             {/* Clone source info */}
             {isClone && source && (
               <Paper elevation={0} sx={{ borderRadius: 2, border: '1.5px solid #bfdbfe', overflow: 'hidden', bgcolor: '#eff6ff' }}>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.25 }}>
+                <Stack direction="row"  spacing={1} sx={{ px: 2, py: 1.25, alignItems: 'center' }}>
                   <ContentCopyIcon sx={{ color: '#3b82f6', fontSize: 16 }} />
                   <Box>
-                    <Typography fontSize={12} fontWeight={700} color="#1d4ed8">Cloning from: {source.name}</Typography>
-                    <Typography fontSize={11} color="#3b82f6">
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}   >Cloning from: {source.name}</Typography>
+                    <Typography sx={{ fontSize: 11, color: '#3b82f6' }}  >
                       {fmt(source.start_date)} — {fmt(source.end_date)} · Status: {source.status}
                     </Typography>
                   </Box>
@@ -1347,10 +1343,10 @@ export default function CycleDetailPage() {
 
           {/* ── Right: Stage Date Windows ── */}
           <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between"
-              sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
-              <Typography fontWeight={700} fontSize={13} color="#1e293b">Stage Dates</Typography>
-              <Typography fontSize={11} color="#94a3b8">
+            <Stack direction="row"  
+              sx={{ px: 2, py: 1.25, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}   >Stage Dates</Typography>
+              <Typography sx={{ fontSize: 11, color: '#94a3b8' }}  >
                 {isNew ? `${configuredCount}/5 configured (optional)` : formEditable ? 'Edit inline' : 'Read-only'}
               </Typography>
             </Stack>
@@ -1358,13 +1354,13 @@ export default function CycleDetailPage() {
             {/* Rollback hint banner */}
             {rollbackTargetId && !isNew && (
               <Box sx={{ px: 2, py: 1, bgcolor: '#fff7ed', borderBottom: '1px solid #fde68a' }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
+                <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
                   <Box sx={{ fontSize: 14 }}>⬅</Box>
                   <Box>
-                    <Typography fontSize={12} fontWeight={700} color="#92400e">
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}   >
                       Rolling back to "{stages.find(s => s.id === rollbackTargetId)?.name}"
                     </Typography>
-                    <Typography fontSize={11} color="#b45309">
+                    <Typography sx={{ fontSize: 11, color: '#b45309' }}  >
                       Update the highlighted stage dates below, then click Save.
                     </Typography>
                   </Box>
@@ -1406,7 +1402,7 @@ export default function CycleDetailPage() {
                       '50%': { boxShadow: '0 0 0 4px rgba(59,130,246,0.25)' },
                     },
                   }}>
-                  <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.25 }} spacing={1.5}>
+                  <Stack direction="row"  sx={{ px: 2, py: 1.25, alignItems: 'center' }} spacing={1.5}>
                     <Box sx={{
                       width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
                       background: done ? '#10b981' : isRollbackTarget ? '#3b82f6' : active ? gradient : (configured && isNew) ? gradient : hasErr ? '#fee2e2' : '#f1f5f9',
@@ -1421,17 +1417,17 @@ export default function CycleDetailPage() {
                           </Typography>}
                     </Box>
                     <Typography
-                      fontWeight={isRollbackTarget ? 700 : active ? 700 : configured ? 600 : 500}
-                      fontSize={13}
-                      color={isRollbackTarget ? '#1E3A8A' : active ? '#1E3A8A' : hasErr ? '#dc2626' : '#374151'}
-                      sx={{ width: 180, flexShrink: 0 }}
+                      
+                      
+                      
+                      sx={{ width: 180, flexShrink: 0, fontSize: 13, fontWeight: isRollbackTarget ? 700 : active ? 700 : configured ? 600 : 500, color: isRollbackTarget ? '#1E3A8A' : active ? '#1E3A8A' : hasErr ? '#dc2626' : '#374151' }}
                     >
                       {isRollbackTarget && <span style={{ marginRight: 4 }}>📍</span>}
                       {stage.name}
                     </Typography>
-                    <Box flex={1} minWidth={0}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}  >
                       {(!formEditable || isFrozen) ? (
-                        <Typography fontSize={12} color="#64748b">
+                        <Typography sx={{ fontSize: 12, color: '#64748b' }}  >
                           {configured
                             ? `${fmt(stageStart)} → ${fmt(stageEnd)}`
                             : <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>Not configured</span>}
@@ -1474,7 +1470,7 @@ export default function CycleDetailPage() {
           </Button>
           <Button size="small" onClick={handleSave} disabled={isSaving || !isDirty}
             variant="contained"
-            startIcon={isSaving ? <CircularProgress size={12} color="inherit" /> : <SaveIcon sx={{ fontSize: 13 }} />}
+            startIcon={isSaving ? <CircularProgress size={12}  /> : <SaveIcon sx={{ fontSize: 13, color: 'inherit' }} />}
             sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 12, background: gradient, '&:hover': { background: gradient, opacity: 0.9 },
              '&.Mui-disabled': { opacity: 1, background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', color: 'rgba(255,255,255,0.75)',}}}>
             {isSaving ? 'Saving…' : 'Save'}
@@ -1564,20 +1560,20 @@ export default function CycleDetailPage() {
       <Dialog
         open={unsavedWarningOpen}
         onClose={() => setUnsavedWarningOpen(false)}
-        maxWidth="xs"
+        
         fullWidth
-        PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}
+        PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}
       >
         <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid #fde68a' }}>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
             <WarningAmberIcon sx={{ color: '#d97706', fontSize: 18 }} />
-            <Typography fontWeight={700} fontSize={14} color="#92400e">
+            <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}   >
               Unsaved Changes
             </Typography>
           </Stack>
         </Box>
         <DialogContent sx={{ pt: 2, pb: 1 }}>
-          <Typography fontSize={13} color="#374151">
+          <Typography sx={{ fontSize: 13, color: '#374151' }}  >
             You have unsaved changes. What would you like to do?
           </Typography>
         </DialogContent>

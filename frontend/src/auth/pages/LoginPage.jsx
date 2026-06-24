@@ -77,9 +77,9 @@ export default function LoginPage() {
               bgcolor: 'rgba(255,255,255,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Typography fontWeight={800} fontSize={18}>A</Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 800 }}  >A</Typography>
             </Box>
-            <Typography fontWeight={600} fontSize={18} letterSpacing={0.5}>
+            <Typography sx={{ letterSpacing: 0.5, fontSize: 18, fontWeight: 600 }}   >
               Executive Portal
             </Typography>
           </Stack>
@@ -136,10 +136,10 @@ export default function LoginPage() {
             }}>
               <LockOutlinedIcon sx={{ color: '#fff', fontSize: 28 }} />
             </Box>
-            <Typography variant="h5" fontWeight={700} color="#1e293b">
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}  >
               Sign in to your account
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography variant="body2"  sx={{ mt: 0.5, color: 'text.secondary' }}>
               KRA Management Platform
             </Typography>
           </Stack>
@@ -168,7 +168,7 @@ export default function LoginPage() {
               </Button>
 
               <Divider sx={{ my: 1.5 }}>
-                <Typography variant="caption" color="text.disabled" sx={{ px: 1 }}>or</Typography>
+                <Typography variant="caption"  sx={{ px: 1, color: 'text.disabled' }}>or</Typography>
               </Divider>
 
               <Button
@@ -222,7 +222,7 @@ export default function LoginPage() {
                     fontWeight: 600
                   }}
                 >
-                  {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
+                  {loading ? <CircularProgress size={24} sx={{ color: 'inherit' }}  /> : 'Sign In'}
                 </Button>
                 <Button
                   fullWidth

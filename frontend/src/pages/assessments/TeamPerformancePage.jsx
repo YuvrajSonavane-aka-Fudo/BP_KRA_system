@@ -96,7 +96,7 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
 
   return (
     <Box sx={{ width: 248, borderRadius: 2, overflow: 'hidden', bgcolor: '#fff', boxShadow: '0 12px 40px -4px rgba(15,23,42,0.18)', border: '1px solid #e2e8f0' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.25, py: 0.75, background: gradient }}>
+      <Stack direction="row"   sx={{ px: 1.25, py: 0.75, background: gradient, alignItems: 'center', justifyContent: 'space-between' }}>
         <IconButton size="small" onClick={() => vm===0 ? (setVm(11),setVy(y=>y-1)) : setVm(m=>m-1)}
           sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
           <ChevronLeftIcon sx={{ fontSize: 14 }} />
@@ -106,7 +106,7 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
           sx={{ color:'#fff', p:0.2, '&:hover':{ bgcolor:'rgba(255,255,255,0.15)', borderRadius:1 } }}>
           <ChevronRightIcon sx={{ fontSize: 14 }} />
         </IconButton>
-        <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml: 0.5 }}>
+        <Stack direction="row"  spacing={0.4} sx={{ ml: 0.5, alignItems: 'center' }}>
           {[{ key:'start', val: startDate }, { key:'end', val: endDate }].map(({ key, val }, i) => (
             <React.Fragment key={key}>
               {i === 1 && <Typography sx={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>→</Typography>}
@@ -127,7 +127,7 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
         </Stack>
       </Stack>
       <Box sx={{ px: 1.25, pt: 0.75, pb: 0.75 }}>
-        <Stack direction="row" mb={0.4}>
+        <Stack direction="row" sx={{ mb: 0.4 }} >
           {WEEK_DAYS.map(d => (
             <Box key={d} sx={{ flex:1, textAlign:'center' }}>
               <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', letterSpacing: '0.02em' }}>{d}</Typography>
@@ -274,7 +274,7 @@ function CycleStageStepper({ currentStageId, completedStageIds }) {
           const isLast = i === states.length - 1;
           return (
             <React.Fragment key={stage.id}>
-              <Stack alignItems="center" spacing={0.5} sx={{ minWidth: 80 }}>
+              <Stack  spacing={0.5} sx={{ minWidth: 80, alignItems: 'center' }}>
                 <Box sx={{
                   width: 34, height: 34, borderRadius: '50%',
                   bgcolor: stage.isCurrent ? BLUE : stage.isDone ? '#22c55e' : '#e2e8f0',
@@ -334,15 +334,15 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
     }}>
       {/* KRA name bar */}
       <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#fafbff', borderBottom: '1px solid #f1f5f9' }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}  >
+          <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
             {row.lead_rating_id
               ? <CheckCircleIcon sx={{ fontSize: 17, color: '#22c55e' }} />
               : <PendingIcon sx={{ fontSize: 17, color: '#f59e0b' }} />
             }
             <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>{row.kra_name}</Typography>
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }} >
             {row.category_name && (
               <Chip label={row.category_name} size="small"
                 sx={{ bgcolor: '#eef2ff', color: '#4f46e5', fontSize: 11, fontWeight: 600, height: 20 }} />
@@ -395,7 +395,7 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
             Lead Evaluation
           </Typography>
           {!editable ? (
-            <Stack direction="row" alignItems="flex-start" spacing={1}>
+            <Stack direction="row"  spacing={1} sx={{ alignItems: 'flex-start' }}>
               <LockIcon sx={{ fontSize: 15, color: '#cbd5e1', mt: 0.2 }} />
               <Typography sx={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
                 {lockReason || 'Not available at this stage.'}
@@ -436,7 +436,7 @@ function KRAReviewRow({ row, ratings, editable, lockReason, onSave, saving, save
                   }
                 }}
               />
-              <Stack direction="row" justifyContent="flex-end">
+              <Stack direction="row" sx={{ justifyContent: 'flex-end' }} >
                 <Box onClick={dirty ? handleSave : undefined} sx={{
                   display: 'inline-flex', alignItems: 'center', gap: 0.8,
                   px: 2, py: 0.8, borderRadius: 2,
@@ -494,35 +494,31 @@ function InlineStageRow({ stageData, isTarget, onRangeChange }) {
   }, [open]);
 
   return (
-    <Stack ref={ref} direction="row" alignItems="center" sx={{
-      borderRadius: 2,
+    <Stack ref={ref} direction="row"  sx={{ borderRadius: 2,
       border: isTarget ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
       bgcolor: isTarget ? '#eff6ff' : '#fff',
       overflow: 'visible',
       position: 'relative',
-      transition: 'border-color 0.15s',
-    }}>
+      transition: 'border-color 0.15s', alignItems: 'center' }}>
       {/* Left: stage name */}
       <Box sx={{ px: 2, py: 1.25, minWidth: 170, flexShrink: 0, borderRight: '1px solid #e2e8f0' }}>
-        <Stack direction="row" alignItems="center" spacing={0.75}>
+        <Stack direction="row"  spacing={0.75} sx={{ alignItems: 'center' }}>
           {isTarget && (
             <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#3b82f6', flexShrink: 0 }} />
           )}
-          <Typography fontSize={13} fontWeight={isTarget ? 700 : 500} color={isTarget ? BLUE : '#374151'}>
+          <Typography sx={{ fontSize: 13, fontWeight: isTarget ? 700 : 500, color: isTarget ? BLUE : '#374151' }}   >
             {stageData.name}
           </Typography>
         </Stack>
       </Box>
 
       {/* Right: calendar pill */}
-      <Stack direction="row" alignItems="center" spacing={1} flex={1}
+      <Stack direction="row"  spacing={1} 
         onClick={() => setOpen(o => !o)}
-        sx={{
-          px: 1.5, py: 1.1, cursor: 'pointer',
+        sx={{ px: 1.5, py: 1.1, cursor: 'pointer',
           borderRadius: '0 8px 8px 0',
           '&:hover': { bgcolor: isTarget ? 'rgba(219,234,254,0.3)' : '#f8fafc' },
-          transition: 'background 0.12s',
-        }}>
+          transition: 'background 0.12s', alignItems: 'center', flex: 1 }}>
         <CalendarMonthIcon sx={{ fontSize: 14, color: bothSet ? BLUE : '#94a3b8', flexShrink: 0 }} />
         <Typography sx={{ fontSize: 13, color: bothSet ? '#1e293b' : '#94a3b8', flex: 1, userSelect: 'none' }}>
           {bothSet ? (
@@ -624,7 +620,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
   return (
     <Box sx={{ mt: 1.5 }}>
       {/* Mini stepper */}
-      <Stack direction="row" alignItems="center" spacing={0}>
+      <Stack direction="row"  spacing={0} sx={{ alignItems: 'center' }}>
         {stages.map((stage, i) => {
           const isDone    = stage.id < currentStageId;
           const isCurrent = stage.id === currentStageId;
@@ -632,7 +628,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
           return (
             <React.Fragment key={stage.id}>
               <Tooltip title={stage.name}>
-                <Stack alignItems="center" spacing={0.3} sx={{ minWidth: 52 }}>
+                <Stack  spacing={0.3} sx={{ minWidth: 52, alignItems: 'center' }}>
                   <Box sx={{
                     width: isCurrent ? 26 : 20, height: isCurrent ? 26 : 20,
                     borderRadius: '50%',
@@ -665,7 +661,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
 
       {/* Admin back/forward controls */}
       {isAdmin && (
-        <Stack direction="row" alignItems="center" spacing={1} mt={1}>
+        <Stack direction="row"  spacing={1} sx={{ alignItems: 'center', mt: 1 }} >
           <Tooltip title={currentIdx > 0 ? `Move back to: ${stages[currentIdx - 1]?.name}` : 'Already at first stage'}>
             <span>
               <IconButton size="small"
@@ -696,7 +692,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
 
       {/* ─── Confirm dialog — unified blue theme ─── */}
       <Dialog open={confirmDialog.open} onClose={() => !isBusy && closeDialog()}
-        maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 20px 60px -10px rgba(15,23,42,0.2)' } }}>
+         fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 20px 60px -10px rgba(15,23,42,0.2)' } }} sx={{ maxWidth: 'sm' }}>
 
         {/* Header — always blue */}
         <Box sx={{
@@ -704,7 +700,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
           px: 3, pt: 2.5, pb: 2,
           borderBottom: '1px solid #bfdbfe',
         }}>
-          <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Stack direction="row"  spacing={1.25} sx={{ alignItems: 'center' }}>
             <Box sx={{
               width: 32, height: 32, borderRadius: '50%',
               bgcolor: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -714,13 +710,13 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
               </Typography>
             </Box>
             <Box>
-              <Typography fontWeight={700} fontSize={15} color={BLUE}>
+              <Typography sx={{ fontSize: 15, fontWeight: 700, color: BLUE }}   >
                 {isBack
                   ? `Move Back to ${confirmDialog.toStage?.name}`
                   : `Move Forward to ${confirmDialog.toStage?.name}`}
               </Typography>
               {isBack && (
-                <Typography fontSize={12} color="#64748b" mt={0.2}>
+                <Typography sx={{ mt: 0.2, fontSize: 12, color: '#64748b' }}   >
                   Set this employee's personal stage dates
                 </Typography>
               )}
@@ -731,7 +727,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
         <DialogContent sx={{ pt: 2, pb: 1, px: 3, overflow: 'visible' }}>
           {isBack ? (
             <>
-              <Typography fontSize={13} color="#374151" mb={2} sx={{ lineHeight: 1.6 }}>
+              <Typography    sx={{ lineHeight: 1.6, mb: 2, fontSize: 13, color: '#374151' }}>
                 Adjust stage dates for this employee. These will override cycle-level dates only for them.
               </Typography>
               <Stack spacing={0.75}>
@@ -750,7 +746,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
               </Stack>
             </>
           ) : (
-            <Typography fontSize={13} color="#374151" sx={{ lineHeight: 1.6 }}>
+            <Typography   sx={{ lineHeight: 1.6, fontSize: 13, color: '#374151' }}>
               Move this employee forward to <strong>{confirmDialog.toStage?.name}</strong>? They will advance by one stage.
             </Typography>
           )}
@@ -840,9 +836,9 @@ function EmployeeReviewPanel({ cycleId, emp, allEmployees, ratings, currentCycle
 
       {/* Fixed header */}
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 2, flexShrink: 0, bgcolor: '#f5f6fa' }}>
-        <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+        <Stack direction="row"  spacing={2} sx={{ alignItems: 'center', mb: 2 }} >
           <IconButton onClick={onBack} size="small" sx={{ bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#e2e8f0' } }}>
-            <ArrowBackIcon fontSize="small" />
+            <ArrowBackIcon sx={{ fontSize: 'small' }}  />
           </IconButton>
 
           <Avatar sx={{ width: 42, height: 42, bgcolor: BLUE, fontSize: 15, fontWeight: 800 }}>
@@ -869,7 +865,7 @@ function EmployeeReviewPanel({ cycleId, emp, allEmployees, ratings, currentCycle
           >
             {allEmployees.map(e => (
               <MenuItem key={e.employee_id} value={e.employee_id} sx={{ fontSize: 13 }}>
-                <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
                   <Avatar sx={{ width: 22, height: 22, bgcolor: BLUE, fontSize: 9, fontWeight: 800 }}>
                     {initials(e.full_name)}
                   </Avatar>
@@ -886,7 +882,7 @@ function EmployeeReviewPanel({ cycleId, emp, allEmployees, ratings, currentCycle
 
           <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, px: 2, py: 1, minWidth: 130, flexShrink: 0 }}>
             <Typography sx={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, mb: 0.3 }}>KRAs Reviewed</Typography>
-            <Stack direction="row" alignItems="baseline" spacing={0.5}>
+            <Stack direction="row"  spacing={0.5} sx={{ alignItems: 'baseline' }}>
               <Typography sx={{ fontSize: 20, fontWeight: 800, color: BLUE }}>{reviewed}</Typography>
               <Typography sx={{ fontSize: 13, color: '#94a3b8' }}>/ {localKras.length}</Typography>
             </Stack>
@@ -913,7 +909,7 @@ function EmployeeReviewPanel({ cycleId, emp, allEmployees, ratings, currentCycle
       {/* Scrollable KRA list */}
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2 }}>
         {!editable && lockReason && (
-          <Alert severity="warning" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
+          <Alert severity="warning" icon={<LockOutlinedIcon  />} sx={{ mb: 2, borderRadius: 2, fontSize: 'small' }}>
             {lockReason} KRA data is shown in read-only mode.
           </Alert>
         )}
@@ -924,7 +920,7 @@ function EmployeeReviewPanel({ cycleId, emp, allEmployees, ratings, currentCycle
             placeholder={`Search ${localKras.length} KRAs…`}
             value={kraSearch}
             onChange={e => setKraSearch(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#94a3b8' }} /></InputAdornment> }}
+            slotProps={{ input: { startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 16, color: '#94a3b8', position: 'start' }} /></InputAdornment> } }}
             sx={{ mb: 2, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 13, bgcolor: '#fff' } }}
           />
         )}
@@ -1046,7 +1042,7 @@ export default function TeamPerformancePage() {
 
       {/* Fixed header */}
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 2, flexShrink: 0 }}>
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" gap={2} mb={2}>
+        <Stack direction="row" sx={{ alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2 }}     >
           <Box>
             {cycle && (
               <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
@@ -1080,7 +1076,7 @@ export default function TeamPerformancePage() {
         ) : (
           <>
             {employees.length > 0 && (
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} >
                 <Paper elevation={0} sx={{ flex: 1, border: '1.5px solid #e2e8f0', borderRadius: 3, p: 2.5 }}>
                   <Typography sx={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
                     Average Team Rating
@@ -1107,7 +1103,7 @@ export default function TeamPerformancePage() {
 
                 {pending > 0 && (
                   <Paper elevation={0} sx={{ flex: 1, border: '1.5px solid #bfdbfe', borderRadius: 3, p: 2.5, bgcolor: '#eff6ff' }}>
-                    <Stack direction="row" alignItems="flex-start" spacing={1}>
+                    <Stack direction="row"  spacing={1} sx={{ alignItems: 'flex-start' }}>
                       <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 0.3, flexShrink: 0 }}>
                         <Typography sx={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>!</Typography>
                       </Box>
@@ -1125,13 +1121,13 @@ export default function TeamPerformancePage() {
               </Stack>
             )}
 
-            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}   >
               <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>
                 Team Members {employees.length > 0 && `(${employees.length})`}
               </Typography>
               <TextField placeholder="Search team..." value={search}
                 onChange={e => setSearch(e.target.value)} size="small"
-                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#94a3b8' }} /></InputAdornment> }}
+                slotProps={{ input: { startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 16, color: '#94a3b8', position: 'start' }} /></InputAdornment> } }}
                 sx={{ width: 220, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 13, bgcolor: '#fff' } }} />
             </Stack>
 
@@ -1165,7 +1161,7 @@ export default function TeamPerformancePage() {
                         >
                           {/* Employee */}
                           <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
-                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                            <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
                               <Avatar sx={{ width: 34, height: 34, bgcolor: BLUE, fontSize: 12, fontWeight: 800 }}>
                                 {initials(emp.full_name)}
                               </Avatar>

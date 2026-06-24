@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import AddIcon              from '@mui/icons-material/Add';
 import ContentCopyIcon      from '@mui/icons-material/ContentCopy';
-import DeleteOutlineIcon    from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon    from '@mui/icons-material/DeleteOutlined';
 import SearchIcon           from '@mui/icons-material/Search';
 import BlockIcon            from '@mui/icons-material/Block';
 import PlayArrowIcon        from '@mui/icons-material/PlayArrow';
@@ -48,10 +48,10 @@ const STATUS_ACTIONS = {
 };
 
 const ACTION_CONFIG = {
-  ACTIVE:    { label: 'Activate',    icon: <PlayArrowIcon fontSize="small" />,   confirmColor: '#15803d' },
-  ON_HOLD:   { label: 'Put On Hold', icon: <PauseIcon fontSize="small" />,       confirmColor: '#9a3412' },
-  CLOSED:    { label: 'Close',       icon: <CheckCircleIcon fontSize="small" />, confirmColor: '#1E3A8A' },
-  CANCELLED: { label: 'Cancel',      icon: <BlockIcon fontSize="small" />,       confirmColor: '#dc2626' },
+  ACTIVE:    { label: 'Activate',    icon: <PlayArrowIcon sx={{ fontSize: 'small' }}  />,   confirmColor: '#15803d' },
+  ON_HOLD:   { label: 'Put On Hold', icon: <PauseIcon sx={{ fontSize: 'small' }}  />,       confirmColor: '#9a3412' },
+  CLOSED:    { label: 'Close',       icon: <CheckCircleIcon sx={{ fontSize: 'small' }}  />, confirmColor: '#1E3A8A' },
+  CANCELLED: { label: 'Cancel',      icon: <BlockIcon sx={{ fontSize: 'small' }}  />,       confirmColor: '#dc2626' },
 };
 const ACTION_DIALOG_CONFIG = {
   ACTIVE: { title:'Activate Cycle', confirmLabel:'Activate Cycle', cancelLabel:'Not Now' },
@@ -130,11 +130,11 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
   }
   return (
     <Box sx={{ width:248, borderRadius:2, overflow:'hidden', bgcolor:'#fff', boxShadow:'0 12px 40px -4px rgba(15,23,42,0.18)', border:'1px solid #e2e8f0' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px:1.25, py:0.75, background:gradient }}>
+      <Stack direction="row"   sx={{ px:1.25, py:0.75, background:gradient, alignItems: 'center', justifyContent: 'space-between' }}>
         <IconButton size="small" onClick={() => vm===0?(setVm(11),setVy(y=>y-1)):setVm(m=>m-1)} sx={{ color:'#fff',p:0.2,'&:hover':{bgcolor:'rgba(255,255,255,0.15)',borderRadius:1} }}><ChevronLeftIcon sx={{ fontSize:14 }}/></IconButton>
         <Typography sx={{ fontWeight:700, fontSize:12, color:'#fff' }}>{MONTHS[vm].slice(0,3)} {vy}</Typography>
         <IconButton size="small" onClick={() => vm===11?(setVm(0),setVy(y=>y+1)):setVm(m=>m+1)} sx={{ color:'#fff',p:0.2,'&:hover':{bgcolor:'rgba(255,255,255,0.15)',borderRadius:1} }}><ChevronRightIcon sx={{ fontSize:14 }}/></IconButton>
-        <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml:0.5 }}>
+        <Stack direction="row"  spacing={0.4} sx={{ ml:0.5, alignItems: 'center' }}>
           {[{key:'start',val:startDate},{key:'end',val:endDate}].map(({key,val},i)=>(
             <React.Fragment key={key}>
               {i===1&&<Typography sx={{fontSize:9,color:'rgba(255,255,255,0.5)'}}>→</Typography>}
@@ -147,7 +147,7 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
         </Stack>
       </Stack>
       <Box sx={{ px:1.25, pt:0.75, pb:0.75 }}>
-        <Stack direction="row" mb={0.4}>{WEEK_DAYS.map(d=><Box key={d} sx={{flex:1,textAlign:'center'}}><Typography sx={{fontSize:9,fontWeight:700,color:'#cbd5e1'}}>{d}</Typography></Box>)}</Stack>
+        <Stack direction="row" sx={{ mb: 0.4 }} >{WEEK_DAYS.map(d=><Box key={d} sx={{flex:1,textAlign:'center'}}><Typography sx={{fontSize:9,fontWeight:700,color:'#cbd5e1'}}>{d}</Typography></Box>)}</Stack>
         {Array.from({length:Math.ceil(cells.length/7)},(_,ri)=>(
           <Stack key={ri} direction="row" sx={{mb:0.1}}>
             {cells.slice(ri*7,ri*7+7).map((d,ci)=>{
@@ -334,19 +334,19 @@ function BannerStepper({
 /* ── Confirm dialog ── */
 function ConfirmDialog({ open, title, message, warning, confirmLabel, cancelLabel = 'Cancel', confirmColor, onClose, onConfirm, loading, error }) {
   return (
-    <Dialog open={open} onClose={() => !loading && onClose()} maxWidth="xs" fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
+    <Dialog open={open} onClose={() => !loading && onClose()}  fullWidth
+      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid #fde68a' }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
           <WarningAmberIcon sx={{ color: '#d97706', fontSize: 18 }} />
-          <Typography fontWeight={700} fontSize={14} color="#92400e">{title}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}   >{title}</Typography>
         </Stack>
       </Box>
       <DialogContent sx={{ pt: 2, pb: 1 }}>
-        <Typography fontSize={13} color="#374151" mb={warning ? 1.5 : 0}>{message}</Typography>
+        <Typography sx={{ mb: warning ? 1.5 : 0, fontSize: 13, color: '#374151' }}   >{message}</Typography>
         {warning && (
           <Box sx={{ px: 1.5, py: 1, bgcolor: '#fef2f2', borderRadius: 1.5, border: '1px solid #fecaca' }}>
-            <Typography fontSize={12} color="#991b1b">{warning}</Typography>
+            <Typography sx={{ fontSize: 12, color: '#991b1b' }}  >{warning}</Typography>
           </Box>
         )}
         {error && <Alert severity="error" sx={{ mt: 1.5, fontSize: 12, borderRadius: 1.5 }}>{error}</Alert>}
@@ -355,8 +355,8 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, cancelLabe
         <Button onClick={onClose} disabled={loading}
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>{cancelLabel}</Button>
         <Button onClick={onConfirm} disabled={loading} variant="contained"
-          startIcon={loading ? <CircularProgress size={12} color="inherit" /> : null}
-          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }, '&:disabled': { opacity: 0.6 } }}>
+          startIcon={loading ? <CircularProgress size={12}  /> : null}
+          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }, '&:disabled': { opacity: 0.6 }, color: 'inherit' }}>
           {loading ? 'Processing…' : confirmLabel}
         </Button>
       </DialogActions>
@@ -588,10 +588,10 @@ const headerSx = {
     <Box sx={{ height: '100vh', p: 2, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: '#f8fafc', gap: 1.5, boxSizing: 'border-box' }}>
 
       {/* ── Header ── */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexShrink={0}>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}   >
         <Box>
-          <Typography fontWeight={800} color="#0f172a" sx={{ fontSize: '1.15rem', lineHeight: 1.2 }}>Performance Dashboard</Typography>
-          <Typography fontSize={12} color="#64748b">KRA cycle overview</Typography>
+          <Typography   sx={{ fontSize: '1.15rem', lineHeight: 1.2, fontWeight: 800, color: '#0f172a' }}>Performance Dashboard</Typography>
+          <Typography sx={{ fontSize: 12, color: '#64748b' }}  >KRA cycle overview</Typography>
         </Box>
         {canManageCycles && (
           <Button variant="contained" size="small" startIcon={<AddIcon />}
@@ -610,9 +610,9 @@ const headerSx = {
       {activeCycle && (
         <Paper elevation={0} sx={{ borderRadius: 2, flexShrink: 0, overflow: 'hidden', boxShadow: '0 4px 20px rgba(30,58,138,0.18)' }}>
           <Box sx={{ px: 2.5, pt: 2, pb: 2, background: gradient, color: '#fff' }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              <Box flex={1} minWidth={0} pr={2}>
-                <Stack direction="row" alignItems="center" spacing={1} mb={0.5} flexWrap="wrap" gap={0.5}>
+            <Stack direction="row" sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}  >
+              <Box sx={{ flex: 1, minWidth: 0, pr: 2 }}   >
+                <Stack direction="row"  spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}   >
                   <Chip
                     label={activeCycle.status === 'ACTIVE' ? 'ACTIVE' : activeCycle.status === 'DRAFT' ? 'DRAFT' : activeCycle.status.replace('_', ' ')}
                     size="small"
@@ -621,8 +621,8 @@ const headerSx = {
                       color: '#fff', fontSize: 9, fontWeight: 800, height: 17
                     }}
                   />
-                  <Typography fontWeight={800} sx={{ fontSize: '1rem' }} noWrap>{activeCycle.name}</Typography>
-                  <Typography fontSize={11} sx={{ opacity: 0.85 }}>
+                  <Typography  sx={{ fontSize: '1rem', fontWeight: 800 }} noWrap>{activeCycle.name}</Typography>
+                  <Typography  sx={{ opacity: 0.85, fontSize: 11 }}>
                     {formatDate(activeCycle.start_date)} — {formatDate(activeCycle.end_date)}
                   </Typography>
                   {(() => {
@@ -658,7 +658,7 @@ const headerSx = {
                 </Stack>
               </Box>
 
-              <Stack direction="row" spacing={0.75} alignItems="center" flexShrink={0}>
+              <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexShrink: 0 }}  >
                 {canManageCycles && (
                   <Tooltip title="Clone this cycle">
                     <Button size="small" startIcon={<ContentCopyIcon sx={{ fontSize: 13 }} />}
@@ -725,8 +725,8 @@ const headerSx = {
       <Paper sx={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden', minHeight: 444 }}>
 
         {/* Tab bar + search */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between"
-          sx={{ borderBottom: '1px solid #f1f5f9', px: 1.5, bgcolor: '#fff', flexShrink: 0 }}>
+        <Stack direction="row"  
+          sx={{ borderBottom: '1px solid #f1f5f9', px: 1.5, bgcolor: '#fff', flexShrink: 0, alignItems: 'center', justifyContent: 'space-between' }}>
           <Tabs value={tab} onChange={(_, v) => { setTab(v); setPage(0); }}
             variant="scrollable" scrollButtons={false}
             sx={{
@@ -737,9 +737,9 @@ const headerSx = {
             }}>
             {TAB_LABELS.map((label, i) => (
               <Tab key={label} label={
-                <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Stack direction="row"  spacing={0.5}>
                   <span>{label}</span>
-                  <Box sx={{ px: 0.75, py: 0.1, bgcolor: tab === i ? '#1E3A8A' : '#f1f5f9', borderRadius: 99, minWidth: 18, textAlign: 'center' }}>
+                  <Box sx={{ px: 0.75, py: 0.1, bgcolor: tab === i ? '#1E3A8A' : '#f1f5f9', borderRadius: 99, minWidth: 18, textAlign: 'center', alignItems: 'center' }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, color: tab === i ? '#fff' : '#64748b', lineHeight: 1.6 }}>
                       {tabCounts[i]}
                     </Typography>
@@ -750,7 +750,7 @@ const headerSx = {
           </Tabs>
           <TextField size="small" placeholder="Search cycles…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(0); }}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: '#94a3b8' }} /></InputAdornment> }}
+            slotProps={{ input: { startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 15, color: '#94a3b8', position: 'start' }} /></InputAdornment> } }}
             sx={{ ml: 1.5, width: 200, flexShrink: 0, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 12, height: 32 } }}
           />
         </Stack>
@@ -824,9 +824,9 @@ const headerSx = {
                   >
 
                     <TableCell sx={{ maxWidth: 240, pl: 2 }}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
+                      <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
                         {isActive && <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981', flexShrink: 0 }} />}
-                        <Box minWidth={0}>
+                        <Box sx={{ minWidth: 0 }} >
                           <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#1E3A8A' }} noWrap>{cycle.name}</Typography>
                           {cycle.description && (
                             <Typography sx={{ fontSize: 11, color: '#94a3b8' }} noWrap>{cycle.description}</Typography>
@@ -840,7 +840,7 @@ const headerSx = {
                     </TableCell>
 
                     <TableCell>
-                      <Stack direction="row" alignItems="center" spacing={0.75}>
+                      <Stack direction="row"  spacing={0.75} sx={{ alignItems: 'center' }}>
                         <Box sx={{ width: 18, height: 18, borderRadius: '50%', bgcolor: '#dbeafe', color: '#1e40af', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>
                           {stageId}
                         </Box>
@@ -854,7 +854,7 @@ const headerSx = {
                     </TableCell>
 
                     <TableCell onClick={e => e.stopPropagation()} sx={{ pr: 1.5 }}>
-                      <Stack direction="row" spacing={0} justifyContent="flex">
+                      <Stack direction="row" spacing={0} sx={{ justifyContent: 'flex' }} >
                           <Tooltip title="Open Cycle">
                             <IconButton size="small"
                               onClick={e => { e.stopPropagation(); navigate(ROUTES.CYCLE_DETAIL.replace(':id', cycle.id)); }}
@@ -919,9 +919,9 @@ const headerSx = {
         </TableContainer>
 
         {/* ── Pagination footer — 6 rows per page ── */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between"
-          sx={{ px: 2, py: 0.20, borderTop: '1px solid #f1f5f9', bgcolor: '#fafafa', flexShrink: 0 }}>
-          <Typography fontSize={11} color="#94a3b8">
+        <Stack direction="row"  
+          sx={{ px: 2, py: 0.20, borderTop: '1px solid #f1f5f9', bgcolor: '#fafafa', flexShrink: 0, alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={{ fontSize: 11, color: '#94a3b8' }}  >
             {filteredAndSorted.length > 0
               ? `${page * ROWS_PER_PAGE + 1}–${Math.min((page + 1) * ROWS_PER_PAGE, filteredAndSorted.length)} of ${filteredAndSorted.length}`
               : '0 results'}

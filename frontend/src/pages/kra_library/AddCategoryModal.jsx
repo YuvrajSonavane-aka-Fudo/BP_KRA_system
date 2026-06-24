@@ -72,14 +72,14 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         onClose();
       }}
-      maxWidth="xs"
+      
       fullWidth
-      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }}
+      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }} sx={{ maxWidth: 'xs' }}
     >
       {/* Gradient header */}
       <Box sx={{ background: gradient, px: 3, pt: 3, pb: 2.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}  >
+          <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
             <Box sx={{
               width: 36, height: 36, borderRadius: 1.5,
               bgcolor: 'rgba(255,255,255,0.15)',
@@ -88,10 +88,10 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
               <CategoryIcon sx={{ color: '#fff', fontSize: 18 }} />
             </Box>
             <Box>
-              <Typography fontWeight={800} fontSize={15} color="#fff">
+              <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#fff' }}   >
                 {isEdit ? 'Edit Category' : 'Add New Category'}
               </Typography>
-              <Typography fontSize={11} color="rgba(255,255,255,0.65)">
+              <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.65)' }}  >
                 {isEdit
                   ? 'Update category details'
                   : 'Fill in details and keep adding — close when done'}
@@ -99,7 +99,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
             </Box>
           </Stack>
 
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
             {/* Saved count badge */}
             {stayOpen && savedCount > 0 && (
               <Box sx={{
@@ -108,7 +108,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
                 bgcolor: 'rgba(255,255,255,0.18)',
               }}>
                 <CheckCircleIcon sx={{ fontSize: 12, color: '#86efac' }} />
-                <Typography fontSize={11} fontWeight={700} color="#86efac" sx={{ whiteSpace: 'nowrap', lineHeight: 1 }}>
+                <Typography    sx={{ whiteSpace: 'nowrap', lineHeight: 1, fontSize: 11, fontWeight: 700, color: '#86efac' }}>
                   {savedCount} added
                 </Typography>
               </Box>
@@ -118,7 +118,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
               onClick={onClose}
               sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { color: '#fff' } }}
             >
-              <CloseIcon fontSize="small" />
+              <CloseIcon sx={{ fontSize: 'small' }}  />
             </IconButton>
           </Stack>
         </Stack>
@@ -133,7 +133,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
           {/* Category Type — FIRST */}
           {canManageOrg ? (
             <Box>
-              <Typography fontSize={12} fontWeight={700} color="text.secondary" mb={1}>
+              <Typography sx={{ mb: 1, fontSize: 12, fontWeight: 700, color: 'text.secondary' }}    >
                 Category Type
               </Typography>
               <Stack direction="row" spacing={2.5}>
@@ -143,9 +143,9 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
                 ].map(opt => {
                   const isSelected = isStandard === opt.value;
                   return (
-                    <Stack key={String(opt.value)} direction="row" alignItems="center" spacing={0.75}
+                    <Stack key={String(opt.value)} direction="row"  spacing={0.75}
                       onClick={() => setStandard(opt.value)}
-                      sx={{ cursor: 'pointer', userSelect: 'none' }}>
+                      sx={{ cursor: 'pointer', userSelect: 'none', alignItems: 'center' }}>
                       <Box sx={{
                         width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
                         border: `2px solid ${isSelected ? opt.color : '#cbd5e1'}`,
@@ -156,8 +156,8 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
                         {isSelected && <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#fff' }} />}
                       </Box>
                       <Box sx={{ color: isSelected ? opt.color : '#94a3b8', display: 'flex' }}>{opt.icon}</Box>
-                      <Typography fontSize={13} fontWeight={isSelected ? 700 : 500}
-                        color={isSelected ? opt.color : '#64748b'}>
+                      <Typography sx={{ fontSize: 13, fontWeight: isSelected ? 700 : 500, color: isSelected ? opt.color : '#64748b' }}  
+                        >
                         {opt.label}
                       </Typography>
                     </Stack>
@@ -167,11 +167,11 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
             </Box>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <Typography fontSize={12} fontWeight={700} color="text.secondary">Category Type:</Typography>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'text.secondary' }}   >Category Type:</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5,
                 px: 1, py: 0.35, borderRadius: 1, bgcolor: '#dbeafe', border: '1px solid #bfdbfe' }}>
                 <TuneIcon sx={{ fontSize: 12, color: '#1d4ed8' }} />
-                <Typography fontSize={12} fontWeight={700} color="#1d4ed8">Project Level</Typography>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}   >Project Level</Typography>
               </Box>
             </Box>
           )}
@@ -197,13 +197,11 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
           onClick={handleSave}
           disabled={saving}
           variant="contained"
-          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : null}
-          sx={{
-            textTransform: 'none', fontWeight: 700, background: gradient,
+          startIcon={saving ? <CircularProgress size={14}  /> : null}
+          sx={{ textTransform: 'none', fontWeight: 700, background: gradient,
             borderRadius: 1.5, px: 3, minWidth: 130,
             boxShadow: '0 4px 12px rgba(30,58,138,0.3)',
-            '&:hover': { background: gradient, opacity: 0.9 },
-          }}
+            '&:hover': { background: gradient, opacity: 0.9 }, color: 'inherit' }}
         >
           {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save'}
         </Button>

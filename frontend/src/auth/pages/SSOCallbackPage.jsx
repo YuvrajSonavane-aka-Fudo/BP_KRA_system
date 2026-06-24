@@ -49,7 +49,7 @@ export default function SSOCallbackPage() {
       ) : (
         <>
           <CircularProgress sx={{ color: '#fff' }} />
-          <Typography color="rgba(255,255,255,0.8)" fontSize={15}>
+          <Typography sx={{ fontSize: 15, color: 'rgba(255,255,255,0.8)' }}  >
             Completing sign in…
           </Typography>
         </>

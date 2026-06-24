@@ -144,24 +144,24 @@ export default function AddKRAModal({
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         onClose();
       }}
-      maxWidth="sm"
+      
       fullWidth
-      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }}
+      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }} sx={{ maxWidth: 'sm' }}
     >
       {/* Gradient header */}
       <Box sx={{ background: gradient, px: 3, pt: 3, pb: 2.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}  >
+          <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
             <Box sx={{ width: 36, height: 36, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {headerIcon}
             </Box>
             <Box>
-              <Typography fontWeight={800} fontSize={15} color="#fff">{headerTitle}</Typography>
-              <Typography fontSize={11} color="rgba(255,255,255,0.65)">{headerSub}</Typography>
+              <Typography sx={{ fontSize: 15, fontWeight: 800, color: '#fff' }}   >{headerTitle}</Typography>
+              <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.65)' }}  >{headerSub}</Typography>
             </Box>
           </Stack>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
             {/* "N added" badge — visible after at least one save in stay-open mode */}
             {stayOpen && savedCount > 0 && (
               <Box sx={{
@@ -170,14 +170,14 @@ export default function AddKRAModal({
                 bgcolor: 'rgba(255,255,255,0.18)',
               }}>
                 <CheckCircleIcon sx={{ fontSize: 12, color: '#86efac' }} />
-                <Typography fontSize={11} fontWeight={700} color="#86efac">
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#86efac' }}   >
                   {savedCount} added
                 </Typography>
               </Box>
             )}
             <IconButton size="small" onClick={onClose}
               sx={{ color: 'rgba(255,255,255,0.7)', '&:hover': { color: '#fff' } }}>
-              <CloseIcon fontSize="small" />
+              <CloseIcon sx={{ fontSize: 'small' }}  />
             </IconButton>
           </Stack>
         </Stack>
@@ -187,7 +187,7 @@ export default function AddKRAModal({
           <Box sx={{ mt: 1.5, px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.1)',
             display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
             <ContentCopyIcon sx={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }} />
-            <Typography fontSize={11} color="rgba(255,255,255,0.8)">
+            <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}  >
               Cloning from: <strong style={{ color: '#fff' }}>{kra.name}</strong>
             </Typography>
           </Box>
@@ -216,19 +216,19 @@ export default function AddKRAModal({
             >
               {categories.length === 0 ? (
                 <MenuItem disabled>
-                  <Typography fontSize={13} color="#94a3b8">No categories available</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#94a3b8' }}  >No categories available</Typography>
                 </MenuItem>
               ) : (
                 categories.filter(cat => canManageOrg ? true : !cat.is_standard).map(cat => {
                   const isStd = cat.is_standard;
                   return (
                     <MenuItem key={cat.id} value={cat.id}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
+                      <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
                         <Box sx={{
                           width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                           bgcolor: isStd ? '#16a34a' : '#1d4ed8',
                         }} />
-                        <Typography fontSize={13} fontWeight={600} color="#1e293b">{cat.name}</Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}   >{cat.name}</Typography>
                         <Chip
                           label={isStd ? 'Org Level' : 'Project Level'}
                           size="small"
@@ -271,7 +271,7 @@ export default function AddKRAModal({
             <Select
               multiple
               value={selectedLevels}
-              label={<>Applicable Levels <Box component="span" sx={{ color: '#ef4444' }}>*</Box></>}
+              label={<>Applicable Levels <Box component="span" sx={{ color: '#ef4444', fontSize: 10.5, fontWeight: 700 }}>*</Box></>}
               onChange={e => {
                 setSelectedLevels(e.target.value);
                 setErrors(v => ({ ...v, levels: undefined }));
@@ -289,7 +289,7 @@ export default function AddKRAModal({
                         px: 0.75, py: 0.2, borderRadius: 0.75,
                         bgcolor: s.bg, border: `1px solid ${s.border}`, height: 22,
                       }}>
-                        <Typography fontSize={10.5} fontWeight={700} color={s.color}>{lv.name}</Typography>
+                        <Typography   >{lv.name}</Typography>
                       </Box>
                     );
                   })}
@@ -300,7 +300,7 @@ export default function AddKRAModal({
             >
               {levels.length === 0 ? (
                 <MenuItem disabled>
-                  <Typography fontSize={13} color="#94a3b8">No levels available — add levels first</Typography>
+                  <Typography sx={{ fontSize: 13, color: '#94a3b8' }}  >No levels available — add levels first</Typography>
                 </MenuItem>
               ) : (
                 levels.map((lv, i) => {
@@ -313,16 +313,16 @@ export default function AddKRAModal({
                         checked={selectedLevels.includes(lv.id)} size="small"
                         sx={{ p: 0.5, mr: 1, color: s.color, '&.Mui-checked': { color: s.color } }}
                       />
-                      <Stack direction="row" alignItems="center" spacing={1} flex={1}>
+                      <Stack direction="row"  spacing={1} sx={{ alignItems: 'center', flex: 1 }} >
                         <Box sx={{
                           display: 'inline-flex', alignItems: 'center', gap: 0.5,
                           px: 0.75, py: 0.25, borderRadius: 0.75,
                           bgcolor: s.bg, border: `1px solid ${s.border}`,
                         }}>
-                          <Typography fontSize={11} fontWeight={700} color={s.color}>{lv.name}</Typography>
+                          <Typography sx={{ fontSize: 11, fontWeight: 700, color: s.color }}   >{lv.name}</Typography>
                         </Box>
                         {expLabel && (
-                          <Typography fontSize={11} color="#94a3b8">{expLabel}</Typography>
+                          <Typography sx={{ fontSize: 11, color: '#94a3b8' }}  >{expLabel}</Typography>
                         )}
                       </Stack>
                     </MenuItem>
@@ -345,12 +345,10 @@ export default function AddKRAModal({
 
       <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
         <Button onClick={handleSave} disabled={saving} variant="contained"
-          startIcon={saving ? <CircularProgress size={14} color="inherit" /> : null}
-          sx={{
-            textTransform: 'none', fontWeight: 700, background: gradient, borderRadius: 1.5,
+          startIcon={saving ? <CircularProgress size={14}  /> : null}
+          sx={{ textTransform: 'none', fontWeight: 700, background: gradient, borderRadius: 1.5,
             px: 3, minWidth: 130, boxShadow: '0 4px 12px rgba(30,58,138,0.3)',
-            '&:hover': { background: gradient, opacity: 0.9 },
-          }}>
+            '&:hover': { background: gradient, opacity: 0.9 }, color: 'inherit' }}>
           {btnLabel}
         </Button>
       </DialogActions>
