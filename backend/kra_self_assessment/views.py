@@ -32,6 +32,7 @@ from kra_cycle.models import (
     KRACycleStage,
     Stage,
     Rating,
+    KRALevel,
 )
 
 from utils import _get_caller, _audit
@@ -101,15 +102,30 @@ class SelfAssessmentView(APIView):
         if not ekc:
             return Response('Forbidden', status=status.HTTP_403_FORBIDDEN)
 
-        kra_rows = EmployeeKRALevel.objects.select_related(
-            'kra_level__kra',
-            'kra_level__category',
-            'self_rating',
-            'lead_rating',
-        ).filter(
-            employee=caller,
-            employee_kra_cycle=ekc,
-        )
+        raw_sql = """
+            SELECT ekl.*
+            FROM employee_kra_level ekl
+            WHERE ekl.employee_id = %s AND ekl.employee_kra_cycle_id = %s
+        """
+        kra_rows = list(EmployeeKRALevel.objects.raw(raw_sql, [caller.id, ekc.id]))
+
+        # Pre-populate the related models in Python to prevent N+1 lazy queries during serialization
+        kra_level_ids = {r.kra_level_id for r in kra_rows if r.kra_level_id is not None}
+        kra_levels = {
+            kl.id: kl for kl in KRALevel.objects.filter(id__in=kra_level_ids).select_related('kra', 'category')
+        }
+
+        rating_ids = {r.self_rating_id for r in kra_rows if r.self_rating_id is not None} | \
+                     {r.lead_rating_id for r in kra_rows if r.lead_rating_id is not None}
+        ratings = {rt.id: rt for rt in Rating.objects.filter(id__in=rating_ids)}
+
+        for r in kra_rows:
+            if r.kra_level_id in kra_levels:
+                r.kra_level = kra_levels[r.kra_level_id]
+            if r.self_rating_id in ratings:
+                r.self_rating = ratings[r.self_rating_id]
+            if r.lead_rating_id in ratings:
+                r.lead_rating = ratings[r.lead_rating_id]
 
         # Resolve the employee's effective current stage (personal override takes priority)
         employee_stage_id = ekc.stage_id
