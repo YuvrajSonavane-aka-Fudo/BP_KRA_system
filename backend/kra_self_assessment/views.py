@@ -1,38 +1,97 @@
+"""
+File: views.py
+App: kra_self_assessment
+Purpose:
+    Handles HTTP requests/responses for KRA Self Assessment API endpoints.
+
+Includes:
+    - SelfAssessmentView: Retrieve KRA self assessment details for a cycle.
+    - SelfAssessmentSubmitView: Save/update individual self assessment entries.
+
+Responsibilities:
+    - Process KRA self assessment queries and validation for employees.
+
+Notes:
+    - Keeps views thin, delegates data validation and structure formatting to serializers.py.
+    - Identity source is Employee, using session-based authentication.
+"""
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.request import Request
 
 from kra_cycle.models import (
-    Employee,
-    KRACycle,
-    KRACycleStage,
     EmployeeKRACycle,
-    EmployeeKRACycleCategory,
     EmployeeKRACycleStage,
     EmployeeKRALevel,
-    KRALevel,
-    KRA,
-    KRACategory,
+    KRACycleStage,
     Stage,
-    Level,
     Rating,
-    AuditLog,
 )
 
-from utils import _get_caller, _is_hr, _is_lead, _caller_can_act_on, _audit
+from utils import _get_caller, _audit
+
+from .serializers import (
+    SelfAssessmentSerializer,
+    SelfAssessmentUpdateSerializer,
+)
+
 
 class SelfAssessmentView(APIView):
-    """
-    GET /api/v1/kra/cycles/{cycle_id}/self-assessment
-    Returns the logged-in employee's KRAs for the given cycle.
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, cycle_id):
+    def get(self, request: Request, cycle_id: int) -> Response:
+        """
+        API view to list all self assessments for the authenticated caller under a specific cycle.
+
+        Endpoint: GET /api/v1/kra/cycles/<cycle_id>/self-assessment
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "cycle_id": 1,
+                "employee_kra_cycle_id": 12,
+                "status": "Draft",
+                "employee_stage_id": 2,
+                "stage_end_date": "2026-07-20T00:00:00",
+                "current_stage": {
+                    "id": 2,
+                    "name": "KRA Tracking"
+                },
+                "kras": [
+                    {
+                        "employee_kra_level_id": 15,
+                        "kra_level_id": 10,
+                        "kra_name": "Coding Speed",
+                        "category_name": "Core Development",
+                        "description_by_lead": "Requires high output",
+                        "help_and_assistance_required": "None",
+                        "self_rating_id": 3,
+                        "self_rating": 3,
+                        "self_comment": "Met expectations",
+                        "progress_notes": "None",
+                        "lead_rating_id": null,
+                        "lead_rating": null,
+                        "lead_comment": null,
+                        "lead_progress_notes": null
+                    }
+                ]
+            }
+
+        Error Responses:
+            403: Forbidden (Employee not enrolled in cycle)
+            401: Unauthorized
+        """
         caller = _get_caller(request)
 
         ekc = EmployeeKRACycle.objects.select_related('stage').filter(
@@ -42,44 +101,15 @@ class SelfAssessmentView(APIView):
         if not ekc:
             return Response('Forbidden', status=status.HTTP_403_FORBIDDEN)
 
-        # FIX: query EmployeeKRALevel directly filtered by both employee AND ekc.
-        # Previously used ekc.kra_level_rows which resolves through EmployeeKRACycle
-        # and returns ALL employees' rows for that cycle, not just the caller's.
         kra_rows = EmployeeKRALevel.objects.select_related(
-            'kra_level__kra',       # traverse KRALevel → KRA for the real name
-            'kra_level__category',  # traverse KRALevel → KRACategory for category_name
+            'kra_level__kra',
+            'kra_level__category',
             'self_rating',
             'lead_rating',
         ).filter(
-            employee=caller,        # only this employee's rows
+            employee=caller,
             employee_kra_cycle=ekc,
         )
-
-        kras = [
-            {
-                'employee_kra_level_id':        r.id,
-                'kra_level_id':                 r.kra_level_id,
-                # Always use the master KRA name — kra_level.name is a stale denormalised copy
-                'kra_name': (
-                    r.kra_level.kra.name if r.kra_level and r.kra_level.kra else None
-                ),
-                'category_name': (
-                    r.kra_level.category.name
-                    if r.kra_level and r.kra_level.category else None
-                ),
-                'description_by_lead':          r.description_by_lead,
-                'help_and_assistance_required': r.help_and_assistance_required,
-                'self_rating_id':               r.self_rating_id,
-                'self_rating':                  r.self_rating.rating if r.self_rating else None,
-                'self_comment':                 r.self_comment,
-                'progress_notes':               r.progress_notes,
-                'lead_rating_id':               r.lead_rating_id,
-                'lead_rating':                  r.lead_rating.rating if r.lead_rating else None,
-                'lead_comment':                 r.lead_comment,
-                'lead_progress_notes':          r.lead_progress_notes,
-            }
-            for r in kra_rows
-        ]
 
         # Resolve the employee's effective current stage (personal override takes priority)
         employee_stage_id = ekc.stage_id
@@ -102,31 +132,45 @@ class SelfAssessmentView(APIView):
                 if cycle_stage and cycle_stage.end_date:
                     stage_end_date = cycle_stage.end_date.isoformat()
 
-        return Response({
-            'cycle_id':              cycle_id,
-            'employee_kra_cycle_id': ekc.id,
-            'status':                ekc.status,
-            # employee_stage_id: the employee's personal stage (may differ from cycle stage if sent back)
-            'employee_stage_id':     employee_stage_id,
-            # stage_end_date: personal deadline for current stage (from override or cycle-level)
-            'stage_end_date':        stage_end_date,
-            'current_stage':         (
-                {'id': ekc.stage.id, 'name': ekc.stage.name}
-                if ekc.stage else None
-            ),
-            'kras': kras,
-        }, status=status.HTTP_200_OK)
+        serializer = SelfAssessmentSerializer(ekc, context={
+            'stage_end_date': stage_end_date,
+            'kra_rows': kra_rows,
+        })
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class SelfAssessmentSubmitView(APIView):
-    """
-    PATCH /api/v1/kra/assessments/{employee_kra_level_id}/self
-    Employee saves self_rating, self_comment, progress_notes.
-    Allowed in Stage 2 (KRA Tracking) or Stage 3 (Assessment).
-    """
     permission_classes = [IsAuthenticated]
 
-    def patch(self, request, employee_kra_level_id):
+    def patch(self, request: Request, employee_kra_level_id: int) -> Response:
+        """
+        API view to save or update individual self assessment details (rating, comments, progress notes).
+
+        Endpoint: PATCH /api/v1/kra/assessments/<employee_kra_level_id>/self
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "self_rating_id": 3,
+                "self_comment": "Successfully finished task",
+                "progress_notes": "Sprint 3 goals achieved",
+                "help_and_assistance_required": "None"
+            }
+
+        Response (200):
+            {
+                "employee_kra_level_id": 15,
+                "self_rating_id": 3,
+                "message": "Self assessment saved"
+            }
+
+        Error Responses:
+            400: Self assessment only allowed during KRA Tracking or Assessment stage, or invalid self_rating_id
+            404: Employee KRA level not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
 
         row = get_object_or_404(
@@ -141,8 +185,6 @@ class SelfAssessmentSubmitView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        data = request.data
-
         # Capture OLD DATA for audit
         old_data = {
             "self_rating_id": row.self_rating_id,
@@ -151,29 +193,21 @@ class SelfAssessmentSubmitView(APIView):
             "help_and_assistance_required": row.help_and_assistance_required,
         }
 
-        updated_fields = {}
-
-        # Apply updates
-        self_rating_id = data.get('self_rating_id')
-        if self_rating_id is not None:
-            if not Rating.objects.filter(id=self_rating_id).exists():
+        serializer = SelfAssessmentUpdateSerializer(row, data=request.data, partial=True)
+        if not serializer.is_valid():
+            if 'self_rating' in serializer.errors:
                 return Response('Invalid self_rating_id', status=status.HTTP_400_BAD_REQUEST)
-            row.self_rating_id = self_rating_id
-            updated_fields["self_rating_id"] = self_rating_id
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if 'self_comment' in data:
-            row.self_comment = data['self_comment']
-            updated_fields["self_comment"] = data['self_comment']
+        # Track what fields are being updated for audit logs
+        updated_fields = {}
+        for field in ['self_comment', 'progress_notes', 'help_and_assistance_required']:
+            if field in request.data:
+                updated_fields[field] = request.data[field]
+        if 'self_rating_id' in request.data:
+            updated_fields['self_rating_id'] = request.data['self_rating_id']
 
-        if 'progress_notes' in data:
-            row.progress_notes = data['progress_notes']
-            updated_fields["progress_notes"] = data['progress_notes']
-
-        if 'help_and_assistance_required' in data:
-            row.help_and_assistance_required = data['help_and_assistance_required']
-            updated_fields["help_and_assistance_required"] = data['help_and_assistance_required']
-
-        row.save()
+        serializer.save()
 
         # AUDIT LOG
         _audit(
