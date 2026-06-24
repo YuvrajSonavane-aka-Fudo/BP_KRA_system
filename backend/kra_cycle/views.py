@@ -29,45 +29,7 @@ from .models import (
     AuditLog,
 )
 
-HR_ROLES = {"Admin", "HR", "Vertical Lead"}
-LEAD_ROLES = {"Manager", "Team Lead"}
-EMPLOYEE_ROLE = "Employee"
-
-
-def _get_caller(request):
-    return request.user
-
-
-def _is_hr(employee):
-    # Check bridge table first, fall back to direct role FK
-    if employee.employee_roles.filter(role__name__in=HR_ROLES).exists():
-        return True
-    return bool(employee.role and employee.role.name in HR_ROLES)
-
-
-def _is_lead(employee):
-    # Check bridge table first, fall back to direct role FK
-    if employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists():
-        return True
-    return bool(employee.role and employee.role.name in LEAD_ROLES)
-
-
-def _caller_can_act_on(caller, target_employee_id):
-    if _is_hr(caller):
-        return True
-    return Employee.objects.filter(id=target_employee_id, manager_id=caller.id).exists()
-
-
-def _audit(request, action, entity, entity_id, old_data=None, new_data=None):
-    AuditLog.objects.create(
-        employee=_get_caller(request),
-        action=action,
-        entity=entity,
-        entity_id=entity_id,
-        old_data=old_data,
-        new_data=new_data,
-        ip_address=request.META.get("REMOTE_ADDR"),
-    )
+from utils import _get_caller, _is_hr, _is_lead, _caller_can_act_on, _audit
 
 
 def _clone_assignments(source_cycle, new_cycle, caller):
