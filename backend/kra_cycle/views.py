@@ -1,3 +1,27 @@
+"""
+File: views.py
+App: kra_cycle
+Purpose:
+    Handles the HTTP request/response lifecycle for KRA Cycle API endpoints.
+
+Includes:
+    - Authentication (Login/Logout)
+    - KRA Cycle List & Create
+    - KRA Cycle Update (Status & Details)
+    - KRA Cycle Cloning
+    - KRA Cycle Stage Advancement and Employee Overrides
+    - Reference Data lookup
+    - KRA Library lookup
+    - Employee Stage Override Dates
+
+Responsibilities:
+    - Handle the HTTP request/response lifecycle for API endpoints.
+
+Notes:
+    - Keeps views thin, delegates calculations to utils.py and serialization to serializers.py.
+    - Identity source is Employee, using session-based authentication.
+"""
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
@@ -5,12 +29,9 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.request import Request
 
-from datetime import datetime, date, time
-from django.utils.timezone import make_aware
 import threading
-from django.conf import settings
-from django.core.mail import send_mail
 
 from .models import (
     Employee,
@@ -18,8 +39,6 @@ from .models import (
     KRACycleStage,
     EmployeeKRACycle,
     EmployeeKRACycleStage,
-    EmployeeKRACycleCategory,
-    EmployeeKRALevel,
     KRALevel,
     KRA,
     KRACategory,
@@ -29,304 +48,63 @@ from .models import (
     AuditLog,
 )
 
-from utils import _get_caller, _is_hr, _is_lead, _caller_can_act_on, _audit
+from utils import (
+    _get_caller,
+    _is_hr,
+    _is_lead,
+    _caller_can_act_on,
+    _audit,
+    _clone_assignments,
+    _parse_date,
+    send_stage_override_email,
+    send_employee_stage_override_email,
+)
 
-
-def _clone_assignments(source_cycle, new_cycle, caller):
-    """
-    Clones all EmployeeKRACycle rows (+ their categories and KRA level rows)
-    from source_cycle into new_cycle.
-
-    Returns a dict with enrolled / skipped / needs_review lists and a summary.
-    """
-
-    #  Fetch all source enrolments with related data in as few queries as possible
-    source_ekcs = list(
-        EmployeeKRACycle.objects.filter(kra_cycle=source_cycle).select_related(
-            "employee__manager", "employee__level", "employee__role"
-        )
-    )
-
-    if not source_ekcs:
-        return {
-            "enrolled": [],
-            "skipped": [],
-            "needs_review": [],
-            "summary": {"total": 0, "enrolled": 0, "skipped": 0, "needs_review": 0},
-        }
-
-    source_ekc_ids = [ekc.id for ekc in source_ekcs]
-    source_emp_ids = [ekc.employee_id for ekc in source_ekcs]
-
-    # Pre-flight: fetch all categories and KRA levels in bulk
-
-    # All category rows across all source enrolments
-    all_source_cats = list(
-        EmployeeKRACycleCategory.objects.filter(
-            employee_kra_cycle_id__in=source_ekc_ids
-        )
-    )
-    # Group by ekc_id for fast lookup
-    cats_by_ekc = {}
-    for cat in all_source_cats:
-        cats_by_ekc.setdefault(cat.employee_kra_cycle_id, []).append(cat)
-
-    # All KRA level rows across all source enrolments
-    all_source_kra_rows = list(
-        EmployeeKRALevel.objects.filter(employee_kra_cycle_id__in=source_ekc_ids)
-    )
-    kra_rows_by_ekc = {}
-    for row in all_source_kra_rows:
-        kra_rows_by_ekc.setdefault(row.employee_kra_cycle_id, []).append(row)
-
-    #  Validate which category_ids and kra_level_ids still exist in DB
-
-    all_cat_ids = {cat.category_id for cat in all_source_cats}
-    all_kra_level_ids = {row.kra_level_id for row in all_source_kra_rows}
-
-    valid_cat_ids = set(
-        KRACategory.objects.filter(id__in=all_cat_ids).values_list("id", flat=True)
-    )
-    valid_kra_level_ids = set(
-        KRALevel.objects.filter(id__in=all_kra_level_ids).values_list("id", flat=True)
-    )
-
-    # Find employees already enrolled in the NEW cycle
-    already_in_new_cycle = set(
-        EmployeeKRACycle.objects.filter(
-            kra_cycle=new_cycle,
-            employee_id__in=source_emp_ids,
-        ).values_list("employee_id", flat=True)
-    )
-
-    #  Process each source enrolment
-    enrolled = []
-    skipped = []
-    needs_review = []
-
-    # Track role changes for informational purposes
-    def _current_roles(emp):
-        return list(emp.employee_roles.values_list("name", flat=True))
-
-    with transaction.atomic():
-        for src_ekc in source_ekcs:
-            emp = src_ekc.employee
-            eid = src_ekc.employee_id
-
-            # Case: employee deleted
-            if emp is None:
-                skipped.append(
-                    {
-                        "employee_id": eid,
-                        "reason": "Employee record no longer exists",
-                    }
-                )
-                continue
-
-            #  Case: employee inactive
-            if not emp.active:
-                skipped.append(
-                    {
-                        "employee_id": eid,
-                        "full_name": f"{emp.first_name} {emp.last_name}",
-                        "reason": "Employee is no longer active",
-                    }
-                )
-                continue
-
-            # Case: already enrolled in new cycle
-            if eid in already_in_new_cycle:
-                skipped.append(
-                    {
-                        "employee_id": eid,
-                        "full_name": f"{emp.first_name} {emp.last_name}",
-                        "reason": "Already enrolled in the new cycle (manually added)",
-                    }
-                )
-                continue
-
-            # Case: caller is Lead — only clone their direct reports
-            if not _is_hr(caller):
-                if emp.manager_id != caller.id:
-                    skipped.append(
-                        {
-                            "employee_id": eid,
-                            "full_name": f"{emp.first_name} {emp.last_name}",
-                            "reason": "Not your direct report",
-                        }
-                    )
-                    continue
-
-            #  Case: manager changed — use current manager
-            current_manager_id = emp.manager_id  # always use fresh value
-            manager_changed = current_manager_id != src_ekc.employee_manager_id
-
-            #  Case: level changed — use current level
-            current_level_id = emp.level_id  # always use fresh value
-            level_changed = current_level_id != src_ekc.employee_level_id
-
-            #  Case: role changed — note it but don't block
-            current_roles = _current_roles(emp)
-            role_changed = False
-            # (informational only — we still enrol)
-
-            #  Resolve categories for this employee
-            source_cats = cats_by_ekc.get(src_ekc.id, [])
-            valid_cats = [c for c in source_cats if c.category_id in valid_cat_ids]
-            invalid_cats = [
-                c.category_id for c in source_cats if c.category_id not in valid_cat_ids
-            ]
-
-            # Recalculate weightage after dropping invalid categories
-            try:
-                remaining_weight = sum(int(c.weightage or 0) for c in valid_cats)
-            except (ValueError, TypeError):
-                remaining_weight = 0
-
-            # Case: dropped categories broke weightage
-            if invalid_cats and remaining_weight != 100:
-                needs_review.append(
-                    {
-                        "employee_id": eid,
-                        "full_name": f"{emp.first_name} {emp.last_name}",
-                        "reason": "Category weightage no longer sums to 100 after removing deleted categories",
-                        "invalid_category_ids": invalid_cats,
-                        "remaining_weightage": remaining_weight,
-                        "action": "Please manually re-assign this employee with corrected weightages",
-                    }
-                )
-                continue
-
-            #  Resolve KRA level rows for this employee
-            source_kra_rows = kra_rows_by_ekc.get(src_ekc.id, [])
-            valid_kra_rows = [
-                r for r in source_kra_rows if r.kra_level_id in valid_kra_level_ids
-            ]
-            dropped_kra_ids = [
-                r.kra_level_id
-                for r in source_kra_rows
-                if r.kra_level_id not in valid_kra_level_ids
-            ]
-
-            # Create the new EmployeeKRACycle
-            new_ekc = EmployeeKRACycle.objects.create(
-                employee_id=eid,
-                kra_cycle=new_cycle,
-                status="Draft",
-                stage_id=1,
-                is_date_based=src_ekc.is_date_based,
-                employee_manager_id=current_manager_id,  # ← always fresh
-                employee_level_id=current_level_id,  # ← always fresh
-            )
-
-            # Clone category weightages
-            EmployeeKRACycleCategory.objects.bulk_create(
-                [
-                    EmployeeKRACycleCategory(
-                        employee_kra_cycle=new_ekc,
-                        category_id=cat.category_id,
-                        weightage=cat.weightage,
-                    )
-                    for cat in valid_cats
-                ]
-            )
-
-            # Clone KRA level rows (ratings always nulled)
-            EmployeeKRALevel.objects.bulk_create(
-                [
-                    EmployeeKRALevel(
-                        employee_id=eid,
-                        kra_level_id=row.kra_level_id,
-                        employee_kra_cycle=new_ekc,
-                        # All assessment fields intentionally null on clone
-                    )
-                    for row in valid_kra_rows
-                ]
-            )
-
-            enrolled.append(
-                {
-                    "employee_id": eid,
-                    "full_name": f"{emp.first_name} {emp.last_name}",
-                    "employee_kra_cycle_id": new_ekc.id,
-                    "kras_cloned": len(valid_kra_rows),
-                    "kras_dropped": dropped_kra_ids,  # kra_levels that no longer exist
-                    "categories_dropped": invalid_cats,  # categories that no longer exist
-                    "manager_updated": manager_changed,
-                    "level_updated": level_changed,
-                }
-            )
-
-    return {
-        "enrolled": enrolled,
-        "skipped": skipped,
-        "needs_review": needs_review,
-        "summary": {
-            "total": len(source_ekcs),
-            "enrolled": len(enrolled),
-            "skipped": len(skipped),
-            "needs_review": len(needs_review),
-        },
-    }
-
-
-def _parse_date(value):
-    """Accepts '2026-05-13' or '2026-05-13T00:00:00', always returns aware datetime."""
-    try:
-        d = date.fromisoformat(value)  # handles date-only strings
-        return make_aware(datetime.combine(d, time.min))
-    except ValueError:
-        return make_aware(datetime.fromisoformat(value.replace("Z", "")))
-
-
-def send_stage_override_email(employee, cycle, stage_data):
-    """
-    Sends email for single stage override update.
-    Shows only Stage ID (no stage name lookup).
-    """
-
-    try:
-
-        if not employee.email:
-            return
-
-        subject = f"KRA Stage Dates Updated - {cycle.name}"
-
-        message = f"""
-                Hi {employee.first_name},
-
-                The dates for a KRA stage have been updated for the cycle:
-
-                {cycle.name}
-
-                Your stage has been changed
-
-                Please login to the KRA portal to review the updated schedule.
-
-                Regards,
-                HR Team
-                """
-
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[employee.email],
-            fail_silently=False,  # set True only after debugging
-        )
-
-    except Exception as e:
-        print(f"Failed to send stage override email: {str(e)}")
+from .serializers import (
+    KRACycleSerializer,
+    ReferenceStageSerializer,
+    ReferenceLevelSerializer,
+    ReferenceRatingSerializer,
+    ReferenceCategorySerializer,
+    KRALibrarySerializer,
+)
 
 
 # 1. Authentication
-
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
-    def post(self, request):
+    def post(self, request: Request) -> Response:
+        """
+        API view to log in an employee and create a session.
+
+        Endpoint: POST /api/v1/auth/login
+
+        Request Headers:
+            None
+
+        Request Body:
+            {
+                "email": "<employee_email>",
+                "password": "<employee_password>"
+            }
+
+        Response (200):
+            {
+                "session_id": "<session_key>",
+                "employee_id": 1,
+                "roles": ["HR"],
+                "full_name": "John Doe",
+                "department": "Engineering"
+            }
+
+        Error Responses:
+            400: Please provide both email and password
+            401: Invalid credentials
+            403: Account is inactive
+        """
         email = request.data.get("email", "").strip()
         password = request.data.get("password", "")
 
@@ -390,7 +168,26 @@ class LogoutView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
-    def post(self, request):
+    def post(self, request: Request) -> Response:
+        """
+        API view to log out the current employee and flush session.
+
+        Endpoint: POST /api/v1/auth/logout
+
+        Request Headers:
+            None
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "message": "Logged out successfully"
+            }
+
+        Error Responses:
+            None
+        """
         employee_id = request.session.get("employee_id")
 
         # Audit before flushing session
@@ -414,11 +211,51 @@ class LogoutView(APIView):
 
 # 2 & 3. KRA Cycle — List & Create
 
-
 class KRACycleListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
+        """
+        API view to list all KRA cycles.
+
+        Endpoint: GET /api/v1/kra/cycles
+        Query Parameters:
+            status (optional): filter by status (e.g. DRAFT, ACTIVE)
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "cycles": [
+                    {
+                        "id": 1,
+                        "name": "Cycle Q1 2026",
+                        "description": "First quarter KRA cycle",
+                        "start_date": "2026-01-01T00:00:00Z",
+                        "end_date": "2026-03-31T00:00:00Z",
+                        "status": "ACTIVE",
+                        "current_stage": {
+                            "id": 1,
+                            "name": "Self Assessment"
+                        },
+                        "cycle_stages": [
+                            {
+                                "stage_id": 1,
+                                "start_date": "2026-01-01T00:00:00Z",
+                                "end_date": "2026-01-15T00:00:00Z"
+                            }
+                        ]
+                    }
+                ]
+            }
+
+        Error Responses:
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         status_filter = request.query_params.get("status")
 
@@ -446,31 +283,48 @@ class KRACycleListCreateView(APIView):
         if status_filter:
             qs = qs.filter(status=status_filter)
 
-        cycles = [
-            {
-                "id": c.id,
-                "name": c.name,
-                "description": c.description,
-                "start_date": c.start_date,
-                "end_date": c.end_date,
-                "status": c.status,
-                "current_stage": (
-                    {"id": c.stage.id, "name": c.stage.name} if c.stage else None
-                ),
-                "cycle_stages": [
-                    {
-                        "stage_id": cs.stage.id,
-                        "start_date": cs.start_date,
-                        "end_date": cs.end_date,
-                    }
-                    for cs in c.cycle_stages.filter(is_deleted=False).order_by("id")
-                ],
-            }
-            for c in qs
-        ]
-        return Response({"cycles": cycles}, status=status.HTTP_200_OK)
+        return Response(
+            {"cycles": KRACycleSerializer(qs, many=True).data},
+            status=status.HTTP_200_OK
+        )
 
-    def post(self, request):
+    def post(self, request: Request) -> Response:
+        """
+        API view to create a new KRA cycle with stages.
+
+        Endpoint: POST /api/v1/kra/cycles
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "Cycle Q3 2026",
+                "description": "KRA Cycle for Q3",
+                "start_date": "2026-07-01T00:00:00",
+                "end_date": "2026-09-30T00:00:00",
+                "stages": [
+                    {
+                        "stage_id": 1,
+                        "start_date": "2026-07-01T00:00:00",
+                        "end_date": "2026-07-15T00:00:00"
+                    }
+                ]
+            }
+
+        Response (201):
+            {
+                "id": 1,
+                "name": "Cycle Q3 2026",
+                "status": "DRAFT",
+                "stage": null,
+                "stages_count": 1
+            }
+
+        Error Responses:
+            400: Missing required field, invalid date format, or invalid stage_id(s)
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         data = request.data
 
@@ -481,7 +335,7 @@ class KRACycleListCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        stages_data = data.get("stages", [])  # fix: was data["stages",[]]
+        stages_data = data.get("stages", [])
 
         try:
             cycle_start = _parse_date(data["start_date"])
@@ -558,14 +412,14 @@ class KRACycleListCreateView(APIView):
                 "id": cycle.id,
                 "name": cycle.name,
                 "status": cycle.status,
-                "stage": None,  # no stage set on draft without stages
+                "stage": None,
                 "stages_count": len(stages_data),
             },
             status=status.HTTP_201_CREATED,
         )
 
-# 4. KRA Cycle — Update Status / Soft Delete
 
+# 4. KRA Cycle — Update Status / Soft Delete
 
 class KRACycleUpdateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -579,36 +433,89 @@ class KRACycleUpdateView(APIView):
         "CANCELLED": [],
     }
 
-    def get(self, request, cycle_id):
-        cycle = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
-        return Response(
+    def get(self, request: Request, cycle_id: int) -> Response:
+        """
+        API view to retrieve details of a specific KRA cycle.
+
+        Endpoint: GET /api/v1/kra/cycles/<cycle_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
             {
-                "id": cycle.id,
-                "name": cycle.name,
-                "description": cycle.description,
-                "start_date": cycle.start_date,
-                "end_date": cycle.end_date,
-                "status": cycle.status,
-                "current_stage": (
-                    {"id": cycle.stage.id, "name": cycle.stage.name}
-                    if cycle.stage
-                    else None
-                ),
+                "id": 1,
+                "name": "Cycle Q1 2026",
+                "description": "First quarter KRA cycle",
+                "start_date": "2026-01-01T00:00:00Z",
+                "end_date": "2026-03-31T00:00:00Z",
+                "status": "ACTIVE",
+                "current_stage": {
+                    "id": 1,
+                    "name": "Self Assessment"
+                },
                 "cycle_stages": [
                     {
-                        "stage_id": cs.stage.id,
-                        "start_date": cs.start_date,
-                        "end_date": cs.end_date,
+                        "stage_id": 1,
+                        "start_date": "2026-01-01T00:00:00Z",
+                        "end_date": "2026-01-15T00:00:00Z"
                     }
-                    for cs in cycle.cycle_stages.filter(is_deleted=False)
-                    .select_related("stage")
-                    .order_by("id")
-                ],
-            },
-            status=status.HTTP_200_OK,
-        )
+                ]
+            }
 
-    def patch(self, request, cycle_id):
+        Error Responses:
+            404: Cycle not found
+            401: Unauthorized
+        """
+        cycle = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
+        return Response(KRACycleSerializer(cycle).data, status=status.HTTP_200_OK)
+
+    def patch(self, request: Request, cycle_id: int) -> Response:
+        """
+        API view to patch/update a KRA cycle's status, dates, stages, or name.
+
+        Endpoint: PATCH /api/v1/kra/cycles/<cycle_id>
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "status": "ACTIVE",
+                "is_deleted": false,
+                "name": "Updated name",
+                "description": "Updated desc",
+                "start_date": "2026-07-01",
+                "end_date": "2026-09-30",
+                "stages": [
+                    {
+                        "stage_id": 1,
+                        "start_date": "2026-07-01",
+                        "end_date": "2026-07-15"
+                    }
+                ]
+            }
+
+        Response (200):
+            {
+                "id": 1,
+                "status": "ACTIVE",
+                "stage": {
+                    "id": 1,
+                    "name": "Self Assessment"
+                },
+                "message": "Cycle activated. Email notifications sent to enrolled employees."
+            }
+
+        Error Responses:
+            400: Invalid status transition
+            403: Only HR can update cycles
+            404: Cycle not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
 
         if not _is_hr(caller):
@@ -651,7 +558,7 @@ class KRACycleUpdateView(APIView):
         if is_deleted is not None:
             cycle.is_deleted = is_deleted
 
-        #  Save name / description if provided 
+        # Save name / description if provided
         if "name" in request.data:
             cycle.name = request.data["name"]
         if "description" in request.data:
@@ -667,7 +574,7 @@ class KRACycleUpdateView(APIView):
             except (ValueError, AttributeError):
                 pass
 
-        #  Save stage dates if provided 
+        # Save stage dates if provided
         stages_data = request.data.get("stages")
         if stages_data:
             for s in stages_data:
@@ -726,105 +633,45 @@ class KRACycleUpdateView(APIView):
 
 # 5. KRA Cycle — Clone
 
-
-# class KRACycleCloneView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request, cycle_id):
-#         caller = _get_caller(request)
-
-#         if not _is_hr(caller):
-#             return Response(
-#                 {"error": "Only HR can clone cycles"},
-#                 status=status.HTTP_403_FORBIDDEN,
-#             )
-
-#         source = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
-#         data   = request.data
-
-#         for field in ("name", "start_date", "end_date"):
-#             if field not in data:
-#                 return Response(
-#                     {"error": f"Missing required field: {field}"},
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#         with transaction.atomic():
-#             source_stages = (
-#                 source.cycle_stages.filter(is_deleted=False)
-#                 .select_related("stage")
-#                 .order_by("id")
-#             )
-
-#             if not source_stages.exists():
-#                 return Response(
-#                     {"error": "Source cycle has no stages to clone"},
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#             first_stage = source_stages.first().stage
-
-#             new_cycle = KRACycle.objects.create(
-#                 name        = data["name"],
-#                 description = data.get("description", source.description),
-#                 start_date  = data["start_date"],
-#                 end_date    = data["end_date"],
-#                 status      = "DRAFT",
-#                 stage       = first_stage,
-#                 is_deleted  = False,
-#             )
-
-#             for cs in source_stages:
-#                 KRACycleStage.objects.create(
-#                     kra_cycle  = new_cycle,
-#                     stage      = cs.stage,
-#                     start_date = cs.start_date,
-#                     end_date   = cs.end_date,
-#                     is_deleted = False,
-#                 )
-
-#         _audit(request, "CYCLE_CLONED", "KRACycle", new_cycle.id,
-#             old_data = {
-#                 "source_id":   source.id,
-#                 "source_name": source.name,
-#             },
-#             new_data = {
-#                 "name":       new_cycle.name,
-#                 "start_date": str(new_cycle.start_date),
-#                 "end_date":   str(new_cycle.end_date),
-#                 "cloned_by":  caller.email,
-#             }
-#         )
-
-#         return Response(
-#             {
-#                 "id":           new_cycle.id,
-#                 "name":         new_cycle.name,
-#                 "status":       new_cycle.status,
-#                 "stage":        {"id": first_stage.id, "name": first_stage.name},
-#                 "cloned_from":  source.id,
-#                 "stages_count": source_stages.count(),
-#             },
-#             status=status.HTTP_201_CREATED,
-#         )
-
-
 class KRACycleCloneView(APIView):
-    """
-    POST /api/v1/kra/cycles/{cycle_id}/clone
-
-    Body:
-        {
-            "name":               "Cycle Q4 2026",
-            "start_date":         "2026-10-01T00:00:00",
-            "end_date":           "2026-12-31T00:00:00",
-            "clone_assignments":  true     ← optional, default true
-        }
-    """
-
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, cycle_id):
+    def post(self, request: Request, cycle_id: int) -> Response:
+        """
+        API view to clone an existing cycle shell along with its stages and assignments.
+
+        Endpoint: POST /api/v1/kra/cycles/<cycle_id>/clone
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "name": "Cloned Cycle Q4 2026",
+                "start_date": "2026-10-01T00:00:00",
+                "end_date": "2026-12-31T00:00:00",
+                "clone_assignments": true
+            }
+
+        Response (201):
+            {
+                "id": 2,
+                "name": "Cloned Cycle Q4 2026",
+                "status": "DRAFT",
+                "cloned_from": 1,
+                "assignments": {
+                    "enrolled": [...],
+                    "skipped": [...],
+                    "needs_review": [...],
+                    "summary": { ... }
+                }
+            }
+
+        Error Responses:
+            400: Missing required fields or invalid date formats
+            401: Unauthorized
+            404: Source cycle not found
+        """
         caller = _get_caller(request)
         source = get_object_or_404(KRACycle, id=cycle_id, is_deleted=False)
         data = request.data
@@ -847,7 +694,7 @@ class KRACycleCloneView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Step 1: Clone the cycle shell + stage windows 
+        # Step 1: Clone the cycle shell + stage windows
         with transaction.atomic():
             new_cycle = KRACycle.objects.create(
                 name=data["name"],
@@ -869,7 +716,7 @@ class KRACycleCloneView(APIView):
 
         assignment_result = None
 
-        #  Step 2: Clone assignments if requested 
+        # Step 2: Clone assignments if requested
         if clone_assignments:
             assignment_result = _clone_assignments(
                 source_cycle=source,
@@ -905,37 +752,43 @@ class KRACycleCloneView(APIView):
 
 # 6. KRA Cycle - Stage advancement
 
-
 class KRACycleAdvanceStageView(APIView):
-    """
-    POST /api/v1/kra/cycles/{cycle_id}/advance-stage
-
-    Two modes:
-
-    1. CYCLE-LEVEL advance (no body or empty body)
-       - Moves the cycle forward by 1 stage
-       - Syncs ALL enrolled employees to the new stage
-       - HR only
-
-    2. EMPLOYEE-LEVEL override (provide target_stage_id + optional employee_ids)
-       - HR can set ANY stage (forward or backward) for:
-           a) ALL employees in the cycle  →  omit employee_ids or pass []
-           b) Specific employees only     →  pass employee_ids: [1001, 1002]
-       - Does NOT change the cycle's own stage_id
-
-    Request body examples:
-
-        {}                                          # advance cycle by 1, sync all employees
-
-        { "target_stage_id": 3 }                   # set ALL employees back to stage 3
-
-        { "target_stage_id": 3,
-          "employee_ids": [1001, 1002] }            # set only those two employees to stage 3
-    """
-
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, cycle_id):
+    def post(self, request: Request, cycle_id: int) -> Response:
+        """
+        API view to advance a KRA cycle stage or override stage values for specific employees.
+
+        Endpoint: POST /api/v1/kra/cycles/<cycle_id>/advance-stage
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body (Cycle Advance Mode):
+            None or {}
+
+        Request Body (Employee Override Mode):
+            {
+                "target_stage_id": 3,
+                "employee_ids": [1001, 1002]
+            }
+
+        Response (200):
+            {
+                "mode": "cycle_advance",
+                "cycle_id": 1,
+                "previous_stage": { "id": 1, "name": "Self Assessment" },
+                "current_stage": { "id": 2, "name": "Lead Assessment" },
+                "employees_synced": 15,
+                "message": "Cycle advanced to Lead Assessment"
+            }
+
+        Error Responses:
+            400: Bad parameters or stage configuration missing
+            403: Only HR can advance stages
+            404: Cycle not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
 
         if not _is_hr(caller):
@@ -949,14 +802,14 @@ class KRACycleAdvanceStageView(APIView):
         target_stage_id = request.data.get("target_stage_id")  # optional
         employee_ids = request.data.get("employee_ids", [])  # optional list
 
-        #  Mode 2: explicit stage override for employees
+        # Mode 2: explicit stage override for employees
         if target_stage_id is not None:
             return self._override_employee_stages(cycle, target_stage_id, employee_ids)
 
-        #  Mode 1: advance the cycle by one stage
+        # Mode 1: advance the cycle by one stage
         return self._advance_cycle(cycle)
 
-    #  Mode 1 helper
+    # Mode 1 helper
     def _advance_cycle(self, cycle):
         if not cycle.stage_id:
             return Response(
@@ -1069,48 +922,6 @@ class KRACycleAdvanceStageView(APIView):
                 cycle.save(update_fields=["stage"])
 
         scope = f"employees {employee_ids}" if employee_ids else "all employees"
-        
-
-
-        def send_employee_stage_override_email(employee, cycle, target_stage):
-            """
-            Email for individual employee stage override.
-            """
-
-            try:
-
-                if not employee.email:
-                    return
-
-                subject = f"KRA Stage Updated - {cycle.name}"
-
-                message = f"""
-        Hi {employee.first_name},
-
-        Your KRA stage has been updated.
-
-        Cycle: {cycle.name}
-
-        New Stage:
-        - Stage ID: {target_stage.id}
-        - Stage Name: {target_stage.name}
-
-        Please login to the KRA portal for details.
-
-        Regards,
-        HR Team
-        """
-
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[employee.email],
-                    fail_silently=True,
-                )
-
-            except Exception as e:
-                print(f"Stage override email failed: {str(e)}")
 
         def trigger_emails():
             for ekc in ekc_qs.select_related("employee", "kra_cycle"):
@@ -1121,7 +932,7 @@ class KRACycleAdvanceStageView(APIView):
             lambda: threading.Thread(target=trigger_emails, daemon=True).start()
         )
 
-        #  AUDIT LOG
+        # AUDIT LOG
         _audit(
             self.request,
             "EMPLOYEE_STAGE_OVERRIDE",
@@ -1157,48 +968,95 @@ class KRACycleAdvanceStageView(APIView):
         )
 
 
-class ReferenceDataView(APIView):
-    """
-    GET /api/v1/kra/reference-data
-    Returns stages, levels, ratings, and categories. Called once on app load.
-    """
+# 7. Reference Data
 
+class ReferenceDataView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        stages = list(Stage.objects.values("id", "name"))
-        levels = list(
-            Level.objects.values("id", "name", "min_experience", "max_experience")
-        )
-        ratings = list(Rating.objects.values("id", "rating", "description"))
-        categories = list(KRACategory.objects.values("id", "name", "is_standard"))
+    def get(self, request: Request) -> Response:
+        """
+        API view to fetch master reference records for stages, levels, ratings, and categories.
 
+        Endpoint: GET /api/v1/kra/reference-data
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "stages": [ { "id": 1, "name": "Self Assessment" } ],
+                "levels": [ { "id": 1, "name": "Dev-01", "min_experience": 0, "max_experience": 2 } ],
+                "ratings": [ { "id": 1, "rating": 5, "description": "Outstanding" } ],
+                "categories": [ { "id": 1, "name": "Core Development", "is_standard": true } ]
+            }
+
+        Error Responses:
+            401: Unauthorized
+        """
         return Response(
             {
-                "stages": stages,
-                "levels": levels,
-                "ratings": ratings,
-                "categories": categories,
+                "stages": ReferenceStageSerializer(Stage.objects.all(), many=True).data,
+                "levels": ReferenceLevelSerializer(Level.objects.all(), many=True).data,
+                "ratings": ReferenceRatingSerializer(Rating.objects.all(), many=True).data,
+                "categories": ReferenceCategorySerializer(KRACategory.objects.all(), many=True).data,
             },
             status=status.HTTP_200_OK,
         )
 
 
-class KRALibraryView(APIView):
-    """
-    GET /api/v1/kra/library?category_id=&level_id=
-    Returns all KRAs with their level variants; optionally filtered.
-    """
+# 8. KRA Library
 
+class KRALibraryView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
+        """
+        API view to retrieve KRAs from the library, optionally filtered by category and level.
+
+        Endpoint: GET /api/v1/kra/library
+        Query Parameters:
+            category_id (optional): category PK
+            level_id (optional): seniority level PK
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "kras": [
+                    {
+                        "id": 1,
+                        "name": "Coding Speed",
+                        "description": "Measure coding throughput",
+                        "category_id": 1,
+                        "category_name": "Core Development",
+                        "levels": [
+                            {
+                                "kra_level_id": 10,
+                                "level_id": 1,
+                                "level_name": "Dev-01",
+                                "description": "Meets core sprint goals"
+                            }
+                        ]
+                    }
+                ]
+            }
+
+        Error Responses:
+            401: Unauthorized
+        """
         category_id = request.query_params.get("category_id")
         level_id = request.query_params.get("level_id")
 
         qs = KRA.objects.select_related("category").prefetch_related(
-            "kra_levels__level",  # related_name 'kra_levels' on KRALevel.kra
-            "kra_levels__category",  # requires 'category' field on KRALevel
+            "kra_levels__level",
+            "kra_levels__category",
         )
 
         if category_id:
@@ -1206,46 +1064,45 @@ class KRALibraryView(APIView):
         if level_id:
             qs = qs.filter(kra_levels__level_id=level_id).distinct()
 
-        kras = []
-        for k in qs:
-            levels_data = []
-            for kl in k.kra_levels.all():
-                entry = {
-                    "kra_level_id": kl.id,
-                    "level_id": kl.level_id,
-                    "level_name": kl.level.name if kl.level else None,
-                    # 'name' and 'category' exist in DB but may be absent from
-                    # the model — add them to KRALevel (see NOTE at top of file)
-                    "description": getattr(kl, "name", None),
-                }
-                if level_id and str(kl.level_id) != str(level_id):
-                    continue
-                levels_data.append(entry)
+        serializer = KRALibrarySerializer(qs, many=True, context={"level_id": level_id})
+        return Response({"kras": serializer.data}, status=status.HTTP_200_OK)
 
-            kras.append(
-                {
-                    "id": k.id,
-                    "name": k.name,
-                    "description": k.description,
-                    "category_id": k.category_id,
-                    "category_name": k.category.name if k.category else None,
-                    "levels": levels_data,
-                }
-            )
 
-        return Response({"kras": kras}, status=status.HTTP_200_OK)
-
+# 9. Employee Stage Overrides
 
 class EmployeeStageOverrideDatesView(APIView):
-    """
-    POST /api/v1/kra/employee-cycles/:ekc_id/stage-dates
-    Save per-employee stage date overrides.
-    Body: { stages: [{ stage_id, start_date, end_date }] }
-    """
-
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, ekc_id):
+    def post(self, request: Request, ekc_id: int) -> Response:
+        """
+        API view to set customized start/end dates for cycle stages for a single employee.
+
+        Endpoint: POST /api/v1/kra/employee-cycles/<ekc_id>/stage-dates
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            {
+                "stages": [
+                    {
+                        "stage_id": 1,
+                        "start_date": "2026-07-01T00:00:00",
+                        "end_date": "2026-07-20T00:00:00"
+                    }
+                ]
+            }
+
+        Response (200):
+            {
+                "message": "Stage dates saved"
+            }
+
+        Error Responses:
+            403: Only HR can set stage overrides
+            404: Employee cycle not found
+            401: Unauthorized
+        """
         caller = _get_caller(request)
         if not _is_hr(caller):
             return Response(
