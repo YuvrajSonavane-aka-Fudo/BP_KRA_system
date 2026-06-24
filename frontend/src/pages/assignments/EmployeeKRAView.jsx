@@ -9,7 +9,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -31,20 +31,20 @@ function truncateWords(str = '', max = 8) {
 // ── Close dialog — only rendered when dirty=true ─────────────────────────────
 function CloseConfirmDialog({ open, onGoBack, onDiscard, onSaveClose, saving  }) {
   return (
-    <Dialog open={open} onClose={onGoBack} maxWidth="xs" fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
+    <Dialog open={open} onClose={onGoBack}  fullWidth
+      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid #fde68a' }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
           <WarningAmberIcon sx={{ color: '#d97706', fontSize: 18 }} />
-          <Typography fontWeight={700} fontSize={14} color="#92400e">Unsaved changes</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}   >Unsaved changes</Typography>
         </Stack>
       </Box>
       <Box sx={{ px: 2.5, py: 2 }}>
-        <Typography fontSize={13} color="#374151" lineHeight={1.6}>
+        <Typography sx={{ lineHeight: 1.6, fontSize: 13, color: '#374151' }}   >
           You have unsaved weightage changes. Go back to keep editing, or save everything now and close.
         </Typography>
       </Box>
-      <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ px: 2.5, pb: 2.5 }}>
+      <Stack direction="row"  spacing={1} sx={{ px: 2.5, pb: 2.5, justifyContent: 'flex-end' }}>
         <Button onClick={onGoBack} disabled={saving}
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>
           Keep Editing
@@ -54,7 +54,7 @@ function CloseConfirmDialog({ open, onGoBack, onDiscard, onSaveClose, saving  })
           Discard & Leave
         </Button>
         <Button onClick={onSaveClose} disabled={saving} variant="contained"
-          startIcon={saving ? <CircularProgress size={12} color="inherit" /> : <SaveIcon sx={{ fontSize: 14 }} />}
+          startIcon={saving ? <CircularProgress size={12}  /> : <SaveIcon sx={{ fontSize: 14, color: 'inherit' }} />}
           sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
             background: gradient, '&:hover': { opacity: 0.9 } }}>
           {saving ? 'Saving…' : 'Save & Leave'}
@@ -66,28 +66,26 @@ function CloseConfirmDialog({ open, onGoBack, onDiscard, onSaveClose, saving  })
 
 function WarnDialog({ open, title, message, confirmLabel, confirmColor = '#dc2626', onConfirm, onCancel, loading }) {
   return (
-    <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
+    <Dialog open={open} onClose={onCancel}  fullWidth
+      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid #fde68a' }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
           <WarningAmberIcon sx={{ color: '#d97706', fontSize: 18 }} />
-          <Typography fontWeight={700} fontSize={14} color="#92400e">{title}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}   >{title}</Typography>
         </Stack>
       </Box>
       <Box sx={{ px: 2.5, py: 2 }}>
-        <Typography fontSize={13} color="#374151">{message}</Typography>
+        <Typography sx={{ fontSize: 13, color: '#374151' }}  >{message}</Typography>
       </Box>
-      <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ px: 2.5, pb: 2.5 }}>
+      <Stack direction="row"  spacing={1} sx={{ px: 2.5, pb: 2.5, justifyContent: 'flex-end' }}>
         <Button onClick={onCancel} disabled={loading}
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>
           Go Back
         </Button>
         <Button onClick={onConfirm} disabled={loading} variant="contained"
-          startIcon={loading ? <CircularProgress size={12} color="inherit" /> : null}
-          sx={{
-            textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
-            bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }
-          }}>
+          startIcon={loading ? <CircularProgress size={12}  /> : null}
+          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
+            bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }, color: 'inherit' }}>
           {loading ? 'Processing…' : confirmLabel}
         </Button>
       </Stack>
@@ -127,27 +125,27 @@ function CloneTargetPanel({ employees = [], sourceEmployee, onClone, onClose, se
 
   return (
     <Box sx={{ p: 1.75, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0', mt: 0.75 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.25}>
-        <Typography fontSize={12} fontWeight={700} color="#1e293b">Copy KRAs to other employees</Typography>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.25 }}   >
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}   >Copy KRAs to other employees</Typography>
         <IconButton size="small" onClick={onClose} sx={{ p: 0.25 }}>
           <CloseIcon sx={{ fontSize: 13, color: '#94a3b8' }} />
         </IconButton>
       </Stack>
       <Box sx={{ px: 1.5, py: 1, mb: 1.25, borderRadius: 1.5, bgcolor: '#eff6ff', border: '1px solid #bfdbfe' }}>
-        <Typography fontSize={11} color="#1d4ed8" lineHeight={1.6}>
+        <Typography sx={{ lineHeight: 1.6, fontSize: 11, color: '#1d4ed8' }}   >
           Selected KRAs will be copied. If someone already has a KRA, it won't be added again.
         </Typography>
       </Box>
       <TextField size="small" placeholder="Search employees…" value={search}
         onChange={e => setSearch(e.target.value)}
-        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 13, color: '#94a3b8' }} /></InputAdornment> }}
+        slotProps={{ input: { startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 13, color: '#94a3b8', position: 'start' }} /></InputAdornment> } }}
         sx={{ mb: 0.75, width: '100%', '& .MuiOutlinedInput-root': { borderRadius: 1.5, fontSize: 12, height: 32 } }}
       />
-      <Stack direction="row" alignItems="center" sx={{ px: 0.25, mb: 0.4 }}>
+      <Stack direction="row"  sx={{ px: 0.25, mb: 0.4, alignItems: 'center' }}>
         <Checkbox size="small"
           indeterminate={selectedIds.length > 0 && selectedIds.length < eligible.length}
           checked={(eligible?.length > 0) && (selectedIds?.length === eligible?.length)} onChange={e => toggleAll(e.target.checked)} sx={{ p: 0.25 }} />
-        <Typography fontSize={10} fontWeight={700} color="#64748b" textTransform="uppercase" letterSpacing="0.04em">
+        <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10, fontWeight: 700, color: '#64748b' }}     >
           All ({eligible.length})
         </Typography>
         {selectedIds.length > 0 && (
@@ -161,7 +159,7 @@ function CloneTargetPanel({ employees = [], sourceEmployee, onClone, onClose, se
       }}>
         {eligible.length === 0
           ? <Box sx={{ textAlign: 'center', py: 2.5 }}>
-            <Typography fontSize={11} color="#94a3b8">No other employees found</Typography>
+            <Typography sx={{ fontSize: 11, color: '#94a3b8' }}  >No other employees found</Typography>
           </Box>
           : eligible.map(emp => {
             const sel = selectedIds.includes(emp.employee_id);
@@ -175,9 +173,9 @@ function CloneTargetPanel({ employees = [], sourceEmployee, onClone, onClose, se
                 }}>
                 <Checkbox size="small" checked={sel} onChange={() => toggleId(emp.employee_id)}
                   onClick={e => e.stopPropagation()} sx={{ p: 0, mr: 1, flexShrink: 0 }} />
-                <Box minWidth={0}>
-                  <Typography fontSize={11} fontWeight={600} color="#1e293b" noWrap>{emp.full_name}</Typography>
-                  <Typography fontSize={9.5} color="#94a3b8" noWrap>
+                <Box sx={{ minWidth: 0 }} >
+                  <Typography    noWrap sx={{ fontSize: 11, fontWeight: 600, color: '#1e293b' }}>{emp.full_name}</Typography>
+                  <Typography   noWrap sx={{ fontSize: 9.5, color: '#94a3b8' }}>
                     {emp.level}{emp.department ? ` · ${emp.department}` : ''}
                   </Typography>
                 </Box>
@@ -191,7 +189,7 @@ function CloneTargetPanel({ employees = [], sourceEmployee, onClone, onClose, se
           display: 'flex', alignItems: 'center', gap: 1
         }}>
           <CheckCircleIcon sx={{ color: '#16a34a', fontSize: 16, flexShrink: 0 }} />
-          <Typography fontSize={11} fontWeight={600} color="#166534">Done! KRAs copied successfully.</Typography>
+          <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#166534' }}   >Done! KRAs copied successfully.</Typography>
         </Box>
       )}
       <Button variant="contained" fullWidth size="small"
@@ -424,12 +422,12 @@ export default function EmployeeKRAView({
 
   return (
     <>
-      <Dialog open={open} onClose={() => { }} maxWidth="lg" fullWidth disableEscapeKeyDown
-        PaperProps={{ sx: { borderRadius: 3, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}>
+      <Dialog open={open} onClose={() => { }}  fullWidth disableEscapeKeyDown
+        PaperProps={{ sx: { borderRadius: 3, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }} sx={{ maxWidth: 'lg' }}>
 
         {/* ── HEADER ── */}
         <Box sx={{ background: gradient, px: 2.5, pt: 2, pb: 1.75, color: '#fff', flexShrink: 0 }}>
-          <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
             <Avatar sx={{
               width: 38, height: 38, fontSize: 13, fontWeight: 800, flexShrink: 0,
               bgcolor: 'rgba(255,255,255,0.18)', border: '2px solid rgba(255,255,255,0.3)'
@@ -438,15 +436,15 @@ export default function EmployeeKRAView({
             </Avatar>
 
             <Box sx={{ flexShrink: 0, minWidth: 0 }}>
-              <Stack direction="row" alignItems="center" spacing={0.75}>
-                <Typography fontWeight={800} fontSize={14} lineHeight={1.2} noWrap>
+              <Stack direction="row"  spacing={0.75} sx={{ alignItems: 'center' }}>
+                <Typography    noWrap sx={{ lineHeight: 1.2, fontSize: 14, fontWeight: 800 }}>
                   {employee.full_name}
                 </Typography>
                 <Chip icon={<CheckCircleIcon sx={{ fontSize: '10px !important', color: '#86efac !important' }} />}
                   label="Assigned" size="small"
                   sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#bbf7d0', fontSize: 9, fontWeight: 700, height: 17 }} />
               </Stack>
-              <Typography fontSize={10.5} sx={{ opacity: 0.6, mt: 0.15 }} noWrap>
+              <Typography  sx={{ opacity: 0.6, mt: 0.15, fontSize: 10.5 }} noWrap>
                 {[employee.title, employee.level, employee.department, employee.email].filter(Boolean).join(' · ')}
               </Typography>
             </Box>
@@ -454,7 +452,7 @@ export default function EmployeeKRAView({
             {/* Search */}
             <TextField size="small" placeholder={`Search across ${totalKRAs} KRAs…`}
               value={search} onChange={e => setSearch(e.target.value)}
-              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.5)' }} /></InputAdornment> }}
+              slotProps={{ input: { startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', position: 'start' }} /></InputAdornment> } }}
               sx={{
                 flex: 1,
                 '& .MuiOutlinedInput-root': {
@@ -540,7 +538,7 @@ export default function EmployeeKRAView({
           bgcolor: wValid ? '#f0fdf4' : remaining > 0 ? '#fefce8' : '#fef2f2',
           borderBottom: `1px solid ${wValid ? '#bbf7d0' : remaining > 0 ? '#fde68a' : '#fecaca'}`
         }}>
-          <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
             <Tooltip title={allChecked ? 'Deselect all' : 'Select all KRAs'}>
               <Checkbox size="small" checked={allChecked} indeterminate={someChecked && !allChecked}
                 onChange={e => toggleAll(e.target.checked)}
@@ -551,8 +549,8 @@ export default function EmployeeKRAView({
                   '&.MuiCheckbox-indeterminate': { color: '#1E3A8A' }
                 }} />
             </Tooltip>
-            <Typography fontSize={12.5} fontWeight={700}
-              color={wValid ? '#166534' : remaining > 0 ? '#92400e' : '#991b1b'}>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: wValid ? '#166534' : remaining > 0 ? '#92400e' : '#991b1b' }}  
+              >
               Total Weightage:
             </Typography>
             <Chip label={`${totalW.toFixed(0)}%`} size="small"
@@ -562,11 +560,11 @@ export default function EmployeeKRAView({
                 color: wValid ? '#166534' : remaining > 0 ? '#854d0e' : '#991b1b'
               }} />
             {!wValid && (
-              <Typography fontSize={11.5} color={remaining > 0 ? '#92400e' : '#991b1b'} fontWeight={500}>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 500, color: remaining > 0 ? '#92400e' : '#991b1b' }}   >
                 {remaining > 0 ? `${remaining}% still available` : `${Math.abs(remaining)}% over limit`}
               </Typography>
             )}
-            {wValid && <Typography fontSize={11} color="#166534" fontWeight={500}>All weightages balanced ✓</Typography>}
+            {wValid && <Typography sx={{ fontSize: 11, fontWeight: 500, color: '#166534' }}   >All weightages balanced ✓</Typography>}
             {saveSuccess && (
               <Chip icon={<CheckCircleIcon sx={{ fontSize: '11px !important' }} />} label="Saved!" size="small"
                 sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: 10 }} />
@@ -575,8 +573,8 @@ export default function EmployeeKRAView({
               <Chip label={`${checkedCount} selected`} size="small"
                 sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: 10, height: 20 }} />
             )}
-            <Box flex={1} />
-            <Stack direction="row" gap={0.75} alignItems="center">
+            <Box sx={{ flex: 1 }}  />
+            <Stack direction="row" sx={{ alignItems: 'center', gap: 0.75 }}  >
               <Chip
                 icon={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#16a34a', ml: '6px !important' }} />}
                 label="Org" size="small"
@@ -599,7 +597,7 @@ export default function EmployeeKRAView({
         }}>
           {filtered.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 8, color: '#94a3b8' }}>
-              <Typography fontSize={13}>No KRAs match your search.</Typography>
+              <Typography sx={{ fontSize: 13 }} >No KRAs match your search.</Typography>
             </Box>
           ) : (
             <Stack spacing={1.25}>
@@ -617,7 +615,7 @@ export default function EmployeeKRAView({
 
                     {/* ── Category header — NO clone/delete icons here ── */}
                     <Box sx={{ bgcolor: tc.header, px: 1.5, py: 0.85 }}>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <Stack direction="row"  spacing={0.5} sx={{ alignItems: 'center' }}>
 
                         <Checkbox size="small"
                           checked={catChecked(group.category_id)}
@@ -640,10 +638,10 @@ export default function EmployeeKRAView({
                           : <FolderSpecialIcon sx={{ fontSize: 14, color: tc.color, flexShrink: 0 }} />}
 
                         {/* Category name — clickable to collapse */}
-                        <Stack direction="row" alignItems="baseline" spacing={0.75} flex={1}
+                        <Stack direction="row"  spacing={0.75} 
                           onClick={() => toggleCat(group.category_id)}
-                          sx={{ cursor: 'pointer', ml: 0.25, userSelect: 'none', '&:hover': { opacity: 0.8 } }}>
-                          <Typography fontSize={13} fontWeight={700} color={tc.color}>
+                          sx={{ cursor: 'pointer', ml: 0.25, userSelect: 'none', '&:hover': { opacity: 0.8 }, alignItems: 'baseline', flex: 1 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, color: tc.color }}   >
                             {group.category_name}
                             <Box component="sup" sx={{ fontSize: 9, fontWeight: 800, ml: '2px', verticalAlign: 'super', lineHeight: 0 }}>
                               {group.rows.length}
@@ -658,7 +656,7 @@ export default function EmployeeKRAView({
 
                         {/* Weightage input */}
                         <Tooltip title="Set category weightage (all must total 100%)" placement="top">
-                          <Stack direction="row" alignItems="center" spacing={0.4}>
+                          <Stack direction="row"  spacing={0.4} sx={{ alignItems: 'center' }}>
                             <TextField size="small" value={catW} placeholder="0"
                               disabled={isManager && group.is_standard }
                               onChange={e => handleWeightChange(group.category_id, e.target.value)}
@@ -674,7 +672,7 @@ export default function EmployeeKRAView({
                                 }
                               }}
                             />
-                            <Typography fontSize={11} fontWeight={700} color={tc.color}>%</Typography>
+                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: tc.color }}   >%</Typography>
                           </Stack>
                         </Tooltip>
 
@@ -697,14 +695,12 @@ export default function EmployeeKRAView({
 
                           return (
                             <Box key={row.key}>
-                              <Stack direction="row" alignItems="center"
-                                sx={{
-                                  px: 1.5, py: 0.85,
+                              <Stack direction="row" 
+                                sx={{ px: 1.5, py: 0.85,
                                   borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
                                   bgcolor: isChecked ? '#f0f7ff' : '#fff',
                                   '&:hover': { bgcolor: isChecked ? '#e8f1ff' : '#fafafa' },
-                                  transition: 'background 0.1s'
-                                }}>
+                                  transition: 'background 0.1s', alignItems: 'center' }}>
 
                                 <Checkbox size="small" checked={isChecked}
                                   disabled={isManager && group.is_standard }
@@ -716,22 +712,22 @@ export default function EmployeeKRAView({
                                     '&.Mui-checked': { color: '#1E3A8A' } }}
                                 />
 
-                                <Typography fontSize={12.5} fontWeight={500} color="#1e293b"
-                                  sx={{ width: 175, flexShrink: 0 }}>
+                                <Typography   
+                                  sx={{ width: 175, flexShrink: 0, fontSize: 12.5, fontWeight: 500, color: '#1e293b' }}>
                                   {row.kra_name}
                                 </Typography>
 
-                                <Box flex={1} minWidth={0} px={1}>
+                                <Box sx={{ flex: 1, minWidth: 0, px: 1 }}   >
                                   {row.description ? (
                                     truncated ? (
                                       <Tooltip title={full} placement="top" arrow
                                         componentsProps={{ tooltip: { sx: { maxWidth: 340, fontSize: 11, bgcolor: '#1e293b', lineHeight: 1.6 } } }}>
-                                        <Typography fontSize={11} color="#94a3b8" sx={{ cursor: 'default' }}>
+                                        <Typography   sx={{ cursor: 'default', fontSize: 11, color: '#94a3b8' }}>
                                           {descText}
                                         </Typography>
                                       </Tooltip>
                                     ) : (
-                                      <Typography fontSize={11} color="#94a3b8">{descText}</Typography>
+                                      <Typography sx={{ fontSize: 11, color: '#94a3b8' }}  >{descText}</Typography>
                                     )
                                   ) : null}
                                 </Box>
@@ -758,7 +754,7 @@ export default function EmployeeKRAView({
 
         {/* ── FOOTER ── */}
         <Box sx={{ px: 2.5, py: 1.25, borderTop: '1px solid #f1f5f9', bgcolor: '#fafafa', flexShrink: 0 }}>
-          <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1}>
+          <Stack direction="row"   spacing={1} sx={{ alignItems: 'center', justifyContent: 'flex-end' }}>
             {saveSuccess && (
               <Chip icon={<CheckCircleIcon sx={{ fontSize: '11px !important' }} />} label="Saved!" size="small"
                 sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: 10 }} />

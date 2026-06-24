@@ -11,7 +11,7 @@ import {
 import SearchIcon        from '@mui/icons-material/Search';
 import AddIcon           from '@mui/icons-material/Add';
 import EditIcon          from '@mui/icons-material/Edit';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import ExpandMoreIcon    from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon    from '@mui/icons-material/ExpandLess';
 import LibraryBooksIcon  from '@mui/icons-material/LibraryBooks';
@@ -134,23 +134,23 @@ function Toast({ open, message, severity = 'success', onClose }) {
 // ─── Delete Confirm ───────────────────────────────────────────────────────────
 function DeleteConfirmDialog({ open, title, message, onClose, onConfirm, deleting }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
+    <Dialog open={open} onClose={onClose}  fullWidth
+      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fef2f2', px: 2.5, pt: 2, pb: 1.5 }}>
-        <Stack direction="row" alignItems="center" spacing={1.25}>
+        <Stack direction="row"  spacing={1.25} sx={{ alignItems: 'center' }}>
           <DeleteOutlineIcon sx={{ color: '#dc2626', fontSize: 17 }} />
-          <Typography fontWeight={700} fontSize={14} color="#991b1b">{title}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#991b1b' }}   >{title}</Typography>
         </Stack>
       </Box>
       <DialogContent sx={{ pt: 1.5, pb: 1 }}>
-        <Typography fontSize={13} color="#374151">{message}</Typography>
+        <Typography sx={{ fontSize: 13, color: '#374151' }}  >{message}</Typography>
       </DialogContent>
       <DialogActions sx={{ px: 2.5, pb: 2 }}>
         <Button onClick={onClose} disabled={deleting}
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>Cancel</Button>
-        <Button onClick={onConfirm} disabled={deleting} variant="contained" color="error"
-          startIcon={deleting ? <CircularProgress size={12} color="inherit" /> : null}
-          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 13 }}>
+        <Button onClick={onConfirm} disabled={deleting} variant="contained" 
+          startIcon={deleting ? <CircularProgress size={12}  /> : null}
+          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 13, color: 'inherit' }}>
           {deleting ? 'Deleting…' : 'Delete'}
         </Button>
       </DialogActions>
@@ -161,17 +161,17 @@ function DeleteConfirmDialog({ open, title, message, onClose, onConfirm, deletin
 // ─── Blocked Delete Dialog (item is assigned to employees) ───────────────────
 function BlockedDeleteDialog({ open, title, message, onClose }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }}>
+    <Dialog open={open} onClose={onClose}  fullWidth
+      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5 }}>
-        <Stack direction="row" alignItems="center" spacing={1.25}>
+        <Stack direction="row"  spacing={1.25} sx={{ alignItems: 'center' }}>
           <Box sx={{
             width: 28, height: 28, borderRadius: '50%',
             bgcolor: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            <Typography fontSize={14} lineHeight={1}>⚠️</Typography>
+            <Typography sx={{ lineHeight: 1, fontSize: 14 }}  >⚠️</Typography>
           </Box>
-          <Typography fontWeight={700} fontSize={14} color="#92400e">{title}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#92400e' }}   >{title}</Typography>
         </Stack>
       </Box>
       <DialogContent sx={{ pt: 2, pb: 1 }}>
@@ -243,20 +243,20 @@ function GlobalSearchBar({ kras, categories, onSelectKRA, onSelectCategory }) {
       <TextField size="small" placeholder="Search categories & KRAs…" value={query}
         onChange={e => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        InputProps={{
+        slotProps={{ input: {
           startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon sx={{ color: 'rgba(255,255,255,0.55)', fontSize: 16 }} />
+            <InputAdornment >
+              <SearchIcon sx={{ color: 'rgba(255,255,255,0.55)', fontSize: 16, position: 'end' }} />
             </InputAdornment>
           ),
           endAdornment: query ? (
-            <InputAdornment position="end">
+            <InputAdornment >
               <IconButton size="small" onClick={() => { setQuery(''); setOpen(false); }} sx={{ p: 0.2 }}>
                 <CloseIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }} />
               </IconButton>
             </InputAdornment>
           ) : null,
-        }}
+        } }}
         sx={{
           width: '100%',
           '& .MuiOutlinedInput-root': {
@@ -280,14 +280,14 @@ function GlobalSearchBar({ kras, categories, onSelectKRA, onSelectCategory }) {
         }}>
           {!hasResults ? (
             <Box sx={{ px: 2, py: 2, textAlign: 'center' }}>
-              <Typography fontSize={12} color="#94a3b8">No results for "{query}"</Typography>
+              <Typography sx={{ fontSize: 12, color: '#94a3b8' }}  >No results for "{query}"</Typography>
             </Box>
           ) : (
             <>
               {results.cats.length > 0 && (
                 <Box>
                   <Box sx={{ px: 2, py: 0.75, bgcolor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                    <Typography fontSize={9.5} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.07em">Categories</Typography>
+                    <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', fontSize: 9.5, fontWeight: 700, color: '#94a3b8' }}     >Categories</Typography>
                   </Box>
                   {results.cats.map((cat) => {
                     const style = cat.is_standard ? GREEN_STYLE : BLUE_STYLE;
@@ -297,7 +297,7 @@ function GlobalSearchBar({ kras, categories, onSelectKRA, onSelectCategory }) {
                         sx={{ px: 2, py: 0.9, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 1.25,
                           '&:hover': { bgcolor: '#f8fafc' }, borderBottom: '1px solid #f8fafc' }}>
                         <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: style.color, flexShrink: 0 }} />
-                        <Typography fontSize={12.5} fontWeight={600} color="#1e293b" flex={1}>{cat.name}</Typography>
+                        <Typography sx={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: '#1e293b' }}    >{cat.name}</Typography>
                         <Chip label={cat.is_standard ? 'Org Level' : 'Project Level'} size="small"
                           sx={{ fontSize: 9, height: 16, fontWeight: 700,
                             bgcolor: cat.is_standard ? '#dcfce7' : '#dbeafe',
@@ -311,7 +311,7 @@ function GlobalSearchBar({ kras, categories, onSelectKRA, onSelectCategory }) {
                 <Box>
                   <Box sx={{ px: 2, py: 0.75, bgcolor: '#f8fafc', borderBottom: '1px solid #f1f5f9',
                     borderTop: results.cats.length ? '1px solid #e2e8f0' : undefined }}>
-                    <Typography fontSize={9.5} fontWeight={700} color="#94a3b8" textTransform="uppercase" letterSpacing="0.07em">KRAs</Typography>
+                    <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', fontSize: 9.5, fontWeight: 700, color: '#94a3b8' }}     >KRAs</Typography>
                   </Box>
                   {results.kras.map(kra => {
                     const cat = categories.find(c => c.id === kra.category_id);
@@ -320,11 +320,11 @@ function GlobalSearchBar({ kras, categories, onSelectKRA, onSelectCategory }) {
                       <Box key={kra.id}
                         onClick={() => { onSelectKRA(kra); setOpen(false); setQuery(''); }}
                         sx={{ px: 2, py: 0.9, cursor: 'pointer', '&:hover': { bgcolor: '#f8fafc' }, borderBottom: '1px solid #f8fafc' }}>
-                        <Stack direction="row" alignItems="center" spacing={1}>
+                        <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
                           <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: style.color, flexShrink: 0, mt: 0.25 }} />
-                          <Box flex={1} minWidth={0}>
-                            <Typography fontSize={12.5} fontWeight={600} color="#1e293b" noWrap>{kra.name}</Typography>
-                            {cat && <Typography fontSize={10.5} color="#94a3b8" noWrap>in {cat.name}</Typography>}
+                          <Box sx={{ flex: 1, minWidth: 0 }}  >
+                            <Typography    noWrap sx={{ fontSize: 12.5, fontWeight: 600, color: '#1e293b' }}>{kra.name}</Typography>
+                            {cat && <Typography   noWrap sx={{ fontSize: 10.5, color: '#94a3b8' }}>in {cat.name}</Typography>}
                           </Box>
                         </Stack>
                       </Box>
@@ -356,11 +356,11 @@ function LevelChip({ lv, idx, levelMap = {}, showExp = false }) {
       px: 1, py: 0.25, borderRadius: 1,
       bgcolor: s.bg, border: `1px solid ${s.border}`, height: 22,
     }}>
-      <Typography fontSize={10.5} fontWeight={700} color={s.color} lineHeight={1}>{lv.level_name}</Typography>
+      <Typography sx={{ lineHeight: 1, fontSize: 10.5, fontWeight: 700, color: s.color }}    >{lv.level_name}</Typography>
       {expLabel && (
         <>
           <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: s.color, opacity: 0.5 }} />
-          <Typography fontSize={10} color="#64748b" lineHeight={1}>{expLabel}</Typography>
+          <Typography sx={{ lineHeight: 1, fontSize: 10, color: '#64748b' }}   >{expLabel}</Typography>
         </>
       )}
     </Box>
@@ -401,29 +401,27 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
         </TableCell>
 
         <TableCell sx={{ py: 1.1, pl: 0.25, pr: 1, borderBottom: expanded ? 'none' : undefined, width: '90%' }}>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
             <Box sx={{ color: '#cbd5e1', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
               {expanded ? <ExpandLessIcon sx={{ fontSize: 14 }} /> : <ExpandMoreIcon sx={{ fontSize: 14 }} />}
             </Box>
-            <Box minWidth={0} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography fontWeight={650} fontSize={13} color="#1e293b" noWrap
+            <Box  sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+              <Typography    noWrap
                 onClick={e => {
                   e.stopPropagation();
                   // label click is visual only — does not affect checkbox selection
                 }}
-                sx={{ cursor: 'pointer', '&:hover': { color: '#1d4ed8' } }}>
+                sx={{ cursor: 'pointer', '&:hover': { color: '#1d4ed8' }, fontSize: 13, fontWeight: 650, color: '#1e293b' }}>
                 {kra.name}
               </Typography>
               {kra.description && !expanded && (
                 <Typography
-                  fontSize={11.5}
-                  color="#94a3b8"
+                  
+                  
                   noWrap
-                  sx={{
-                    maxWidth: 470,
+                  sx={{ maxWidth: 470,
                     overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
+                    textOverflow: 'ellipsis', fontSize: 11.5, color: '#94a3b8' }}
                 >
                   — {kra.description}
                 </Typography>
@@ -458,17 +456,17 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
 
                   {kra.levels.length > 3 && (
                     <Typography
-                      fontSize={9}
-                      fontWeight={500}
-                      color="#94a3b8"
-                      sx={{ alignSelf: 'center', ml: 0.25 }}
+                      
+                      
+                      
+                      sx={{ alignSelf: 'center', ml: 0.25, fontSize: 9, fontWeight: 500, color: '#94a3b8' }}
                     >
                       +{kra.levels.length - 3} more
                     </Typography>
                   )}
                 </>
               ) : (
-                <Typography fontSize={11} color="#cbd5e1" fontStyle="italic">
+                <Typography sx={{ fontStyle: 'italic', fontSize: 11, color: '#cbd5e1' }}   >
                   —
                 </Typography>
               )}
@@ -478,8 +476,8 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
         <TableCell align="right" sx={{ py: 1.1, pr: 1.5, borderBottom: expanded ? 'none' : undefined, width: 120 }}
           onClick={e => e.stopPropagation()}>
           {canManage && (
-            <Stack direction="row" spacing={0} justifyContent="flex-end"
-              className="kra-actions" sx={{ opacity: 0, transition: 'opacity 0.12s' }}>
+            <Stack direction="row" spacing={0} 
+              className="kra-actions" sx={{ opacity: 0, transition: 'opacity 0.12s', justifyContent: 'flex-end' }}>
               <Tooltip title="Edit">
                 <IconButton size="small" onClick={() => onEdit(kra)}
                   sx={{ color: '#94a3b8', '&:hover': { color: '#1d4ed8' }, p: 0.4, borderRadius: 1 }}>
@@ -508,13 +506,13 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
           <Collapse in={expanded} timeout="auto" unmountOnExit>
             <Box sx={{ pl: 8, pr: 3, py: 1.25, bgcolor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
               {kra.description && (
-                <Typography fontSize={12.5} color="#475569" lineHeight={1.55} mb={kra.levels?.length ? 1 : 0}>
+                <Typography sx={{ lineHeight: 1.55, mb: kra.levels?.length ? 1 : 0, fontSize: 12.5, color: '#475569' }}    >
                   {kra.description}
                 </Typography>
               )}
               {/* Expanded → level name + exp range */}
               {kra.levels?.length > 0 && (
-                <Stack direction="row" flexWrap="wrap" gap={0.75}>
+                <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.75 }}  >
                   {kra.levels.map((lv, i) => {
                     const s = CAT_PALETTE[i % CAT_PALETTE.length];
                     const parentLevel = levelMap[lv.level_id] ?? {};
@@ -528,11 +526,11 @@ function KRARow({ kra, catIdx, levelMap = {}, canManage, onEdit, onClone, onDele
                         display: 'inline-flex', alignItems: 'center', gap: 0.75,
                         px: 1.25, py: 0.4, borderRadius: 1,
                         bgcolor: s.bg, border: `1px solid ${s.border}` }}>
-                        <Typography fontSize={11.5} fontWeight={700} color={s.color}>{lv.level_name}</Typography>
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: s.color }}   >{lv.level_name}</Typography>
                         {expLabel && (
                           <>
                             <Box sx={{ width: 3, height: 3, borderRadius: '50%', bgcolor: s.color, opacity: 0.4 }} />
-                            <Typography fontSize={11} color="#64748b">{expLabel}</Typography>
+                            <Typography sx={{ fontSize: 11, color: '#64748b' }}  >{expLabel}</Typography>
                           </>
                         )}
                       </Box>
@@ -640,7 +638,7 @@ function CategoriesPanel({
           '&:hover': { bgcolor: active ? colorStyle.bg : '#f8fafc' },
           transition: 'all 0.12s',
         }}>
-        <Stack direction="row" alignItems="center" spacing={0.25}>
+        <Stack direction="row"  spacing={0.25} sx={{ alignItems: 'center' }}>
           {/* Category checkbox */}
           {canManage && (
             <Checkbox
@@ -681,10 +679,10 @@ function CategoriesPanel({
             />
           )}
           <Typography
-            fontSize={13.5}
-            fontWeight={active ? 700 : 600}
-            color={active ? colorStyle.color : '#334155'}
-            noWrap flex={1} lineHeight={1.4}
+            
+            
+            
+            noWrap  
             // REPLACE with:
 onClick={() => {
   onSelectCat(cat.id);
@@ -698,10 +696,10 @@ onClick={() => {
     setSelectedKRAIds(() => new Set(catKRAIds));
   }
 }}
-            sx={{ cursor: 'pointer', userSelect: 'none' }}>
+            sx={{ cursor: 'pointer', userSelect: 'none', flex: 1, lineHeight: 1.4, fontSize: 13.5, fontWeight: active ? 700 : 600, color: active ? colorStyle.color : '#334155' }}>
             {cat.name}
           </Typography>
-          <Stack direction="row" alignItems="center" spacing={0.35} flexShrink={0}>
+          <Stack direction="row"  spacing={0.35} sx={{ alignItems: 'center', flexShrink: 0 }} >
             {canActOnThis  && active ? (
               <>
                 <Chip label="+ KRA" size="small"
@@ -751,7 +749,7 @@ onClick={() => {
           <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0,
             flex: standardCats.length / (standardCats.length + customCats.length || 1),
           }}>
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5, flexShrink: 0 }}>
+            <Stack direction="row"  spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5, flexShrink: 0, alignItems: 'center' }}>
               {canManageOrg  && (() => {
                 const allOrgCatIds = standardCats.map(c => c.id);
                 const allOrgKRAIds = kras.filter(k => standardCats.some(c => c.id === k.category_id)).map(k => k.id);
@@ -777,7 +775,7 @@ onClick={() => {
                 );
               })()}
               <StarIcon sx={{ fontSize: 10, color: '#16a34a' }} />
-              <Typography fontSize={9.5} fontWeight={700} color="#16a34a" textTransform="uppercase" letterSpacing="0.07em">
+              <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', fontSize: 9.5, fontWeight: 700, color: '#16a34a' }}     >
                 Org Level <Box component="span" sx={{ opacity: 0.65 }}>({standardCats.length})</Box>
               </Typography>
               <Chip
@@ -803,7 +801,7 @@ onClick={() => {
             flex: customCats.length / (standardCats.length + customCats.length || 1),
             borderTop: standardCats.length > 0 ? '1px solid #f1f5f9' : undefined,
           }}>
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5, flexShrink: 0 }}>
+            <Stack direction="row"  spacing={0.5} sx={{ px: 1.75, pt: 1, pb: 0.5, flexShrink: 0, alignItems: 'center' }}>
               {canManage && (() => {
                 const allProjCatIds = customCats.map(c => c.id);
                 const allProjKRAIds = kras.filter(k => customCats.some(c => c.id === k.category_id)).map(k => k.id);
@@ -829,7 +827,7 @@ onClick={() => {
                 );
               })()}
               <TuneIcon sx={{ fontSize: 10, color: '#1d4ed8' }} />
-              <Typography fontSize={9.5} fontWeight={700} color="#1d4ed8" textTransform="uppercase" letterSpacing="0.07em">
+              <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.07em', fontSize: 9.5, fontWeight: 700, color: '#1d4ed8' }}     >
                 Project Level <Box component="span" sx={{ opacity: 0.65 }}>({customCats.length})</Box>
               </Typography>
               <Chip
@@ -853,7 +851,7 @@ onClick={() => {
 
         {categories.length === 0 && (
           <Box sx={{ px: 2, py: 3, textAlign: 'center' }}>
-            <Typography fontSize={12} color="#94a3b8">No categories yet</Typography>
+            <Typography sx={{ fontSize: 12, color: '#94a3b8' }}  >No categories yet</Typography>
           </Box>
         )}
       </Box>
@@ -863,12 +861,12 @@ onClick={() => {
         {!selectedCat ? (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, flexDirection: 'column', gap: 1.5 }}>
             <LibraryBooksIcon sx={{ fontSize: 40, color: '#e2e8f0' }} />
-            <Typography color="#94a3b8" fontSize={13} fontWeight={600}>Select a category to view its KRAs</Typography>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}   >Select a category to view its KRAs</Typography>
           </Box>
         ) : filtered.length === 0 ? (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, flexDirection: 'column', gap: 1.5 }}>
             <LibraryBooksIcon sx={{ fontSize: 36, color: '#e2e8f0' }} />
-            <Typography color="#94a3b8" fontSize={12.5} fontWeight={600}>No KRAs in this category yet</Typography>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: '#94a3b8' }}   >No KRAs in this category yet</Typography>
             {canManage && (
               <Button size="small" variant="outlined" startIcon={<AddIcon sx={{ fontSize: 13 }} />}
                 onClick={() => onAddKRAForCategory(selectedCat)}
@@ -880,9 +878,9 @@ onClick={() => {
         ) : (
           <>
             {/* Sticky header */}
-            <Stack direction="row" alignItems="center"
+            <Stack direction="row" 
               sx={{ px: 1.5, py: 0.9, bgcolor: '#fafbfc', borderBottom: '1px solid #f1f5f9',
-                flexShrink: 0, position: 'sticky', top: 0, zIndex: 2 }}>
+                flexShrink: 0, position: 'sticky', top: 0, zIndex: 2, alignItems: 'center' }}>
 
               {/* Checkbox col */}
               <Box sx={{ width: 28, flexShrink: 0 }}>
@@ -909,8 +907,8 @@ onClick={() => {
 
               {/* KRA name col */}
               <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, mr: 1 }}>
-                <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">KRA</Typography>
-                <Typography fontSize={9.5} fontWeight={700} color="#b0bac4">({filtered.length})</Typography>
+                <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}     >KRA</Typography>
+                <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}   >({filtered.length})</Typography>
                 <Chip label={`↕ ${kraSortDir === 'asc' ? 'A–Z' : 'Z–A'}`} size="small"
                   onClick={() => setKraSortDir(d => d === 'asc' ? 'desc' : 'asc')}
                   sx={{ height: 16, fontSize: 9, fontWeight: 700, cursor: 'pointer',
@@ -921,13 +919,13 @@ onClick={() => {
 
               {/* LEVELS col — must match row's Stack width + mr:1 */}
               <Box sx={{ width: 120, flexShrink: 0, mr: 1 }}>
-                <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">LEVELS</Typography>
+                <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}     >LEVELS</Typography>
               </Box>
 
               {/* ACTIONS col — must match row's Stack width:80 */}
               {canManage && (
                 <Box sx={{ width: 80, flexShrink: 0 }}>
-                  <Typography fontSize={9.5} fontWeight={700} color="#b0bac4" textTransform="uppercase" letterSpacing="0.06em">ACTIONS</Typography>
+                  <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}     >ACTIONS</Typography>
                 </Box>
               )}
             </Stack>
@@ -954,10 +952,10 @@ onClick={() => {
                     <Box key={cat?.id}>
                       {/* Category heading — only shown when multiple cats selected */}
                       {activeCatIds.size > 1 && (
-                        <Stack direction="row" alignItems="center" spacing={0.75}
+                        <Stack direction="row"  spacing={0.75}
                           sx={{ px: 2, py: 0.6, bgcolor: tc.bg, borderBottom: `1px solid ${tc.border}`,
-                            borderTop: '1px solid #f1f5f9' }}>
-                          <Typography fontSize={11} fontWeight={800} color={tc.color}>{cat?.name}</Typography>
+                            borderTop: '1px solid #f1f5f9', alignItems: 'center' }}>
+                          <Typography sx={{ fontSize: 11, fontWeight: 800, color: tc.color }}   >{cat?.name}</Typography>
                           <Chip label={isOrg ? 'Org' : 'Proj'} size="small"
                             sx={{ height: 14, fontSize: 8, fontWeight: 700,
                               bgcolor: 'rgba(255,255,255,0.6)', color: tc.color, borderRadius: 0.5 }} />
@@ -967,7 +965,7 @@ onClick={() => {
                         const isChecked = selectedKRAIds.has(kra.id);
                         const canActOnKRA = cat?.is_standard ? canManageOrg : canManage;
                         return (
-                          <Stack key={kra.id} direction="row" alignItems="center"
+                          <Stack key={kra.id} direction="row" 
                             onClick={() => {
                               setSelectedKRAIds(prev => {
                                 const next = new Set(prev);
@@ -977,8 +975,7 @@ onClick={() => {
                             }}
                             sx={{ px: 1.5, py: 0.85, borderBottom: '1px solid #f8fafc', cursor: 'pointer',
                               bgcolor: isChecked ? '#eff6ff' : labelHighlightId === kra.id ? '#fefce8' : '#fff',
-                              '&:hover': { bgcolor: isChecked ? '#dbeafe' : labelHighlightId === kra.id ? '#fef9c3' : '#f8fafc' },
-                            }}>
+                              '&:hover': { bgcolor: isChecked ? '#dbeafe' : labelHighlightId === kra.id ? '#fef9c3' : '#f8fafc' }, alignItems: 'center' }}>
                             {canManage && (
                               <Checkbox size="small"
                                 checked={selectedKRAIds.has(kra.id)}
@@ -1000,12 +997,12 @@ onClick={() => {
                               <ExpandMoreIcon sx={{ fontSize: 14 }} />
                             </Box>
                             <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, mr: 1 }}>
-                              <Typography fontSize={13} fontWeight={600} color="#1e293b" noWrap flexShrink={0}
-                                sx={{ '&:hover': { color: '#1d4ed8' } }}>
+                              <Typography    noWrap 
+                                sx={{ '&:hover': { color: '#1d4ed8' }, flexShrink: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
                                 {kra.name}
                               </Typography>
                               {kra.description && (
-                                <Typography fontSize={11.5} color="#94a3b8" noWrap sx={{ minWidth: 0 }}>
+                                <Typography   noWrap sx={{ minWidth: 0, fontSize: 11.5, color: '#94a3b8' }}>
                                   — {kra.description}
                                 </Typography>
                               )}
@@ -1015,7 +1012,7 @@ onClick={() => {
                                 <LevelChip key={lv.id ?? i} lv={lv} idx={i} levelMap={levelMap} showExp={false} />
                               ))}
                               {kra.levels?.length > 3 && (
-                                <Typography fontSize={9} color="#94a3b8" sx={{ alignSelf: 'center' }}>
+                                <Typography   sx={{ alignSelf: 'center', fontSize: 9, color: '#94a3b8' }}>
                                   +{kra.levels.length - 3} more
                                 </Typography>
                               )}
@@ -1067,7 +1064,7 @@ onClick={() => {
           border: '0.5px solid', borderColor: 'divider',
           minWidth: 'max-content',
         }}>
-          <Typography fontSize={12.5} fontWeight={600} color="text.primary" sx={{ px: 0.5 }}>
+          <Typography    sx={{ px: 0.5, fontSize: 12.5, fontWeight: 600, color: 'text.primary' }}>
             {selectedCatIds.size > 0 && selectedKRAIds.size > 0
               ? `${selectedCatIds.size} categor${selectedCatIds.size !== 1 ? 'ies' : 'y'} · ${selectedKRAIds.size} KRA${selectedKRAIds.size !== 1 ? 's' : ''} selected`
               : selectedCatIds.size > 0
@@ -1094,8 +1091,8 @@ onClick={() => {
 
           <Button size="small" disabled={bulkDeleting}
             startIcon={bulkDeleting
-              ? <CircularProgress size={11} color="inherit" />
-              : <DeleteOutlineIcon sx={{ fontSize: 13 }} />}
+              ? <CircularProgress size={11}  />
+              : <DeleteOutlineIcon sx={{ fontSize: 13, color: 'inherit' }} />}
             onClick={() => setConfirmDeleteOpen(true)}
             sx={{
               textTransform: 'none', fontWeight: 500, fontSize: 12,
@@ -1357,14 +1354,14 @@ const [projSortDir, setProjSortDir] = useState('asc');
 
         {/* Left: title */}
         <Box sx={{ position: 'absolute', left: { xs: 20, md: 28 }, top: '50%', transform: 'translateY(-50%)', zIndex: 1 }}>
-          <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
             <Box sx={{ width: 36, height: 36, borderRadius: 1.5, bgcolor: 'rgba(255,255,255,0.13)',
               display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <LibraryBooksIcon sx={{ color: '#fff', fontSize: 18 }} />
             </Box>
             <Box>
-              <Typography fontWeight={800} fontSize={17} color="#fff" lineHeight={1.15}>KRA Library</Typography>
-              <Typography fontSize={11} color="rgba(255,255,255,0.6)">Master repository for Key Result Areas</Typography>
+              <Typography sx={{ lineHeight: 1.15, fontSize: 17, fontWeight: 800, color: '#fff' }}    >KRA Library</Typography>
+              <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}  >Master repository for Key Result Areas</Typography>
             </Box>
           </Stack>
         </Box>
@@ -1379,8 +1376,8 @@ const [projSortDir, setProjSortDir] = useState('asc');
       </Paper>
 
       <Box sx={{ px: 0, borderBottom: '1px solid #e2e8f0', bgcolor: '#fff', flexShrink: 0 }}>
-        <Stack direction="row" alignItems="center" sx={{ px: 2.5, minHeight: 40, gap: 1 }}>
-          <Typography fontSize={12.5} fontWeight={700} color="#1e293b">
+        <Stack direction="row"  sx={{ px: 2.5, minHeight: 40, gap: 1, alignItems: 'center' }}>
+          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: '#1e293b' }}   >
             Categories ({categories.length})
           </Typography>
           {canManage && (
@@ -1411,9 +1408,9 @@ const [projSortDir, setProjSortDir] = useState('asc');
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', bgcolor: '#fff' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
-            <Stack alignItems="center" spacing={1}>
+            <Stack  spacing={1} sx={{ alignItems: 'center' }}>
               <CircularProgress size={28} sx={{ color: '#1E3A8A' }} />
-              <Typography fontSize={12.5} color="#94a3b8">Loading KRA library…</Typography>
+              <Typography sx={{ fontSize: 12.5, color: '#94a3b8' }}  >Loading KRA library…</Typography>
             </Stack>
           </Box>
         ) : error ? (

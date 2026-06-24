@@ -32,17 +32,17 @@ export default function Sidebar({ onToggle }) {
 
   // Build nav items — show "Reviews" only for leads/HR/admin, always show "Self Assessment"
   const ALL_NAV_ITEMS = [
-    { label: 'Dashboard',        icon: <DashboardIcon fontSize="small" />,       path: ROUTES.DASHBOARD, employeeVisible: true },
-    { label: 'KRAs Library',     icon: <LibraryBooksIcon fontSize="small" />,    path: ROUTES.KRA_LIBRARY, employeeVisible: false },
-    { label: 'KRA Assignment',   icon: <GroupsIcon fontSize="small" />,          path: ROUTES.ASSIGNMENTS, employeeVisible: false },
+    { label: 'Dashboard',        icon: <DashboardIcon sx={{ fontSize: 'small' }}  />,       path: ROUTES.DASHBOARD, employeeVisible: true },
+    { label: 'KRAs Library',     icon: <LibraryBooksIcon sx={{ fontSize: 'small' }}  />,    path: ROUTES.KRA_LIBRARY, employeeVisible: false },
+    { label: 'KRA Assignment',   icon: <GroupsIcon sx={{ fontSize: 'small' }}  />,          path: ROUTES.ASSIGNMENTS, employeeVisible: false },
     // Self Assessment — visible to all authenticated users
-    { label: 'KRA Assessment',  icon: <SelfImprovementIcon fontSize="small" />, path: ROUTES.ASSESSMENTS_SELF, employeeVisible: true },
+    { label: 'KRA Assessment',  icon: <SelfImprovementIcon sx={{ fontSize: 'small' }}  />, path: ROUTES.ASSESSMENTS_SELF, employeeVisible: true },
     //Reviews — visible only to leads / HR / admin
     // ...(canLeadAssess
-    //   ? [{ label: 'Reviews', icon: <RateReviewIcon fontSize="small" />, path: ROUTES.TEAM_PERFORMANCE }]
+    //   ? [{ label: 'Reviews', icon: <RateReviewIcon sx={{ fontSize: 'small' }}  />, path: ROUTES.TEAM_PERFORMANCE }]
     //   : []
     // ),
-    { label: 'Reports',          icon: <AssessmentIcon fontSize="small" />,      path: ROUTES.REPORTS, employeeVisible: false },
+    { label: 'Reports',          icon: <AssessmentIcon sx={{ fontSize: 'small' }}  />,      path: ROUTES.REPORTS, employeeVisible: false },
   ];
   const NAV_ITEMS = isEmployee
   ? ALL_NAV_ITEMS.filter(item => item.employeeVisible)
@@ -87,7 +87,7 @@ export default function Sidebar({ onToggle }) {
           flexShrink: 0,
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={collapsed ? 0 : 1.5} overflow="hidden">
+        <Stack direction="row"  spacing={collapsed ? 0 : 1.5} sx={{ alignItems: 'center', overflow: 'hidden' }} >
           <Tooltip title={collapsed ? (user?.full_name || 'User') : ''} placement="right">
             <Avatar
               sx={{
@@ -99,7 +99,7 @@ export default function Sidebar({ onToggle }) {
             </Avatar>
           </Tooltip>
           {!collapsed && (
-            <Box overflow="hidden">
+            <Box sx={{ overflow: 'hidden' }} >
               <Typography sx={{ fontWeight: 700, fontSize: 14, color: '#fff', lineHeight: 1.2 }} noWrap>
                 {user?.full_name || 'User'}
               </Typography>
@@ -123,7 +123,7 @@ export default function Sidebar({ onToggle }) {
               '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' },
             }}
           >
-            {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
+            {collapsed ? <ChevronRightIcon sx={{ fontSize: 'small' }}  /> : <ChevronLeftIcon sx={{ fontSize: 'small' }}  />}
           </IconButton>
         </Tooltip>
       </Box>
@@ -196,7 +196,7 @@ export default function Sidebar({ onToggle }) {
               }}
             >
               <ListItemIcon sx={{ minWidth: 0, color: 'inherit', justifyContent: 'center' }}>
-                <LogoutIcon fontSize="small" />
+                <LogoutIcon sx={{ fontSize: 'small' }}  />
               </ListItemIcon>
             </ListItemButton>
           </Tooltip>
@@ -210,7 +210,7 @@ export default function Sidebar({ onToggle }) {
             }}
           >
             <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
-              <LogoutIcon fontSize="small" />
+              <LogoutIcon sx={{ fontSize: 'small' }}  />
             </ListItemIcon>
             <ListItemText primary={<Typography sx={{ fontSize: 13 }}>Logout</Typography>} />
           </ListItemButton>

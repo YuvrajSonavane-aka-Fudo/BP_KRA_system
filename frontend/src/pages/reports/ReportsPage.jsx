@@ -88,7 +88,7 @@ function HeaderCell({ label, colKey, sortCol, sortDir, onSort, top = 0, left = u
         '&:hover': { color: BLUE },
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={0.3}>
+      <Stack direction="row"  spacing={0.3} sx={{ alignItems: 'center' }}>
         <span>{label}</span>
         <SortIcon col={colKey} sortCol={sortCol} sortDir={sortDir} />
       </Stack>
@@ -171,7 +171,7 @@ function MultiSelect({
         value={summary}
         disabled={disabled}
         onClick={e => !disabled && setAnchorEl(e.currentTarget)}
-        InputProps={{ readOnly: true }}
+        slotProps={{ input: { readOnly: true } }}
         sx={{
           minWidth,
           '& .MuiOutlinedInput-root': {
@@ -272,10 +272,10 @@ function CycleSelect({ cycles, value, onChange }) {
       isOptionEqualToValue={(o, v) => o.id === v.id}
       renderOption={(props, option) => (
         <li {...props} key={option.id}>
-          <Stack direction="row" alignItems="center" gap={1}>
+          <Stack direction="row"  >
             <span style={{ fontSize: 13 }}>{option.name}</span>
             {option.status === 'ACTIVE' && (
-              <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+              <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4, alignItems: 'center', gap: 1 }}>Active</Box>
             )}
           </Stack>
         </li>
@@ -405,7 +405,7 @@ function Report({ cycles, employees }) {
     <Box>
       {/* Filters */}
       <Paper elevation={0} sx={{ border: '1.5px solid #e2e8f0', borderRadius: 2, p: 1.5, mb: 1.5 }}>
-        <Stack direction="row" flexWrap="wrap" gap={1.5} alignItems="flex-end">
+        <Stack direction="row" sx={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 1.5 }}   >
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#64748b', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cycles <Box component="span" sx={{ color: '#ef4444' }}>*</Box></Typography>
             <MultiSelect
@@ -421,10 +421,10 @@ function Report({ cycles, employees }) {
                 return a.name.localeCompare(b.name);
               }}
               renderOptionContent={c => (
-                <Stack direction="row" alignItems="center" gap={1}>
+                <Stack direction="row"  >
                   <span style={{ fontSize: 13 }}>{c.name}</span>
                   {c.status === 'ACTIVE' && (
-                    <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
+                    <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4, alignItems: 'center', gap: 1 }}>Active</Box>
                   )}
                 </Stack>
               )}
@@ -437,10 +437,10 @@ function Report({ cycles, employees }) {
               getLabel={e => e.full_name ?? e.employee_name ?? String(e.employee_id ?? e.id)}
               getValue={e => e.employee_id ?? e.id}
               sortFn={(a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '')}
-              minWidth={220}
+              
               disabled={!cycleIds.length}
               renderOptionContent={e => (
-                <Stack direction="row" alignItems="center" gap={1} sx={{ width: '100%' }}>
+                <Stack direction="row"   sx={{ width: '100%', alignItems: 'center', minWidth: 220, gap: 1 }}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569', minWidth: 44, flexShrink: 0 }}>
                     {e.employee_id ?? e.id}
                   </Typography>
@@ -455,13 +455,13 @@ function Report({ cycles, employees }) {
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#64748b', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Base Columns <Box component="span" sx={{ color: '#ef4444' }}>*</Box></Typography>
             <MultiSelect label="Select columns…" options={REPORT_BASE_OPTIONAL_COLS}
               value={baseOptionalCols} onChange={setBaseOptionalCols}
-              getLabel={c => c.label} getValue={c => c.key} minWidth={170} />
+              getLabel={c => c.label} getValue={c => c.key} sx={{ minWidth: 170 }}  />
           </Box>
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#64748b', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Columns per Cycle <Box component="span" sx={{ color: '#ef4444' }}>*</Box></Typography>
             <MultiSelect label="Select columns…" options={REPORT_PER_CYCLE_COLUMNS}
               value={perCycleCols} onChange={setPerCycleCols}
-              getLabel={c => c.label} getValue={c => c.key} minWidth={190} />
+              getLabel={c => c.label} getValue={c => c.key} sx={{ minWidth: 190 }}  />
           </Box>
           <Box onClick={fetchReport} sx={{
             px: 2, py: 0.7, borderRadius: 2, cursor: cycleIds.length ? 'pointer' : 'not-allowed',
@@ -486,14 +486,14 @@ function Report({ cycles, employees }) {
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
       {rows.length > 0 && (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}   >
           <Typography sx={{ fontSize: 13, color: '#64748b' }}>
             <b style={{ color: BLUE }}>{displayed.length}</b> rows
             {displayed.length !== rows.length && ` (filtered from ${rows.length})`}
           </Typography>
           <TextField size="small" placeholder="Search name or KRA…"
             value={search} onChange={e => setSearch(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: '#94a3b8' }} /></InputAdornment> }}
+            slotProps={{ input: { startAdornment: <InputAdornment ><SearchIcon sx={{ fontSize: 16, color: '#94a3b8', position: 'start' }} /></InputAdornment> } }}
             sx={{ width: 240, '& .MuiOutlinedInput-root': { borderRadius: 2, fontSize: 13, bgcolor: '#fff' } }}
           />
         </Stack>
@@ -542,20 +542,20 @@ function Report({ cycles, employees }) {
                       colKey={col.key}
                       sortCol={sortCol}
                       sortDir={sortDir}
-                      onSort={handleSort}
-                      top={34}
-                      left={R2_BASE_LEFTS[i]}
-                      width={col.width}
+                      onSort={handleSort} sx={{ top: 34, left: R2_BASE_LEFTS[i], width: col.width }}
+                      
+                      
+                      
                     />
                   ))}
                   {visibleManagerCols.map(col => (
                     <HeaderCell key={col.key} label={col.label} colKey={col.key}
-                      sortCol={sortCol} sortDir={sortDir} onSort={handleSort} top={34} />
+                      sortCol={sortCol} sortDir={sortDir} onSort={handleSort} sx={{ top: 34 }}  />
                   ))}
                   {resultCycles.map(c => visPerCycle.map(col => (
                     <HeaderCell key={`${c.id}_${col.key}`} label={col.label}
                       colKey={`cycle_${c.id}_${col.key}`}
-                      sortCol={sortCol} sortDir={sortDir} onSort={handleSort} top={34} />
+                      sortCol={sortCol} sortDir={sortDir} onSort={handleSort} sx={{ top: 34 }}  />
                   )))}
                 </TableRow>
               </TableHead>
@@ -585,13 +585,13 @@ function Report({ cycles, employees }) {
                       key={idx}
                       sx={{ bgcolor: rowBg, '&:hover': { bgcolor: hoverBg, '& td': { bgcolor: hoverBg } } }}
                     >
-                      {stickyCell('emp_id',   0, <CellValue value={row.employee_id} maxWidth={R2_BASE_COLS[0].width} />)}
-                      {stickyCell('emp_name', 1, <CellValue value={row.employee_name} maxWidth={R2_BASE_COLS[1].width} />, { fontWeight: 600 })}
-                      {stickyCell('kra',      2, <CellValue value={row.kra_name} maxWidth={R2_BASE_COLS[2].width} />)}
+                      {stickyCell('emp_id',   0, <CellValue value={row.employee_id} sx={{ maxWidth: R2_BASE_COLS[0].width }}  />)}
+                      {stickyCell('emp_name', 1, <CellValue value={row.employee_name} sx={{ maxWidth: R2_BASE_COLS[1].width }}  />, { fontWeight: 600 })}
+                      {stickyCell('kra',      2, <CellValue value={row.kra_name} sx={{ maxWidth: R2_BASE_COLS[2].width }}  />)}
 
                       {visibleManagerCols.map(col => (
                         <TableCell key={col.key} sx={{ fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9' }}>
-                          <CellValue value={row[col.key]} maxWidth={140} />
+                          <CellValue value={row[col.key]} sx={{ maxWidth: 140 }}  />
                         </TableCell>
                       ))}
 
@@ -601,7 +601,7 @@ function Report({ cycles, employees }) {
                             fontSize: 12, py: 1.2, borderBottom: '1px solid #f1f5f9',
                             borderLeft: col === visPerCycle[0] ? '2px solid #e2e8f0' : 'none',
                           }}>
-                          <CellValue value={row.cycles?.[String(c.id)]?.[col.key]} maxWidth={180} />
+                          <CellValue value={row.cycles?.[String(c.id)]?.[col.key]} sx={{ maxWidth: 180 }}  />
                         </TableCell>
                       )))}
                     </TableRow>
@@ -675,7 +675,7 @@ export default function ReportsPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
       {/* Header */}
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 2.5 }, pb: 0, flexShrink: 0 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5} flexWrap="wrap" gap={1}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}     >
           <Box>
             <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#1e293b', lineHeight: 1.2 }}>Reports</Typography>
             <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>Generate, filter, sort and export KRA assessment reports.</Typography>

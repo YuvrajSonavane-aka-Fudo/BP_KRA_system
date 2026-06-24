@@ -11,7 +11,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import SaveIcon from '@mui/icons-material/Save';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -102,8 +102,8 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
       boxShadow: '0 12px 40px -4px rgba(15,23,42,0.18), 0 2px 8px -2px rgba(15,23,42,0.08)',
       border: '1px solid #e2e8f0',
     }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between"
-        sx={{ px: 1.25, py: 0.75, background: gradient }}>
+      <Stack direction="row"  
+        sx={{ px: 1.25, py: 0.75, background: gradient, alignItems: 'center', justifyContent: 'space-between' }}>
         <IconButton size="small" onClick={() => vm === 0 ? (setVm(11), setVy(y => y - 1)) : setVm(m => m - 1)}
           sx={{ color: '#fff', p: 0.2, '&:hover': { bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1 } }}>
           <ChevronLeftIcon sx={{ fontSize: 14 }} />
@@ -113,7 +113,7 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
           sx={{ color: '#fff', p: 0.2, '&:hover': { bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1 } }}>
           <ChevronRightIcon sx={{ fontSize: 14 }} />
         </IconButton>
-        <Stack direction="row" alignItems="center" spacing={0.4} sx={{ ml: 0.5 }}>
+        <Stack direction="row"  spacing={0.4} sx={{ ml: 0.5, alignItems: 'center' }}>
           {[{ key: 'start', val: startDate }, { key: 'end', val: endDate }].map(({ key, val }, i) => (
             <React.Fragment key={key}>
               {i === 1 && <Typography sx={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>→</Typography>}
@@ -142,7 +142,7 @@ function RangePicker({ startDate, endDate, onChange, onClose }) {
       </Stack>
 
       <Box sx={{ px: 1.25, pt: 0.75, pb: 0.75 }}>
-        <Stack direction="row" mb={0.4}>
+        <Stack direction="row" sx={{ mb: 0.4 }} >
           {WEEK_DAYS.map(d => (
             <Box key={d} sx={{ flex: 1, textAlign: 'center' }}>
               <Typography sx={{ fontSize: 9, fontWeight: 700, color: '#cbd5e1', letterSpacing: '0.02em' }}>{d}</Typography>
@@ -222,35 +222,31 @@ function InlineStageRow({ stageData, isTarget, onRangeChange }) {
   }, [open]);
 
   return (
-    <Stack ref={ref} direction="row" alignItems="center" sx={{
-      borderRadius: 2,
+    <Stack ref={ref} direction="row"  sx={{ borderRadius: 2,
       border: isTarget ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
       bgcolor: isTarget ? '#eff6ff' : '#fff',
       overflow: 'visible',
       position: 'relative',
-      transition: 'border-color 0.15s',
-    }}>
+      transition: 'border-color 0.15s', alignItems: 'center' }}>
       {/* Left: stage name */}
       <Box sx={{ px: 2, py: 1.25, minWidth: 170, flexShrink: 0, borderRight: '1px solid #e2e8f0' }}>
-        <Stack direction="row" alignItems="center" spacing={0.75}>
+        <Stack direction="row"  spacing={0.75} sx={{ alignItems: 'center' }}>
           {isTarget && (
             <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#3b82f6', flexShrink: 0 }} />
           )}
-          <Typography fontSize={13} fontWeight={isTarget ? 700 : 500} color={isTarget ? BLUE : '#374151'}>
+          <Typography sx={{ fontSize: 13, fontWeight: isTarget ? 700 : 500, color: isTarget ? BLUE : '#374151' }}   >
             {stageData.name}
           </Typography>
         </Stack>
       </Box>
 
       {/* Right: calendar pill */}
-      <Stack direction="row" alignItems="center" spacing={1} flex={1}
+      <Stack direction="row"  spacing={1} 
         onClick={() => setOpen(o => !o)}
-        sx={{
-          px: 1.5, py: 1.1, cursor: 'pointer',
+        sx={{ px: 1.5, py: 1.1, cursor: 'pointer',
           borderRadius: '0 8px 8px 0',
           '&:hover': { bgcolor: isTarget ? 'rgba(219,234,254,0.3)' : '#f8fafc' },
-          transition: 'background 0.12s',
-        }}>
+          transition: 'background 0.12s', alignItems: 'center', flex: 1 }}>
         <CalendarMonthIcon sx={{ fontSize: 14, color: bothSet ? BLUE : '#94a3b8', flexShrink: 0 }} />
         <Typography sx={{ fontSize: 13, color: bothSet ? '#1e293b' : '#94a3b8', flex: 1, userSelect: 'none' }}>
           {bothSet ? (
@@ -334,7 +330,7 @@ function CycleStageStepper({ currentStageId, completedStageIds, dbStages, isAdmi
         const clickable = isAdmin && isActiveCycle && onStageClick && !stage.isCurrent;
         return (
           <React.Fragment key={stage.id}>
-            <Stack alignItems="center" spacing={0.5} sx={{ minWidth: 72 }}>
+            <Stack  spacing={0.5} sx={{ minWidth: 72, alignItems: 'center' }}>
               <Tooltip title={clickable ? (stage.id < currentStageId ? `Move back to ${stage.name}` : `Advance to ${stage.name}`) : stage.name}>
                 <Box onClick={clickable ? () => onStageClick(stage) : undefined} sx={{
                   width: 32, height: 32, borderRadius: '50%',
@@ -435,12 +431,12 @@ function KRACard({ row, ratings, onSave, saving, savedId, ratingEditable, notesE
       borderRadius: 3, overflow: 'hidden', transition: 'border-color 0.2s', scrollMarginTop: '16px',
     }}>
       <Box sx={{ px: 3, py: 2, borderBottom: '1px solid #f1f5f9', bgcolor: isDone ? '#f0fdf4' : '#fafbff' }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}  >
+          <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
             {isDone ? <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 20 }} /> : <RadioButtonUncheckedIcon sx={{ color: '#cbd5e1', fontSize: 20 }} />}
             <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#1e293b' }}>{row.kra_name}</Typography>
           </Stack>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
             {row.category_name && (
               <Chip label={row.category_name} size="small"
                 sx={{ bgcolor: `${categoryColor(row.category_name)}15`, color: categoryColor(row.category_name), fontWeight: 700, fontSize: 11, border: `1px solid ${categoryColor(row.category_name)}30` }} />
@@ -460,7 +456,7 @@ function KRACard({ row, ratings, onSave, saving, savedId, ratingEditable, notesE
           <Box>
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', mb: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Self Rating</Typography>
             {ratingEditable ? (
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}  >
                 {ratings.map(r => (
                   <RatingChip key={r.id} label={`${r.rating} – ${r.description}`}
                     selected={selfRatingId === r.id}
@@ -499,7 +495,7 @@ function KRACard({ row, ratings, onSave, saving, savedId, ratingEditable, notesE
             />
           </Box>
           <Box>
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ cursor: 'pointer', mb: showHelp ? 1 : 0 }} onClick={() => setShowHelp(v => !v)}>
+            <Stack direction="row"  spacing={0.5} sx={{ cursor: 'pointer', mb: showHelp ? 1 : 0, alignItems: 'center' }} onClick={() => setShowHelp(v => !v)}>
               <HelpOutlineIcon sx={{ fontSize: 15, color: '#94a3b8' }} />
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Help & Assistance Required</Typography>
               {showHelp ? <ExpandLessIcon sx={{ fontSize: 15, color: '#94a3b8' }} /> : <ExpandMoreIcon sx={{ fontSize: 15, color: '#94a3b8' }} />}
@@ -533,7 +529,7 @@ function ProgressSidebar({ kras, onJumpTo }) {
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Assessment Progress</Typography>
         </Box>
         <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}   >
             <Typography sx={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>Rated KRAs</Typography>
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: BLUE }}>{rated} of {total}</Typography>
           </Stack>
@@ -551,7 +547,7 @@ function ProgressSidebar({ kras, onJumpTo }) {
             </Box>
           </Stack>
           {pct === 100 && total > 0 && (
-            <Alert severity="success" icon={<CheckCircleIcon fontSize="small" />} sx={{ mt: 2, fontSize: 12, borderRadius: 2, py: 0.5 }}>
+            <Alert severity="success" icon={<CheckCircleIcon  />} sx={{ mt: 2, fontSize: 12, borderRadius: 2, py: 0.5, fontSize: 'small' }}>
               All KRAs rated. You may submit for lead review.
             </Alert>
           )}
@@ -564,9 +560,9 @@ function ProgressSidebar({ kras, onJumpTo }) {
         </Box>
         <Box sx={{ maxHeight: 260, overflowY: 'auto' }}>
           {kras.map(k => (
-            <Stack key={k.employee_kra_level_id} direction="row" alignItems="center" spacing={1}
+            <Stack key={k.employee_kra_level_id} direction="row"  spacing={1}
               onClick={() => onJumpTo(k.employee_kra_level_id)}
-              sx={{ px: 2.5, py: 1, cursor: 'pointer', borderBottom: '1px solid #f8fafc', '&:hover': { bgcolor: '#f1f5f9' } }}
+              sx={{ px: 2.5, py: 1, cursor: 'pointer', borderBottom: '1px solid #f8fafc', '&:hover': { bgcolor: '#f1f5f9' }, alignItems: 'center' }}
             >
               {k.self_rating_id
                 ? <CheckCircleIcon sx={{ fontSize: 14, color: '#22c55e', flexShrink: 0 }} />
@@ -668,7 +664,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
       {!hideCycleHeader && (
         <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 0, flexShrink: 0 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}    >
             <Box>
               {cycle && (
                 <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
@@ -677,7 +673,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
               )}
               <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#1e293b' }}>KRA Assessment</Typography>
             </Box>
-            <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
               {cycles.length > 0 && (
                 <Autocomplete
                   value={cycles.find(c => c.id === cycleId) ?? null}
@@ -687,14 +683,14 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
                   isOptionEqualToValue={(opt, val) => opt.id === val.id}
                   disableClearable
                   size="small"
-                  sx={{ minWidth: 260 }}
+                  sx={{ minWidth: 260, alignItems: 'center' }}
                   renderInput={params => (
                     <TextField {...params} placeholder="Select cycle…"
                       sx={{ '& .MuiOutlinedInput-root': { fontSize: 13, borderRadius: 2, bgcolor: '#fff' } }} />
                   )}
                   renderOption={(props, c) => (
                     <Box component="li" {...props} key={c.id}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
+                      <Stack direction="row"  spacing={1}>
                         <span style={{ fontSize: 13 }}>{c.name}</span>
                         {c.status === 'ACTIVE' && (
                           <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
@@ -736,7 +732,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
       {hideCycleHeader && (
         <Box sx={{ px: { xs: 2, md: 3 }, pt: 2, pb: 0, flexShrink: 0 }}>
           {editable && (
-            <Stack direction="row" justifyContent="flex-end" mb={1}>
+            <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 1 }}  >
               <Box onClick={dirtyCount > 0 && !saving ? handleSaveAll : undefined} sx={{
                 display: 'inline-flex', alignItems: 'center', gap: 0.8,
                 px: 2.5, py: 0.9, borderRadius: 2,
@@ -768,7 +764,7 @@ function EmployeeView({ cycleId, cycles, onCycleChange, ratings, dbStages, hideC
       <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'row' }}>
         <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, md: 3 }, py: 2, minWidth: 0 }}>
           {!loading && lockReason && (
-            <Alert severity="warning" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
+            <Alert severity="warning" icon={<LockOutlinedIcon  />} sx={{ mb: 2, borderRadius: 2, fontSize: 'small' }}>
               {lockReason} Your responses are shown in read-only mode.
             </Alert>
           )}
@@ -990,7 +986,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
 
       {/* ─── Stage change dialog — unified blue theme ─── */}
       <Dialog open={confirmDialog.open} onClose={() => !stageChanging && setConfirmDialog({ open: false })}
-        maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 20px 60px -10px rgba(15,23,42,0.2)' } }}>
+         fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 20px 60px -10px rgba(15,23,42,0.2)' } }} sx={{ maxWidth: 'sm' }}>
 
         {/* Header — always blue */}
         <Box sx={{
@@ -998,7 +994,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
           bgcolor: '#eff6ff',
           borderBottom: '1px solid #bfdbfe',
         }}>
-          <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Stack direction="row"  spacing={1.25} sx={{ alignItems: 'center' }}>
             <Box sx={{
               width: 32, height: 32, borderRadius: '50%',
               bgcolor: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -1008,12 +1004,12 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
               </Typography>
             </Box>
             <Box>
-              <Typography fontWeight={700} fontSize={15} color={BLUE}>
+              <Typography sx={{ fontSize: 15, fontWeight: 700, color: BLUE }}   >
                 {confirmDialog.direction === 'back'
                   ? `Move Back to ${confirmDialog.toStage?.name}`
                   : `Move Forward to ${confirmDialog.toStage?.name}`}
               </Typography>
-              <Typography fontSize={12} color="#64748b" mt={0.2}>
+              <Typography sx={{ mt: 0.2, fontSize: 12, color: '#64748b' }}   >
                 {confirmDialog.direction === 'back'
                   ? "Set this employee's personal stage dates"
                   : 'This employee will advance to the next stage'}
@@ -1025,7 +1021,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
         <DialogContent sx={{ pt: 2, pb: 1, px: 3, overflow: 'visible' }}>
           {confirmDialog.direction === 'back' ? (
             <>
-              <Typography fontSize={13} color="#374151" mb={2} sx={{ lineHeight: 1.6 }}>
+              <Typography    sx={{ lineHeight: 1.6, mb: 2, fontSize: 13, color: '#374151' }}>
                 Adjust stage dates for this employee. These will override cycle-level dates only for them.
               </Typography>
               <Stack spacing={0.75}>
@@ -1040,7 +1036,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
               </Stack>
             </>
           ) : (
-            <Typography fontSize={13} color="#374151" sx={{ lineHeight: 1.6 }}>
+            <Typography   sx={{ lineHeight: 1.6, fontSize: 13, color: '#374151' }}>
               Move this employee forward to <strong>{confirmDialog.toStage?.name}</strong>? This will advance them by one stage.
             </Typography>
           )}
@@ -1118,7 +1114,7 @@ function EmployeeSection({ emp, ratings, currentStageId, cycleId, cycleStages, i
             Manager: {emp.manager_name || '—'} &nbsp;·&nbsp; {emp.department || '—'} &nbsp;·&nbsp; {emp.level || '—'}
           </Typography>
         </Box>
-        <Stack direction="row" alignItems="center" spacing={2}>
+        <Stack direction="row"  spacing={2} sx={{ alignItems: 'center' }}>
           <Chip
             label={`Stage ${empStageId}`}
             size="small"
@@ -1563,8 +1559,8 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', bgcolor: '#f5f6fa' }}>
         <Box sx={{ px: { xs: 2, md: 3 }, pt: 2, pb: 0, flexShrink: 0 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-            <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}   >
+            <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
               <Box onClick={() => handleBackToTeam()} sx={{
                 px: 2, py: 0.6, borderRadius: 2, cursor: 'pointer', fontSize: 13, fontWeight: 700,
                 bgcolor: '#fff', color: '#64748b', border: '1.5px solid #e2e8f0',
@@ -1572,7 +1568,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
               }}>← Team Review</Box>
               <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#1e293b' }}>My Assessment</Typography>
             </Stack>
-            <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center' }}>
               {allEmployeesList.filter(e => e.employee_id !== user?.employee_id).length > 0 && (
                 <Autocomplete
                   value={null}
@@ -1626,14 +1622,14 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                   isOptionEqualToValue={(opt, val) => opt.id === val.id}
                   disableClearable
                   size="small"
-                  sx={{ minWidth: 260 }}
+                  sx={{ minWidth: 260, alignItems: 'center' }}
                   renderInput={params => (
                     <TextField {...params} placeholder="Select cycle…"
                       sx={{ '& .MuiOutlinedInput-root': { fontSize: 13, borderRadius: 2, bgcolor: '#fff' } }} />
                   )}
                   renderOption={(props, c) => (
                     <Box component="li" {...props} key={c.id}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
+                      <Stack direction="row"  spacing={1}>
                         <span style={{ fontSize: 13 }}>{c.name}</span>
                         {c.status === 'ACTIVE' && (
                           <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
@@ -1682,9 +1678,9 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
       <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 0, flexShrink: 0 }}>
 
         {/* Header */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2} mb={2}>
+        <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2 }}     >
           <Typography sx={{ fontSize: 20, fontWeight: 800, color: '#1e293b' }}>Team Review</Typography>
-          <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
+          <Stack direction="row"  spacing={1.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }} >
             {cycles.length > 0 && (
               <Autocomplete
                 value={cycles.find(c => c.id === cycleId) ?? null}
@@ -1694,14 +1690,14 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
                 isOptionEqualToValue={(opt, val) => opt.id === val.id}
                 disableClearable
                 size="small"
-                sx={{ minWidth: 260 }}
+                sx={{ minWidth: 260, alignItems: 'center' }}
                 renderInput={params => (
                   <TextField {...params} placeholder="Select cycle…"
                     sx={{ '& .MuiOutlinedInput-root': { fontSize: 13, borderRadius: 2, bgcolor: '#fff' } }} />
                 )}
                 renderOption={(props, c) => (
                   <Box component="li" {...props} key={c.id}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
+                    <Stack direction="row"  spacing={1}>
                       <span style={{ fontSize: 13 }}>{c.name}</span>
                       {c.status === 'ACTIVE' && (
                         <Box component="span" sx={{ px: 0.75, py: 0.15, borderRadius: 1, bgcolor: '#dcfce7', color: '#16a34a', fontSize: 10, fontWeight: 700, lineHeight: 1.4 }}>Active</Box>
@@ -1713,7 +1709,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
             )}
 
             {employees.length > 0 && (
-              <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Stack direction="row"  spacing={0.5} sx={{ alignItems: 'center' }}>
                 <Autocomplete
                   value={allEmployeesList.find(e => e.employee_id === selectedEmpId) ?? null}
                   onChange={(_, newVal) => {
@@ -1841,7 +1837,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
 
         {employees.length > 0 && (
           <Box sx={{ mt: 2, mb: 1 }}>
-            <Stack direction="row" justifyContent="space-between" mb={0.5}>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', mb: 0.5 }}  >
               <Typography sx={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
                 Overall lead review progress — {employees.length} employees · {totalKras} KRAs
               </Typography>
@@ -1859,7 +1855,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
 
         {allEmployees.length > 1 && !loading && (
           <Box sx={{ display: 'inline-flex', alignItems: 'center', border: '1.5px solid #7490bb', borderRadius: 2, px: 1.5, py: 0.75, mb: 2, bgcolor: '#fff' }}>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
             <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#131313', flexShrink: 0 }}>Sort by:</Typography>
             {[
               { key: 'name', label: 'Name' },
@@ -1896,7 +1892,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
         {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
         {!canLeadReview(currentStageId) && currentStageId && (
-          <Alert severity="info" icon={<LockOutlinedIcon fontSize="small" />} sx={{ mb: 2, borderRadius: 2 }}>
+          <Alert severity="info" icon={<LockOutlinedIcon  />} sx={{ mb: 2, borderRadius: 2, fontSize: 'small' }}>
             Lead ratings are locked at this stage. You can still add or edit comments on any KRA.
           </Alert>
         )}
