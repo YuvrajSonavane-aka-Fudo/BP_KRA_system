@@ -1,8 +1,30 @@
+"""
+File: views.py
+App: kra_reports
+Purpose:
+    - Defines API views for generating KRA reports.
+
+Includes:
+    - MultiCycleReportView
+
+Responsibilities:
+    - Fetches all relevant KRA data for multiple cycles.
+    - Filters data based on user permissions (HR sees all, Managers see direct reports).
+    - Uses serializers to format data for frontend consumption.
+    - Handles dynamic column selection for flexibility.
+
+Notes:
+    - Created to support flexible reporting across multiple cycles.
+    - Optimized to minimize database queries.
+    - Provides consistent data structure for frontend charts and tables.
+"""
+
 from django.db.models import Prefetch
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.request import Request
 
 from kra_cycle.models import (
     Employee,
@@ -12,9 +34,10 @@ from kra_cycle.models import (
 )
 
 from utils import _get_caller, _is_hr, _is_lead
+from .serializers import EmployeeKRALevelReportSerializer
 
 
-def _base_ekc_qs(caller, cycle_ids):
+def _base_ekc_qs(caller: Employee, cycle_ids: list[int]):
     """
     Returns EmployeeKRACycle queryset filtered by cycle_ids and caller permissions.
     HR sees all. Managers see only direct reports.
@@ -45,83 +68,63 @@ def _base_ekc_qs(caller, cycle_ids):
     return qs
 
 
-def _build_row(emp, ekc, kra_row, columns):
-    """Build a single report row dict from an EmployeeKRALevel row."""
-    row = {}
-    if 'employee_id' in columns:
-        row['employee_id'] = emp.id
-    if 'employee_name' in columns:
-        row['employee_name'] = f'{emp.first_name} {emp.last_name}'
-    if 'department' in columns:
-        row['department'] = emp.department.department_name if emp.department else None
-    if 'level' in columns:
-        row['level'] = emp.level.name if emp.level else None
-    if 'manager' in columns:
-        row['manager'] = f'{emp.manager.first_name} {emp.manager.last_name}' if emp.manager else None
-    if 'previous_manager' in columns:
-        row['previous_manager'] = f'{emp.previous_manager.first_name} {emp.previous_manager.last_name}' if emp.previous_manager else None
-    if 'kra_name' in columns:
-        row['kra_name'] = (
-            kra_row.kra_level.kra.name
-            if kra_row.kra_level and kra_row.kra_level.kra else None
-        )
-    if 'category' in columns:
-        row['category'] = (
-            kra_row.kra_level.kra.category.name
-            if kra_row.kra_level and kra_row.kra_level.kra and kra_row.kra_level.kra.category else None
-        )
-    if 'self_rating' in columns:
-        row['self_rating'] = kra_row.self_rating.rating if kra_row.self_rating else None
-    if 'self_comment' in columns:
-        row['self_comment'] = kra_row.self_comment
-    if 'lead_rating' in columns:
-        row['lead_rating'] = kra_row.lead_rating.rating if kra_row.lead_rating else None
-    if 'lead_comment' in columns:
-        row['lead_comment'] = kra_row.lead_comment
-    if 'progress_notes' in columns:
-        row['progress_notes'] = kra_row.progress_notes
-    if 'lead_progress_notes' in columns:
-        row['lead_progress_notes'] = kra_row.lead_progress_notes
-    if 'description_by_lead' in columns:
-        row['description_by_lead'] = kra_row.description_by_lead
-    return row
-
-
 class MultiCycleReportView(APIView):
-    """
-    GET /api/v1/reports/multi-cycle
-
-    Unified report view. Works for single or multiple cycles.
-
-    Query params:
-        cycle_ids    – comma-separated list of cycle IDs (required, min 1)
-        columns      – comma-separated list of per-cycle columns to include
-                       (self_rating, self_comment, lead_rating, lead_comment,
-                        progress_notes, lead_progress_notes, description_by_lead)
-        employee_ids – optional comma-separated list of employee IDs to filter
-        search       – optional search string (matches employee name or KRA name)
-
-    Response structure:
-        {
-          cycles: [ { id, name } ],
-          per_cycle_columns,
-          total_rows,
-          rows: [
-            {
-              employee_id, employee_name, department, level,
-              manager, previous_manager, kra_name, category,
-              cycles: {
-                <cycle_id>: { self_rating, lead_rating, self_comment,
-                               lead_comment, progress_notes,
-                               lead_progress_notes, description_by_lead }
-              }
-            }
-          ]
-        }
-    """
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request: Request) -> Response:
+        """
+        API view to generate a report showing employee assessment data across one or more KRA cycles.
+
+        Endpoint: GET /api/v1/reports/multi-cycle
+
+        Request Headers:
+            Authorization: Required
+
+        Request Body:
+            None
+
+        Response (200):
+            {
+                "cycles": [
+                    {
+                        "id": 1,
+                        "name": "Cycle 1"
+                    }
+                ],
+                "per_cycle_columns": [
+                    "self_rating",
+                    "self_comment",
+                    "lead_rating",
+                    "lead_comment"
+                ],
+                "total_rows": 1,
+                "rows": [
+                    {
+                        "employee_id": 1,
+                        "employee_name": "John Doe",
+                        "department": "Engineering",
+                        "level": "Dev-01",
+                        "manager": "Manager Name",
+                        "previous_manager": null,
+                        "kra_name": "Deliver features",
+                        "category": "Core Development",
+                        "cycles": {
+                            "1": {
+                                "self_rating": 4,
+                                "self_comment": "Good progress",
+                                "lead_rating": 4,
+                                "lead_comment": "Agreed"
+                            }
+                        }
+                    }
+                ]
+            }
+
+        Error Responses:
+            400: cycle_ids is required
+            403: Forbidden for non-HR and non-Leads
+            401: Unauthorized
+        """
         caller = _get_caller(request)
 
         if not (_is_hr(caller) or _is_lead(caller)):
@@ -164,41 +167,23 @@ class MultiCycleReportView(APIView):
                 key = (emp.id, kra_row.kra_level_id)
 
                 if key not in aggregated:
+                    base_serializer = EmployeeKRALevelReportSerializer(
+                        kra_row,
+                        context={'columns': [
+                            'employee_id', 'employee_name', 'department', 'level',
+                            'manager', 'previous_manager', 'kra_name', 'category'
+                        ]}
+                    )
                     aggregated[key] = {
-                        'employee_id':      emp.id,
-                        'employee_name':    f'{emp.first_name} {emp.last_name}',
-                        'department':       emp.department.department_name if emp.department else None,
-                        'level':            emp.level.name if emp.level else None,
-                        'manager':          f'{emp.manager.first_name} {emp.manager.last_name}' if emp.manager else None,
-                        'previous_manager': f'{emp.previous_manager.first_name} {emp.previous_manager.last_name}' if emp.previous_manager else None,
-                        'kra_name':         (
-                            kra_row.kra_level.kra.name
-                            if kra_row.kra_level and kra_row.kra_level.kra else None
-                        ),
-                        'category':         (
-                            kra_row.kra_level.kra.category.name
-                            if kra_row.kra_level and kra_row.kra_level.kra and kra_row.kra_level.kra.category else None
-                        ),
-                        'cycles':           {str(c): None for c in cycle_ids},
+                        **base_serializer.data,
+                        'cycles': {str(c): None for c in cycle_ids},
                     }
 
-                cycle_data = {}
-                if 'self_rating' in per_cycle_columns:
-                    cycle_data['self_rating'] = kra_row.self_rating.rating if kra_row.self_rating else None
-                if 'self_comment' in per_cycle_columns:
-                    cycle_data['self_comment'] = kra_row.self_comment
-                if 'lead_rating' in per_cycle_columns:
-                    cycle_data['lead_rating'] = kra_row.lead_rating.rating if kra_row.lead_rating else None
-                if 'lead_comment' in per_cycle_columns:
-                    cycle_data['lead_comment'] = kra_row.lead_comment
-                if 'progress_notes' in per_cycle_columns:
-                    cycle_data['progress_notes'] = kra_row.progress_notes
-                if 'lead_progress_notes' in per_cycle_columns:
-                    cycle_data['lead_progress_notes'] = kra_row.lead_progress_notes
-                if 'description_by_lead' in per_cycle_columns:
-                    cycle_data['description_by_lead'] = kra_row.description_by_lead
-
-                aggregated[key]['cycles'][str(cid)] = cycle_data
+                cycle_serializer = EmployeeKRALevelReportSerializer(
+                    kra_row,
+                    context={'columns': per_cycle_columns}
+                )
+                aggregated[key]['cycles'][str(cid)] = cycle_serializer.data
 
         rows = list(aggregated.values())
 
