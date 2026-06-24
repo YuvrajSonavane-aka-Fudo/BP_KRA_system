@@ -16,7 +16,7 @@ from .views import (
 
 
 urlpatterns = [
-
+    
     path('kra/categories', KRACategoryListCreateView.as_view()),
     path('kra/categories/<int:category_id>', KRACategoryDetailView.as_view()),
     path('kra/categories/<int:category_id>/clone', KRACategoryCloneView.as_view()),
