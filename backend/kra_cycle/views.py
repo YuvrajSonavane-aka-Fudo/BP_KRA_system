@@ -115,9 +115,19 @@ class LoginView(APIView):
             )
 
         try:
-            employee = Employee.objects.select_related("department", "role").get(
-                email=email
-            )
+            raw_sql = """
+                SELECT e.*, 
+                       d.department_name AS dept_name, 
+                       r.name AS role_name
+                FROM employee e
+                LEFT OUTER JOIN department d ON e.department_id = d.id
+                LEFT OUTER JOIN role r ON e.role = r.id
+                WHERE e.email = %s
+            """
+            employees = list(Employee.objects.raw(raw_sql, [email]))
+            if not employees:
+                raise Employee.DoesNotExist
+            employee = employees[0]
         except Employee.DoesNotExist:
             return Response(
                 {"error": "Invalid credentials"},
@@ -154,11 +164,9 @@ class LoginView(APIView):
             {
                 "session_id": request.session.session_key,
                 "employee_id": employee.id,
-                "roles": [employee.role.name] if employee.role else [],
+                "roles": [employee.role_name] if employee.role_name else [],
                 "full_name": f"{employee.first_name} {employee.last_name}",
-                "department": (
-                    employee.department.department_name if employee.department else None
-                ),
+                "department": employee.dept_name,
             },
             status=status.HTTP_200_OK,
         )
@@ -265,26 +273,38 @@ class KRACycleListCreateView(APIView):
                 .select_related("stage")
                 .prefetch_related("cycle_stages__stage")
             )
+            if status_filter:
+                qs = qs.filter(status=status_filter)
+            cycles_data = KRACycleSerializer(qs, many=True).data
         else:
-            from django.db.models import Q
-            qs = (
-                KRACycle.objects.filter(
-                    Q(is_deleted=False) &
-                    (
-                        Q(status="ACTIVE") |
-                        Q(status__in=["DRAFT", "CLOSED"], employee_cycles__employee=caller)
-                    )
-                )
-                .select_related("stage")
-                .prefetch_related("cycle_stages__stage")
-                .distinct()
-            )
+            raw_sql = """
+                SELECT DISTINCT c.*
+                FROM kra_cycle c
+                LEFT OUTER JOIN employee_kra_cycle ekc ON c.id = ekc.kra_cycle_id
+                WHERE c.is_deleted = FALSE
+                  AND (
+                    c.status = 'ACTIVE'
+                    OR (c.status IN ('DRAFT', 'CLOSED') AND ekc.employee_id = %s)
+                  )
+            """
+            params = [caller.id]
+            if status_filter:
+                raw_sql += " AND c.status = %s"
+                params.append(status_filter)
 
-        if status_filter:
-            qs = qs.filter(status=status_filter)
+            cycles_list = list(KRACycle.objects.raw(raw_sql, params))
+
+            # Pre-populate Stage relation to avoid N+1 queries during serialization
+            stage_ids = {c.stage_id for c in cycles_list if c.stage_id is not None}
+            stages = {s.id: s for s in Stage.objects.filter(id__in=stage_ids)}
+            for c in cycles_list:
+                if c.stage_id in stages:
+                    c.stage = stages[c.stage_id]
+
+            cycles_data = KRACycleSerializer(cycles_list, many=True).data
 
         return Response(
-            {"cycles": KRACycleSerializer(qs, many=True).data},
+            {"cycles": cycles_data},
             status=status.HTTP_200_OK
         )
 
@@ -1054,17 +1074,49 @@ class KRALibraryView(APIView):
         category_id = request.query_params.get("category_id")
         level_id = request.query_params.get("level_id")
 
-        qs = KRA.objects.select_related("category").prefetch_related(
-            "kra_levels__level",
-            "kra_levels__category",
-        )
-
-        if category_id:
-            qs = qs.filter(category_id=category_id)
         if level_id:
-            qs = qs.filter(kra_levels__level_id=level_id).distinct()
+            # Joins: kra (base), kra_category (LEFT JOIN), kra_level (INNER JOIN). (3 tables).
+            raw_sql = """
+                SELECT DISTINCT k.*
+                FROM kra k
+                LEFT OUTER JOIN kra_category c ON k.category_id = c.id
+                INNER JOIN kra_level kl ON k.id = kl.kra_id
+                WHERE kl.level_id = %s
+            """
+            params = [level_id]
+            if category_id:
+                raw_sql += " AND k.category_id = %s"
+                params.append(category_id)
 
-        serializer = KRALibrarySerializer(qs, many=True, context={"level_id": level_id})
+            kras_list = list(KRA.objects.raw(raw_sql, params))
+
+            # Pre-populate category mapping to prevent lazy loading
+            category_ids = {k.category_id for k in kras_list if k.category_id is not None}
+            categories = {cat.id: cat for cat in KRACategory.objects.filter(id__in=category_ids)}
+
+            # Pre-populate levels cache manually to prevent N+1 queries
+            kra_ids = [k.id for k in kras_list]
+            kra_levels = KRALevel.objects.filter(kra_id__in=kra_ids).select_related('level', 'category')
+            levels_by_kra = {}
+            for kl in kra_levels:
+                levels_by_kra.setdefault(kl.kra_id, []).append(kl)
+
+            for k in kras_list:
+                if k.category_id in categories:
+                    k.category = categories[k.category_id]
+                k._prefetched_objects_cache = {'kra_levels': levels_by_kra.get(k.id, [])}
+
+            serializer = KRALibrarySerializer(kras_list, many=True, context={"level_id": level_id})
+        else:
+            qs = KRA.objects.select_related("category").prefetch_related(
+                "kra_levels__level",
+                "kra_levels__category",
+            )
+            if category_id:
+                qs = qs.filter(category_id=category_id)
+
+            serializer = KRALibrarySerializer(qs, many=True, context={"level_id": level_id})
+
         return Response({"kras": serializer.data}, status=status.HTTP_200_OK)
 
 
