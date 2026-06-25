@@ -39,7 +39,7 @@ import {
 
 import EmployeeKRAView from './EmployeeKRAView';
 import useRoleAccess from '../../hooks/useRoleAccess';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 
 const G = 'linear-gradient(135deg, #1E3A8A 0%, #1e40af 60%, #1d4ed8 100%)';
 const ORG_COLOR = { bg: '#f0fdf4', border: '#86efac', text: '#15803d', chip: '#dcfce7', icon: '#16a34a' };

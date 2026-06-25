@@ -1,0 +1,1 @@
+import{n as e,t}from"./axiosInstance-vP7tWF1p.js";var n={redirectToProvider(t){new URLSearchParams({client_id:e.SSO_CLIENT_ID,redirect_uri:e.SSO_REDIRECT_URI,provider:t,response_type:`code`}),window.location.href=`${e.API_BASE_URL}auth/microsoft/login`},async getCurrentUser(){return(await t.get(`auth/me`)).data}};export{n as t};

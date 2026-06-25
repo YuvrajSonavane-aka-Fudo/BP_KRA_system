@@ -21,7 +21,7 @@ import OpenInNewIcon        from '@mui/icons-material/OpenInNew';
 import AssignmentIndIcon    from '@mui/icons-material/AssignmentInd';
 import RateReviewIcon       from '@mui/icons-material/RateReview';
 
-import { useNavigate }      from 'react-router-dom';
+import { useNavigate }      from 'react-router';
 import ROUTES               from '../../config/routes';
 import { useCycles, invalidateCyclesCache } from '../../hooks/useCycles';
 import { updateCycle, advanceCycleStage, getReferenceData }   from '../../api/cyclesApi';

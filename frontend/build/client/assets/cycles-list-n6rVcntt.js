@@ -1,0 +1,1 @@
+import{i as e,t}from"./react-B8IZ02wI.js";import{s as n}from"./hooks-WhnFmKJG.js";import{t as r}from"./routes-Bfwn16YJ.js";var i=e(t(),1);function a(){let e=n();return(0,i.useEffect)(()=>{e(r.DASHBOARD,{replace:!0})},[e]),null}export{a as default};
