@@ -24,7 +24,7 @@ import { getSelfAssessment, saveSelfAssessmentRow, getAssessmentProgress, submit
 import { getCycles, getReferenceData, advanceCycleStage } from '../../api/cyclesApi';
 import { getStageStates, canSelfAssess, canLeadReview, getStageLockReason, STAGE, CYCLE_STAGES } from '../../utils/stageUtils';
 import useAuth from '../../auth/useAuth';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import Tooltip from '@mui/material/Tooltip';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
