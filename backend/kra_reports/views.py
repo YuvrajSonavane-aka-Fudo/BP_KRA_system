@@ -39,6 +39,7 @@ from kra_cycle.models import (
     KRALevel,
 )
 
+from kra_reports.serializers import EmployeeKRALevelReportSerializer
 from utils import _get_caller, _is_hr, _is_lead
 
 
@@ -345,4 +346,4 @@ class MultiCycleReportView(APIView):
             'per_cycle_columns': per_cycle_columns,
             'total_rows':      len(rows),
             'rows':            rows,
-        }, status=status.HTTP_200_OK)
+        }, status=status.HTTP_200_OK)

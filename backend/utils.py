@@ -30,17 +30,15 @@ def _get_caller(request: Any) -> Employee:
 
 
 def _is_hr(employee: Employee) -> bool:
-    """
-    Checks if the employee has an HR role.
-    """
-    return employee.employee_roles.filter(role__name__in=HR_ROLES).exists()
+    if employee.employee_roles.filter(role__name__in=HR_ROLES).exists():
+        return True
+    return bool(employee.role and employee.role.name in HR_ROLES)
 
 
 def _is_lead(employee: Employee) -> bool:
-    """
-    Checks if the employee has a Lead/Manager role.
-    """
-    return employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists()
+    if employee.employee_roles.filter(role__name__in=LEAD_ROLES).exists():
+        return True
+    return bool(employee.role and employee.role.name in LEAD_ROLES)
 
 
 def _caller_can_act_on(caller: Employee, target_employee_id: int) -> bool:

@@ -51,14 +51,14 @@ from kra_cycle.models import (
     KRALevel,
 )
 
-from utils import _get_caller, _is_hr, _caller_can_act_on, _audit
+from utils import _audit, _get_caller, _is_hr, _caller_can_act_on
 from .serializers import (
     BulkAssignmentEnrolSerializer,
     AssignmentUpdateSerializer,
     CloneAssignmentSerializer,
 )
 
-from .utils import (
+from .kra_assignment_utils import (
     get_employee_roles_map,
     get_cycle_data_maps,
     get_all_cycle_ids_map,
