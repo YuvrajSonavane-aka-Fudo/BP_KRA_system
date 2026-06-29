@@ -1,0 +1,1 @@
+import{t as e}from"./react-B8IZ02wI.js";import{n as t,o as n}from"./components-COO5XB0-.js";import{t as r}from"./jsx-runtime-fBfwind-.js";import{t as i}from"./Box-fDzbGWuk.js";e();var a=r();function o({children:e}){return(0,a.jsx)(i,{sx:{minHeight:`100vh`,display:`flex`},children:e})}var s=n(function(){return(0,a.jsx)(o,{children:(0,a.jsx)(t,{})})});export{s as default};

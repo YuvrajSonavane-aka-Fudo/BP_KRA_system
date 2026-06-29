@@ -23,7 +23,7 @@ import MoreVertIcon         from '@mui/icons-material/MoreVert';
 import PlayArrowIcon        from '@mui/icons-material/PlayArrow';
 import PauseIcon            from '@mui/icons-material/Pause';
 import BlockIcon            from '@mui/icons-material/Block';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import ROUTES from '../../config/routes';
 import { getCycles, createCycle, updateCycle, cloneCycle, advanceCycleStage, getReferenceData } from '../../api/cyclesApi';
 import { invalidateCyclesCache } from '../../hooks/useCycles';

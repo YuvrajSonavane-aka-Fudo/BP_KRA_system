@@ -1,0 +1,1 @@
+import{t as e}from"./axiosInstance-vP7tWF1p.js";var t=(t={})=>e.get(`/kra/cycles`,{params:t}),n=t=>e.post(`/kra/cycles`,t),r=(t,n)=>e.patch(`/kra/cycles/${t}`,n),i=(t,n)=>e.post(`/kra/cycles/${t}/clone`,n),a=(t,n={})=>e.post(`/kra/cycles/${t}/advance-stage`,n),o=()=>e.get(`/kra/reference-data`);export{o as a,t as i,i as n,r as o,n as r,a as t};

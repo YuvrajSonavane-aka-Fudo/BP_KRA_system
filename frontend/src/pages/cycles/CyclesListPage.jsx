@@ -1,5 +1,5 @@
       import { useEffect } from 'react';
-      import { useNavigate } from 'react-router-dom';
+      import { useNavigate } from 'react-router';
       import ROUTES from '../../config/routes';
 
       // KRA Cycles page merged into Dashboard. Redirect old /cycles links.
