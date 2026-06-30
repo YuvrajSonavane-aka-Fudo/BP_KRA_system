@@ -70,6 +70,8 @@ class Role(models.Model):
     IntegerField to avoid circular-import issues — swap to ForeignKey
     once you are comfortable with the model graph.
     """
+    # id is now varchar (was auto-increment int). Stores the role code.
+    id: str = models.CharField(max_length=50, primary_key=True)
     name: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
     description: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
     created: Optional[Any] = models.DateTimeField(auto_now_add=True, null=True, blank=True)
@@ -144,8 +146,7 @@ class Employee(models.Model):
     )
     team: Optional[str] = models.CharField(max_length = 255 , null = True , blank = True)
     team_id: Optional[str] = models.CharField(max_length = 255 , null = True , blank = True)
-    #'role' column in DB is an integer FK to role (id).
-    #db_column = 'role' 
+    #'role' column in DB is now a varchar FK to role (id).
     role: Optional[models.ForeignKey] = models.ForeignKey(
         Role , 
         null = True , blank = True,
