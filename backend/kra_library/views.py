@@ -48,14 +48,14 @@ from kra_cycle.models import (
     Rating,
     AuditLog,
 )
+
+from utils import _get_caller, _is_hr, _is_lead, _audit
 from .serializers import (
     KRACategorySerializer,
     LevelSerializer,
     KRALevelSerializer,
     KRASerializer,
 )
-from utils import _get_caller, _is_hr, _is_lead, _audit
-
 
 # KRA CATEGORY
 
@@ -134,9 +134,11 @@ class KRACategoryListCreateView(APIView):
             401: Unauthorized
         """
         caller = _get_caller(request)
-        if not _is_hr(caller):
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
             return Response(
-                {"error": "Only HR can create categories"},
+                {"error": "Only HR or Lead can create categories"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -152,11 +154,15 @@ class KRACategoryListCreateView(APIView):
                 {"error": f"A category named '{name}' already exists"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # A Lead can only create project-level (non-standard) categories.
+        is_standard = request.data.get("is_standard", False)
+        if is_lead and not is_hr:
+            is_standard = False
 
         category = KRACategory.objects.create(
             name=name,
             description=request.data.get("description"),
-            is_standard=request.data.get("is_standard", False),
+            is_standard=is_standard,
         )
 
         _audit(request, "CATEGORY_CREATED", "KRACategory", category.id,
@@ -197,11 +203,20 @@ class KRACategoryDetailView(APIView):
 
     def _update(self, request: Request, category_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can update categories"},
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
+            return Response({"error": "Only HR or Lead can update categories"},
                             status=status.HTTP_403_FORBIDDEN)
 
         category = get_object_or_404(KRACategory, id=category_id)
+
+        # A Lead may only delete project-level (non-standard) categories.
+        if is_lead and not is_hr and category.is_standard:
+            return Response(
+                {"error": "Only HR can delete a standard category"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         old_data = KRACategorySerializer(category).data
         data     = request.data
 
@@ -322,14 +337,21 @@ class KRACategoryDetailView(APIView):
             401: Unauthorized
         """
         caller = _get_caller(request)
-
-        if not _is_hr(caller):
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
             return Response(
-                {"error": "Only HR can delete categories"},
+                {"error": "Only HR or a Lead can delete categories"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         category = get_object_or_404(KRACategory, id=category_id)
+        # A Lead may only delete project-level (non-standard) categories.
+        if is_lead and not is_hr and category.is_standard:
+            return Response(
+                {"error": "Only HR can delete a standard category"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Block deletion if any KRALevel under this category's KRAs
         # (or directly tagged to this category) is assigned to an employee.
@@ -435,8 +457,10 @@ class KRACategoryCloneView(APIView):
             401: Unauthorized
         """
         caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can clone categories"},
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
+            return Response({"error": "Only HR or Lead can clone categories"},
                             status=status.HTTP_403_FORBIDDEN)
 
         source   = get_object_or_404(KRACategory, id=category_id)
@@ -447,11 +471,15 @@ class KRACategoryCloneView(APIView):
                 {"error": f"A category named '{new_name}' already exists"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # A Lead's clone always lands as project-level, even if the source was standard.
+        is_standard = source.is_standard
+        if is_lead and not is_hr:
+            is_standard = False
 
         clone = KRACategory.objects.create(
             name=new_name,
             description=source.description,
-            is_standard=source.is_standard,
+            is_standard=is_standard,
         )
 
         _audit(request, "CATEGORY_CLONED", "KRACategory", clone.id,
@@ -1001,8 +1029,10 @@ class KRALibraryListCreateView(APIView):
             401: Unauthorized
         """
         caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can create KRAs"},
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
+            return Response({"error": "Only HR or Lead can create KRAs"},
                             status=status.HTTP_403_FORBIDDEN)
 
         data = request.data
@@ -1048,10 +1078,14 @@ class KRALibraryListCreateView(APIView):
                     )
 
         with transaction.atomic():
+            # A Lead can only create project-level (non-standard) KRAs.
+            is_standard = data.get("is_standard", True)
+            if is_lead and not is_hr:
+                is_standard = False
             kra = KRA.objects.create(
                 name=name,
                 description=data.get("description"),
-                is_standard=data.get("is_standard", True),
+                is_standard=is_standard,
                 category_id=category_id,
             )
 
@@ -1270,11 +1304,20 @@ class KRADetailView(APIView):
             401: Unauthorized
         """
         caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can delete KRAs"},
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
+            return Response({"error": "Only HR or Lead can delete KRAs"},
                             status=status.HTTP_403_FORBIDDEN)
 
         kra = get_object_or_404(KRA, id=kra_id)
+
+        # A Lead may only delete project-level (non-standard) KRAs.
+        if is_lead and not is_hr and kra.is_standard:
+            return Response(
+                {"error": "Only HR can delete a standard library KRA"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Guard: KRALevel rows that are actively assigned to employees
         active_assignments = kra.kra_levels.filter(
@@ -1304,11 +1347,19 @@ class KRADetailView(APIView):
         
     def _update(self, request: Request, kra_id: int, partial: bool = False) -> Response:
         caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can update KRAs"},
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
+            return Response({"error": "Only HR or Lead can update KRAs"},
                             status=status.HTTP_403_FORBIDDEN)
 
         kra      = get_object_or_404(KRA, id=kra_id)
+         # A Lead may only update project-level (non-standard) KRAs.
+        if is_lead and not is_hr and kra.is_standard:
+            return Response(
+                {"error": "Only HR can update a standard library KRA"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         old_data = KRASerializer(kra).data
         data     = request.data
 
@@ -1449,8 +1500,10 @@ class KRACloneView(APIView):
             401: Unauthorized
         """
         caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can clone KRAs"},
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
+            return Response({"error": "Only HR or a Lead can clone KRAs"},
                             status=status.HTTP_403_FORBIDDEN)
 
         source   = get_object_or_404(KRA, id=kra_id)
@@ -1499,12 +1552,16 @@ class KRACloneView(APIView):
 
             source_levels.append(kl)
 
+        # A Lead's clone always lands as project-level, even if the source was standard.
+        is_standard = source.is_standard
+        if is_lead and not is_hr:
+            is_standard = False
 
         with transaction.atomic():
             clone = KRA.objects.create(
                 name=new_name,
                 description=source.description,
-                is_standard=source.is_standard,
+                is_standard=is_standard,
                 category_id=new_cat,
             )
 
@@ -1646,11 +1703,18 @@ class KRALevelListCreateView(APIView):
             401: Unauthorized
         """
         caller = _get_caller(request)
-        if not _is_hr(caller):
-            return Response({"error": "Only HR can add KRA level variants"},
+        is_hr   = _is_hr(caller)
+        is_lead = _is_lead(caller)
+        if not (is_hr or is_lead):
+            return Response({"error": "Only HR or Lead can add KRA level variants"},
                             status=status.HTTP_403_FORBIDDEN)
 
         kra      = get_object_or_404(KRA, id=kra_id)
+        if is_lead and not is_hr and kra.is_standard:
+            return Response(
+                {"error": "Only HR can add level variants to a standard library KRA"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         data     = request.data
         level_id = data.get("level_id")
 

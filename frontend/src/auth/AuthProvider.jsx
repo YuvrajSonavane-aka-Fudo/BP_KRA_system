@@ -13,7 +13,6 @@ export default function AuthProvider({ children }) {
   useEffect(() => {
     authApi.me()
   .then(res => {
-    console.log('ME RESPONSE:', res.data)  // remove after confirming
     setUser({
       employee_id: res.data.id,
       full_name:   res.data.full_name,

@@ -332,7 +332,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel,cancelLabel
           startIcon={loading ? <CircularProgress size={12}  /> : null}
           sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13,
             bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 },
-            '&:disabled': { opacity: 0.6 }, color: 'inherit' }}>
+            '&:disabled': { opacity: 0.6 }, color: '#fff !important' }}>
           {loading ? 'Processing…' : confirmLabel}
         </Button>
       </DialogActions>
@@ -1064,7 +1064,7 @@ export default function CycleDetailPage() {
                       size="small"
                       startIcon={<EditIcon sx={{ fontSize: 13 }} />}
                       onClick={handleEnterEdit}
-                      sx={{ bgcolor: '#fff', color: '#1E3A8A', borderRadius: 99, fontSize: 11, fontWeight: 700, px: 1.25, py: 0.4, textTransform: 'none', '&:hover': { bgcolor: '#f0f6ff' } }}>
+                      sx={{ bgcolor: '#fff !important', color: '#1E3A8A', borderRadius: 99, fontSize: 11, fontWeight: 700, px: 1.25, py: 0.4, textTransform: 'none', '&:hover': { bgcolor: '#f0f6ff' } }}>
                       Edit
                     </Button>
                   )}
@@ -1500,6 +1500,7 @@ export default function CycleDetailPage() {
         message={`Roll back to Stage ${rollbackConfirm.toStage?.id}: "${rollbackConfirm.toStage?.name}"?`}
         warning="All employees in this cycle will return to this stage. You can review and update the stage dates before saving."
         confirmLabel="Roll Back"
+        color="#fff !important"
         confirmColor="#d97706"
         loading={false}
         error=""
@@ -1533,6 +1534,7 @@ export default function CycleDetailPage() {
           confirmLabel={ACTION_DIALOG_CONFIG[statusConfirm.action]?.confirmLabel}
           cancelLabel={ACTION_DIALOG_CONFIG[statusConfirm.action]?.cancelLabel}
           confirmColor={ACTION_CONFIG[statusConfirm.action]?.confirmColor}
+          cancelColor={ACTION_CONFIG[statusConfirm.action]?.cancelColor}
           loading={statusLoading}
           error={statusError}
 

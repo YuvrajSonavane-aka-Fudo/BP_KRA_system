@@ -144,9 +144,26 @@ export default function AddKRAModal({
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         onClose();
       }}
-      
       fullWidth
-      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }} sx={{ maxWidth: 'sm' }}
+      maxWidth="sm"
+      scroll="paper"
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3,
+            overflow: 'hidden',
+            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.18)',
+            m: { xs: 2, sm: 3 },
+            alignSelf: 'center',
+          },
+        },
+        backdrop: {
+          sx: {
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(4px)',
+          },
+        },
+      }}
     >
       {/* Gradient header */}
       <Box sx={{ background: gradient, px: 3, pt: 3, pb: 2.5 }}>
@@ -200,7 +217,7 @@ export default function AddKRAModal({
             <Alert severity="error" sx={{ borderRadius: 1.5, fontSize: 13 }}>{errors.submit}</Alert>
           )}
 
-          {/* ── Category dropdown (always visible, pre-selected) ── */}
+          {/*  Category dropdown  */}
           <FormControl fullWidth size="small" error={Boolean(errors.cat)}>
             <InputLabel>Category *</InputLabel>
             <Select
@@ -212,28 +229,36 @@ export default function AddKRAModal({
               }}
               disabled={isEdit} // lock category in edit mode
               sx={{ borderRadius: 1.5 }}
-              MenuProps={{ PaperProps: { sx: { maxHeight: 260, borderRadius: 2 } } }}
+              MenuProps={{ slotProps: { paper: { sx: { maxHeight: 260, borderRadius: 2 } } } }}
             >
               {categories.length === 0 ? (
                 <MenuItem disabled>
-                  <Typography sx={{ fontSize: 13, color: '#94a3b8' }}  >No categories available</Typography>
+                  <Typography fontSize={13} color="#94a3b8">No categories available</Typography>
                 </MenuItem>
               ) : (
                 categories.filter(cat => canManageOrg ? true : !cat.is_standard).map(cat => {
                   const isStd = cat.is_standard;
                   return (
                     <MenuItem key={cat.id} value={cat.id}>
-                      <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ width: '100%', flexWrap: 'nowrap', overflow: 'hidden' }}>
                         <Box sx={{
                           width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                           bgcolor: isStd ? '#16a34a' : '#1d4ed8',
+                          display: 'block',
+                          alignSelf: 'center',
                         }} />
-                        <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}   >{cat.name}</Typography>
+                        <Typography
+                          fontSize={13} fontWeight={600} color="#1e293b"
+                          noWrap
+                          sx={{ flex: 1, minWidth: 0 }}
+                        >
+                          {cat.name}
+                        </Typography>
                         <Chip
                           label={isStd ? 'Org Level' : 'Project Level'}
                           size="small"
                           sx={{
-                            fontSize: 9, height: 16, fontWeight: 700,
+                            fontSize: 9, height: 16, fontWeight: 700, flexShrink: 0,
                             bgcolor: isStd ? '#dcfce7' : '#dbeafe',
                             color:   isStd ? '#166534' : '#1d4ed8',
                           }}
@@ -245,7 +270,7 @@ export default function AddKRAModal({
               )}
             </Select>
             {errors.cat && <FormHelperText>{errors.cat}</FormHelperText>}
-          </FormControl>
+          </FormControl>          
 
           {/* KRA Name */}
           <TextField
@@ -296,7 +321,7 @@ export default function AddKRAModal({
                 </Box>
               )}
               sx={{ borderRadius: 1.5 }}
-              MenuProps={{ PaperProps: { sx: { maxHeight: 280, borderRadius: 2 } } }}
+              MenuProps={{ slotProps: { paper: { sx: { maxHeight: 280, borderRadius: 2 } } } }}
             >
               {levels.length === 0 ? (
                 <MenuItem disabled>
@@ -345,10 +370,10 @@ export default function AddKRAModal({
 
       <DialogActions sx={{ px: 3, pb: 3, pt: 2, gap: 1 }}>
         <Button onClick={handleSave} disabled={saving} variant="contained"
-          startIcon={saving ? <CircularProgress size={14}  /> : null}
+          startIcon={saving ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : null}
           sx={{ textTransform: 'none', fontWeight: 700, background: gradient, borderRadius: 1.5,
             px: 3, minWidth: 130, boxShadow: '0 4px 12px rgba(30,58,138,0.3)',
-            '&:hover': { background: gradient, opacity: 0.9 }, color: 'inherit' }}>
+            '&:hover': { background: gradient, opacity: 0.9 }, color: '#fff !important' }}>
           {btnLabel}
         </Button>
       </DialogActions>
