@@ -171,7 +171,7 @@ class MultiCycleReportView(APIView):
             LEFT JOIN level lvl ON e.level_id = lvl.id
             INNER JOIN kra_level kl ON ekl.kra_level_id = kl.id
             INNER JOIN kra k ON kl.kra_id = k.id
-            LEFT JOIN kra_category cat ON k.category_id = cat.id
+            LEFT JOIN category cat ON k.category_id = cat.id
             LEFT JOIN rating sr ON ekl.self_rating_id = sr.id
             LEFT JOIN rating lr ON ekl.lead_rating_id = lr.id
         """

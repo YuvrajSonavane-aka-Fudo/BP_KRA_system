@@ -924,7 +924,7 @@ class KRALibraryListCreateView(APIView):
             SELECT DISTINCT k.id, k.name, k.description, k.is_standard, k.category_id,
                    c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
             FROM kra k
-            LEFT JOIN kra_category c ON k.category_id = c.id
+            LEFT JOIN category c ON k.category_id = c.id
         """
         params = []
         conditions = []
@@ -1148,7 +1148,7 @@ class KRADetailView(APIView):
             SELECT k.id, k.name, k.description, k.is_standard, k.category_id,
                    c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
             FROM kra k
-            LEFT JOIN kra_category c ON k.category_id = c.id
+            LEFT JOIN category c ON k.category_id = c.id
             WHERE k.id = %s
         """
         raw_qs = KRA.objects.raw(sql, [kra_id])
@@ -1523,7 +1523,7 @@ class KRACloneView(APIView):
                    c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
             FROM kra_level kl
             LEFT JOIN level l ON kl.level_id = l.id
-            LEFT JOIN kra_category c ON kl.category_id = c.id
+            LEFT JOIN category c ON kl.category_id = c.id
             WHERE kl.kra_id = %s
         """
         raw_qs = KRALevel.objects.raw(sql, [source.id])
@@ -1634,7 +1634,7 @@ class KRALevelListCreateView(APIView):
                    c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
             FROM kra_level kl
             LEFT JOIN level l ON kl.level_id = l.id
-            LEFT JOIN kra_category c ON kl.category_id = c.id
+            LEFT JOIN category c ON kl.category_id = c.id
             WHERE kl.kra_id = %s
         """
         raw_qs = KRALevel.objects.raw(sql, [kra_id])
@@ -1765,7 +1765,7 @@ class KRALevelDetailView(APIView):
                    c.name AS cat_name, c.description AS cat_desc, c.is_standard AS cat_std
             FROM kra_level kl
             LEFT JOIN level l ON kl.level_id = l.id
-            LEFT JOIN kra_category c ON kl.category_id = c.id
+            LEFT JOIN category c ON kl.category_id = c.id
             WHERE kl.id = %s AND kl.kra_id = %s
         """
         raw_qs = KRALevel.objects.raw(sql, [kra_level_id, kra_id])
