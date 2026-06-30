@@ -63,7 +63,7 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
       setSaving(false);
     }
   }
-
+ 
   return (
     <Dialog
       open={open}
@@ -72,9 +72,26 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         onClose();
       }}
-      
       fullWidth
-      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 24px 48px rgba(0,0,0,0.15)' } }} sx={{ maxWidth: 'xs' }}
+      maxWidth="xs"
+      scroll="paper"
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3,
+            overflow: 'hidden',
+            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.18)',
+            m: { xs: 2, sm: 3 },
+            alignSelf: 'center',
+          },
+        },
+        backdrop: {
+          sx: {
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(4px)',
+          },
+        },
+      }}
     >
       {/* Gradient header */}
       <Box sx={{ background: gradient, px: 3, pt: 3, pb: 2.5 }}>
@@ -197,11 +214,11 @@ export default function AddCategoryModal({ open, onClose, onSaved, category, can
           onClick={handleSave}
           disabled={saving}
           variant="contained"
-          startIcon={saving ? <CircularProgress size={14}  /> : null}
+          startIcon={saving ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : null}
           sx={{ textTransform: 'none', fontWeight: 700, background: gradient,
             borderRadius: 1.5, px: 3, minWidth: 130,
             boxShadow: '0 4px 12px rgba(30,58,138,0.3)',
-            '&:hover': { background: gradient, opacity: 0.9 }, color: 'inherit' }}
+            '&:hover': { background: gradient, opacity: 0.9 }, color: '#fff !important' }}
         >
           {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save'}
         </Button>

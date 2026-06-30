@@ -135,7 +135,7 @@ function Toast({ open, message, severity = 'success', onClose }) {
 function DeleteConfirmDialog({ open, title, message, onClose, onConfirm, deleting }) {
   return (
     <Dialog open={open} onClose={onClose}  fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
+      slotProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fef2f2', px: 2.5, pt: 2, pb: 1.5 }}>
         <Stack direction="row"  spacing={1.25} sx={{ alignItems: 'center' }}>
           <DeleteOutlineIcon sx={{ color: '#dc2626', fontSize: 17 }} />
@@ -162,7 +162,7 @@ function DeleteConfirmDialog({ open, title, message, onClose, onConfirm, deletin
 function BlockedDeleteDialog({ open, title, message, onClose }) {
   return (
     <Dialog open={open} onClose={onClose}  fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
+      slotProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
       <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5 }}>
         <Stack direction="row"  spacing={1.25} sx={{ alignItems: 'center' }}>
           <Box sx={{
@@ -356,11 +356,15 @@ function LevelChip({ lv, idx, levelMap = {}, showExp = false }) {
       px: 1, py: 0.25, borderRadius: 1,
       bgcolor: s.bg, border: `1px solid ${s.border}`, height: 22,
     }}>
-      <Typography sx={{ lineHeight: 1, fontSize: 10.5, fontWeight: 700, color: s.color }}    >{lv.level_name}</Typography>
+      <Typography component="span" sx={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1, fontSize: 10.5, fontWeight: 700, color: s.color }}>
+        {lv.level_name}
+      </Typography>
       {expLabel && (
         <>
-          <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: s.color, opacity: 0.5 }} />
-          <Typography sx={{ lineHeight: 1, fontSize: 10, color: '#64748b' }}   >{expLabel}</Typography>
+          <Box sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: s.color, opacity: 0.5, flexShrink: 0 }} />
+          <Typography component="span" sx={{ display: 'inline-flex', alignItems: 'center', lineHeight: 1, fontSize: 10, color: '#64748b' }}>
+            {expLabel}
+          </Typography>
         </>
       )}
     </Box>
@@ -565,7 +569,8 @@ function CategoriesPanel({
 }) {
   const [page, setPage] = useState(0);
   const PER_PAGE = 10;
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false); 
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [expandedKRAIds, setExpandedKRAIds] = useState(new Set());
 
   useEffect(() => { setPage(0); }, [selectedCatId]);
 
@@ -683,19 +688,18 @@ function CategoriesPanel({
             
             
             noWrap  
-            // REPLACE with:
-onClick={() => {
-  onSelectCat(cat.id);
-  // If already selected, clicking again deselects all
-  if (selectedCatIds.has(cat.id) && selectedCatIds.size === 1) {
-    setSelectedCatIds(new Set());
-    setSelectedKRAIds(() => new Set());
-  } else {
-    setSelectedCatIds(new Set([cat.id]));
-    const catKRAIds = kras.filter(k => k.category_id === cat.id).map(k => k.id);
-    setSelectedKRAIds(() => new Set(catKRAIds));
-  }
-}}
+            onClick={() => {
+              onSelectCat(cat.id);
+              if (!canManageOrg) return; // is_lead: navigate only, preserve existing selection
+              if (selectedCatIds.has(cat.id) && selectedCatIds.size === 1) {
+                setSelectedCatIds(new Set());
+                setSelectedKRAIds(() => new Set());
+              } else {
+                setSelectedCatIds(new Set([cat.id]));
+                const catKRAIds = kras.filter(k => k.category_id === cat.id).map(k => k.id);
+                setSelectedKRAIds(() => new Set(catKRAIds));
+              }
+            }}
             sx={{ cursor: 'pointer', userSelect: 'none', flex: 1, lineHeight: 1.4, fontSize: 13.5, fontWeight: active ? 700 : 600, color: active ? colorStyle.color : '#334155' }}>
             {cat.name}
           </Typography>
@@ -878,12 +882,19 @@ onClick={() => {
         ) : (
           <>
             {/* Sticky header */}
-            <Stack direction="row" 
-              sx={{ px: 1.5, py: 0.9, bgcolor: '#fafbfc', borderBottom: '1px solid #f1f5f9',
-                flexShrink: 0, position: 'sticky', top: 0, zIndex: 2, alignItems: 'center' }}>
-
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: '28px 18px minmax(0, 1fr) 190px 96px',
+              columnGap: 1,
+              px: 1.5, py: 0.9,
+              bgcolor: '#fafbfc',
+              borderBottom: '1px solid #f1f5f9',
+              flexShrink: 0,
+              position: 'sticky', top: 0, zIndex: 2,
+              alignItems: 'center',
+            }}>
               {/* Checkbox col */}
-              <Box sx={{ width: 28, flexShrink: 0 }}>
+              <Box sx={{ width: 28, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
                 {canManage && (
                   <Checkbox size="small"
                     checked={allPageChecked} indeterminate={somePageChecked}
@@ -906,7 +917,7 @@ onClick={() => {
               <Box sx={{ width: 18, flexShrink: 0 }} />
 
               {/* KRA name col */}
-              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, mr: 1 }}>
+              <Box sx={{ minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 0.75, mr: 1 }}>
                 <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}     >KRA</Typography>
                 <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}   >({filtered.length})</Typography>
                 <Chip label={`↕ ${kraSortDir === 'asc' ? 'A–Z' : 'Z–A'}`} size="small"
@@ -917,18 +928,18 @@ onClick={() => {
                 />
               </Box>
 
-              {/* LEVELS col — must match row's Stack width + mr:1 */}
-              <Box sx={{ width: 120, flexShrink: 0, mr: 1 }}>
-                <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}     >LEVELS</Typography>
+              {/* LEVELS col — wide enough so chips stay visible */}
+              <Box sx={{ width: 190, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}>LEVELS</Typography>
               </Box>
 
-              {/* ACTIONS col — must match row's Stack width:80 */}
+              {/* ACTIONS col */}
               {canManage && (
-                <Box sx={{ width: 80, flexShrink: 0 }}>
-                  <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}     >ACTIONS</Typography>
+                <Box sx={{ width: 96, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                  <Typography sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 9.5, fontWeight: 700, color: '#b0bac4' }}>ACTIONS</Typography>
                 </Box>
               )}
-            </Stack>
+            </Box>
 
             {/* Grouped KRA list */}
             <Box sx={{ flex: 1, overflowY: 'auto',
@@ -964,82 +975,129 @@ onClick={() => {
                       {groupKras.map(kra => {
                         const isChecked = selectedKRAIds.has(kra.id);
                         const canActOnKRA = cat?.is_standard ? canManageOrg : canManage;
+                        const isRowExpanded = expandedKRAIds.has(kra.id);
                         return (
-                          <Stack key={kra.id} direction="row" 
+                          <React.Fragment key={kra.id}>
+                          <Box
                             onClick={() => {
-                              setSelectedKRAIds(prev => {
+                              // Row/label click always toggles expand — independent of selection
+                              setExpandedKRAIds(prev => {
                                 const next = new Set(prev);
                                 next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
                                 return next;
                               });
+                              // Keep existing auto-select behaviour, controlled separately by canManageOrg
+                              if (canManageOrg && !selectedKRAIds.has(kra.id)) {
+                                setSelectedKRAIds(prev => {
+                                  const next = new Set(prev);
+                                  next.add(kra.id);
+                                  return next;
+                                });
+                              }
                             }}
-                            sx={{ px: 1.5, py: 0.85, borderBottom: '1px solid #f8fafc', cursor: 'pointer',
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: '28px 18px minmax(0, 1fr) 190px 96px',
+                              columnGap: 1,
+                              px: 1.5, py: 0.85,
+                              borderBottom: '1px solid #f8fafc', cursor: 'pointer',
                               bgcolor: isChecked ? '#eff6ff' : labelHighlightId === kra.id ? '#fefce8' : '#fff',
-                              '&:hover': { bgcolor: isChecked ? '#dbeafe' : labelHighlightId === kra.id ? '#fef9c3' : '#f8fafc' }, alignItems: 'center' }}>
+                              alignItems: 'center',
+                              '&:hover': { bgcolor: isChecked ? '#dbeafe' : labelHighlightId === kra.id ? '#fef9c3' : '#f8fafc' },
+                            }}>
                             {canManage && (
-                              <Checkbox size="small"
-                                checked={selectedKRAIds.has(kra.id)}
-                                indeterminate={false}
-                                disabled={cat?.is_standard && !canManageOrg}
-                                onChange={(e) => { e.stopPropagation(); }}
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  setSelectedKRAIds(prev => {
-                                    const next = new Set(prev);
-                                    next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
-                                    return next;
-                                  });
-                                }}
-                                sx={{ p: 0.25, mr: 0.5, flexShrink: 0, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' } }}
-                              />
+                              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                <Checkbox size="small"
+                                  checked={selectedKRAIds.has(kra.id)}
+                                  indeterminate={false}
+                                  disabled={cat?.is_standard && !canManageOrg}
+                                  onChange={(e) => { e.stopPropagation(); }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setSelectedKRAIds(prev => {
+                                      const next = new Set(prev);
+                                      next.has(kra.id) ? next.delete(kra.id) : next.add(kra.id);
+                                      return next;
+                                    });
+                                  }}
+                                  sx={{ p: 0.25, flexShrink: 0, color: '#cbd5e1', '&.Mui-checked': { color: '#1d4ed8' } }}
+                                />
+                              </Box>
                             )}
-                            <Box sx={{ color: '#cbd5e1', flexShrink: 0, display: 'flex', alignItems: 'center', mr: 0.5 }}>
-                              <ExpandMoreIcon sx={{ fontSize: 14 }} />
+                            {!canManage && <Box />}
+                            <Box sx={{ color: '#cbd5e1', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {isRowExpanded ? <ExpandLessIcon sx={{ fontSize: 14 }} /> : <ExpandMoreIcon sx={{ fontSize: 14 }} />}
                             </Box>
-                            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, mr: 1 }}>
-                              <Typography    noWrap 
+                            <Box sx={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, mr: 1 }}>
+                              <Typography noWrap
                                 sx={{ '&:hover': { color: '#1d4ed8' }, flexShrink: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
                                 {kra.name}
                               </Typography>
                               {kra.description && (
-                                <Typography   noWrap sx={{ minWidth: 0, fontSize: 11.5, color: '#94a3b8' }}>
+                                <Typography noWrap
+                                  sx={{
+                                    minWidth: 0, fontSize: 11.5, color: '#94a3b8',
+                                    display: { xs: 'none', sm: 'block' },
+                                  }}>
                                   — {kra.description}
                                 </Typography>
                               )}
                             </Box>
-                            <Stack direction="row" spacing={0.5} sx={{ width: 160, flexShrink: 0, mr: 1 }}>
-                              {kra.levels?.slice(0, 3).map((lv, i) => (
-                                <LevelChip key={lv.id ?? i} lv={lv} idx={i} levelMap={levelMap} showExp={false} />
-                              ))}
-                              {kra.levels?.length > 3 && (
-                                <Typography   sx={{ alignSelf: 'center', fontSize: 9, color: '#94a3b8' }}>
-                                  +{kra.levels.length - 3} more
+                            <Box sx={{ width: 190, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'visible' }}>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 0.5, width: '100%', minHeight: 24 }}>
+                                {kra.levels?.slice(0, 3).map((lv, i) => (
+                                  <LevelChip key={lv.id ?? i} lv={lv} idx={i} levelMap={levelMap} showExp={false} />
+                                ))}
+                                {kra.levels?.length > 3 && (
+                                  <Typography sx={{ alignSelf: 'center', fontSize: 9, color: '#94a3b8' }}>
+                                    +{kra.levels.length - 3} more
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                            <Box sx={{ width: 96, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                              {canActOnKRA && (
+                                <>
+                                  <Tooltip title="Edit">
+                                    <IconButton size="small" onClick={() => onEditKRA(kra)}
+                                      sx={{ color: '#94a3b8', '&:hover': { color: '#1d4ed8' }, p: 0.4 }}>
+                                      <EditIcon sx={{ fontSize: 13 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Clone">
+                                    <IconButton size="small" onClick={() => onCloneKRA(kra)}
+                                      sx={{ color: '#94a3b8', '&:hover': { color: '#6d28d9' }, p: 0.4 }}>
+                                      <ContentCopyIcon sx={{ fontSize: 13 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete">
+                                    <IconButton size="small" onClick={() => onDeleteKRA(kra)}
+                                      sx={{ color: '#94a3b8', '&:hover': { color: '#dc2626' }, p: 0.4 }}>
+                                      <DeleteOutlineIcon sx={{ fontSize: 13 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </>
+                              )}
+                            </Box>
+                          </Box>
+
+                          {isRowExpanded && (
+                            <Box sx={{ pl: '72px', pr: 3, py: 1, bgcolor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                              {kra.description && (
+                                <Typography sx={{ fontSize: 12.5, lineHeight: 1.5, color: '#475569', mb: kra.levels?.length ? 1 : 0 }}>
+                                  {kra.description}
                                 </Typography>
                               )}
-                            </Stack>
-                            {canActOnKRA  && (
-                              <Stack direction="row" sx={{ flexShrink: 0, width: 80 }} onClick={e => e.stopPropagation()}>
-                                <Tooltip title="Edit">
-                                  <IconButton size="small" onClick={() => onEditKRA(kra)}
-                                    sx={{ color: '#94a3b8', '&:hover': { color: '#1d4ed8' }, p: 0.4 }}>
-                                    <EditIcon sx={{ fontSize: 13 }} />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Clone">
-                                  <IconButton size="small" onClick={() => onCloneKRA(kra)}
-                                    sx={{ color: '#94a3b8', '&:hover': { color: '#6d28d9' }, p: 0.4 }}>
-                                    <ContentCopyIcon sx={{ fontSize: 13 }} />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Delete">
-                                  <IconButton size="small" onClick={() => onDeleteKRA(kra)}
-                                    sx={{ color: '#94a3b8', '&:hover': { color: '#dc2626' }, p: 0.4 }}>
-                                    <DeleteOutlineIcon sx={{ fontSize: 13 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
-                            )}
-                          </Stack>
+                              {kra.levels?.length > 0 && (
+                                <Stack direction="row" sx={{ flexWrap: 'wrap', alignItems: 'center', gap: 0.75 }}>
+                                  {kra.levels.map((lv, i) => (
+                                    <LevelChip key={lv.id ?? i} lv={lv} idx={i} levelMap={levelMap} showExp />
+                                  ))}
+                                </Stack>
+                              )}
+                            </Box>
+                          )}
+                          </React.Fragment>
                         );
                       })}
                     </Box>
@@ -1052,7 +1110,20 @@ onClick={() => {
       </Box>
 
       {/* ── Bulk Delete Floating Bar ── */}
-      {totalSelected > 0 && canManageOrg && (
+      {(() => {
+        const onlyProjectSelected =
+          [...selectedKRAIds].every(id => {
+            const kra = kras.find(k => k.id === id);
+            const cat = categories.find(c => c.id === kra?.category_id);
+            return !cat?.is_standard;
+          }) &&
+          [...selectedCatIds].every(id => {
+            const cat = categories.find(c => c.id === id);
+            return !cat?.is_standard;
+          });
+        const showBulkBar = totalSelected > 0 && canManage && (canManageOrg || onlyProjectSelected);
+        return showBulkBar;
+      })() && (
         <Box sx={{
           position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
           zIndex: 100,

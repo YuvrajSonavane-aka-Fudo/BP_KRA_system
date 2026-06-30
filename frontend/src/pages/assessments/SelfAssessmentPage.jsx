@@ -853,6 +853,8 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
   const [confirmDialog, setConfirmDialog] = useState({ open: false, direction: null, toStage: null });
   const [toast, setToast] = useState('');
   const [overrideStages, setOverrideStages] = useState([]);
+  const [overrideDirty, setOverrideDirty] = useState(false); 
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);  
   const [dateSaving, setDateSaving] = useState(false);
 
   const stages = (dbStages && dbStages.length > 0) ? dbStages : CYCLE_STAGES;
@@ -868,6 +870,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
         end_date: cycleStages?.find(cs => cs.stage_id === s.id)?.end_date?.split('T')[0] ?? '',
       }));
       setOverrideStages(prefilled);
+      setOverrideDirty(false);
     }
     setConfirmDialog({ open: true, direction, toStage });
   }
@@ -896,6 +899,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
       setStageChanging(false);
       setDateSaving(false);
       setConfirmDialog({ open: false, direction: null, toStage: null });
+      setOverrideDirty(false); 
     }
   }
 
@@ -905,6 +909,22 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
         ? { ...s, ...(start_date !== undefined ? { start_date } : {}), ...(end_date !== undefined ? { end_date } : {}) }
         : s
     ));
+    setOverrideDirty(true);  
+  }
+
+  function handleCloseStageDialog() {
+    if (confirmDialog.direction === 'back' && overrideDirty) {
+      setDiscardConfirmOpen(true);   // ask before closing
+      return;
+    }
+    setConfirmDialog({ open: false, direction: null, toStage: null });
+    setOverrideDirty(false);
+  }
+
+  function confirmDiscardClose() {
+    setDiscardConfirmOpen(false);
+    setConfirmDialog({ open: false, direction: null, toStage: null });
+    setOverrideDirty(false);
   }
 
   return (
@@ -985,8 +1005,8 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
       {toast && <Typography sx={{ fontSize: 10, color: '#64748b', mt: 0.5 }}>{toast}</Typography>}
 
       {/* ─── Stage change dialog — unified blue theme ─── */}
-      <Dialog open={confirmDialog.open} onClose={() => !stageChanging && setConfirmDialog({ open: false })}
-         fullWidth PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 20px 60px -10px rgba(15,23,42,0.2)' } }} sx={{ maxWidth: 'sm' }}>
+      <Dialog open={confirmDialog.open} onClose={() => !stageChanging && handleCloseStageDialog()}
+        fullWidth slotProps={{ sx: { borderRadius: 3, overflow: 'hidden', boxShadow: '0 20px 60px -10px rgba(15,23,42,0.2)' } }} sx={{ maxWidth: 'sm' }}>
 
         {/* Header — always blue */}
         <Box sx={{
@@ -1044,7 +1064,7 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
 
         <DialogActions sx={{ px: 3, pb: 2.5, pt: 1.5, gap: 1 }}>
           <Button
-            onClick={() => setConfirmDialog({ open: false })}
+            onClick={handleCloseStageDialog}
             disabled={stageChanging}
             sx={{
               textTransform: 'none', color: '#64748b', fontWeight: 600, fontSize: 13,
@@ -1068,6 +1088,28 @@ function InlineStageStepper({ currentStageId, cycleId, employeeId, ekcId, cycleS
             {stageChanging ? <><CircularProgress size={13} sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />Moving…</>
               : dateSaving ? 'Saving dates…'
                 : confirmDialog.direction === 'back' ? 'Confirm & Save Dates' : 'Confirm Move Forward'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* ─── Discard unsaved date changes confirm ─── */}
+      <Dialog open={discardConfirmOpen} onClose={() => setDiscardConfirmOpen(false)}
+        slotProps={{ sx: { borderRadius: 3, p: 1, minWidth: 340 } }}>
+        <DialogContent>
+          <Typography sx={{ fontWeight: 700, fontSize: 15, color: '#1e293b', mb: 1 }}>
+            Discard unsaved date changes?
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: '#64748b' }}>
+            You've edited stage dates that haven't been saved yet. Closing now will discard them.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setDiscardConfirmOpen(false)}
+            sx={{ borderRadius: 2, textTransform: 'none', color: '#64748b' }}>
+            Keep Editing
+          </Button>
+          <Button onClick={confirmDiscardClose} variant="contained"
+            sx={{ borderRadius: 2, textTransform: 'none', bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' } }}>
+            Discard & Close
           </Button>
         </DialogActions>
       </Dialog>
@@ -1648,7 +1690,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
         </Box>
 
         {/* Unsaved changes dialog */}
-        <Dialog open={unsavedDialog} onClose={() => setUnsavedDialog(false)} PaperProps={{ sx: { borderRadius: 3, p: 1, minWidth: 360 } }}>
+        <Dialog open={unsavedDialog} onClose={() => setUnsavedDialog(false)} slotProps={{ sx: { borderRadius: 3, p: 1, minWidth: 360 } }}>
           <DialogContent>
             <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#1e293b', mb: 1 }}>Unsaved Changes</Typography>
             <Typography sx={{ fontSize: 14, color: '#64748b' }}>
@@ -1938,7 +1980,7 @@ function LeadView({ cycleId, cycles, onCycleChange, ratings, dbStages }) {
       </Box>
 
       {/* Team Review unsaved changes dialog */}
-      <Dialog open={teamUnsavedDialog} onClose={() => { setTeamUnsavedDialog(false); setPendingAction(null); }} PaperProps={{ sx: { borderRadius: 3, p: 1, minWidth: 360 } }}>
+      <Dialog open={teamUnsavedDialog} onClose={() => { setTeamUnsavedDialog(false); setPendingAction(null); }} slotProps={{ sx: { borderRadius: 3, p: 1, minWidth: 360 } }}>
         <DialogContent>
           <Typography sx={{ fontWeight: 700, fontSize: 16, color: '#1e293b', mb: 1 }}>Unsaved Changes</Typography>
           <Typography sx={{ fontSize: 14, color: '#64748b' }}>

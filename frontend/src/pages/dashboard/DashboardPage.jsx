@@ -356,7 +356,7 @@ function ConfirmDialog({ open, title, message, warning, confirmLabel, cancelLabe
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>{cancelLabel}</Button>
         <Button onClick={onConfirm} disabled={loading} variant="contained"
           startIcon={loading ? <CircularProgress size={12}  /> : null}
-          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }, '&:disabled': { opacity: 0.6 }, color: 'inherit' }}>
+          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2.5, fontSize: 13, bgcolor: confirmColor, '&:hover': { bgcolor: confirmColor, opacity: 0.88 }, '&:disabled': { opacity: 0.6 }, color: '#fff !important' }}>
           {loading ? 'Processing…' : confirmLabel}
         </Button>
       </DialogActions>
@@ -663,7 +663,7 @@ const headerSx = {
                   <Tooltip title="Clone this cycle">
                     <Button size="small" startIcon={<ContentCopyIcon sx={{ fontSize: 13 }} />}
                       onClick={() => navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', 'new')}?clone=${activeCycle.id}`)}
-                      sx={{ bgcolor: 'rgba(255,255,255,0.13)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 99, fontSize: 11, fontWeight: 600, px: 1.25, py: 0.4, textTransform: 'none', minWidth: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
+                      sx={{ bgcolor: 'rgba(255,255,255,0.13)', color: '#fff !important', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 99, fontSize: 11, fontWeight: 600, px: 1.25, py: 0.4, textTransform: 'none', minWidth: 0, '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}>
                       Clone
                     </Button>
                   </Tooltip>
@@ -672,7 +672,7 @@ const headerSx = {
                   <Tooltip title="Edit cycle details">
                     <Button size="small" startIcon={<EditIcon sx={{ fontSize: 13 }} />}
                       onClick={() => navigate(`${ROUTES.CYCLE_DETAIL.replace(':id', activeCycle.id)}?edit=true`)}
-                      sx={{ bgcolor: '#fff', color: '#1E3A8A', borderRadius: 99, fontSize: 11, fontWeight: 700, px: 1.25, py: 0.4, textTransform: 'none', minWidth: 0, '&:hover': { bgcolor: '#f0f6ff' } }}>
+                      sx={{ bgcolor: '#fff !important', color: '#1E3A8A', borderRadius: 99, fontSize: 11, fontWeight: 700, px: 1.25, py: 0.4, textTransform: 'none', minWidth: 0, '&:hover': { bgcolor: '#f0f6ff' } }}>
                       Edit
                     </Button>
                   </Tooltip>

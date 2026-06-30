@@ -446,15 +446,18 @@ const VirtualEmpList = memo(function VirtualEmpList({ items, selectedEmpSet, onT
                 <Checkbox size="small" checked={isSel} disabled={isReadOnly}
                   onChange={() => !isReadOnly && onToggleEmployee([emp.employee_id], isSel ? 'deselect' : 'select')}
                   sx={{ p: 0.5, flexShrink: 0, mr: 0.25 }} />
-                <Typography    sx={COL_SX.id} sx={{ fontSize: 10.5, fontWeight: 600, color: '#94a3b8' }}>
+                <Typography sx={{ ...COL_SX.id, fontSize: 10.5, fontWeight: 600, color: '#94a3b8' }}>
                   {emp.employee_id}
                 </Typography>
                 <Box sx={{ ...COL_SX.name, ml: 1, minWidth: 0 }}
                   onClick={() => isAssigned && onView(emp)}
                   style={{ cursor: isAssigned ? 'pointer' : 'default' }}>
                   <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}  >
-                    <Typography    noWrap
-                      sx={isAssigned ? { '&:hover': { textDecoration: 'underline' } } : {}} sx={{ fontSize: 12.5, fontWeight: 600, color: isAssigned ? '#1d4ed8' : '#1e293b' }}>
+                    <Typography noWrap
+                      sx={{
+                        ...(isAssigned ? { '&:hover': { textDecoration: 'underline' } } : {}),
+                        fontSize: 12.5, fontWeight: 600, color: isAssigned ? '#1d4ed8' : '#1e293b',
+                      }}>
                       {emp.full_name}
                     </Typography>
                     {isAssigned && (

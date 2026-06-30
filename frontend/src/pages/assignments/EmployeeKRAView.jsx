@@ -32,7 +32,18 @@ function truncateWords(str = '', max = 8) {
 function CloseConfirmDialog({ open, onGoBack, onDiscard, onSaveClose, saving  }) {
   return (
     <Dialog open={open} onClose={onGoBack}  fullWidth
-      PaperProps={{ sx: { borderRadius: 2.5, overflow: 'hidden' } }} sx={{ maxWidth: 'xs' }}>
+      maxWidth="xs"
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3,
+            width: '90vw',
+            maxHeight: '88vh',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            m: 2,
+          },
+        },
+      }}>
       <Box sx={{ bgcolor: '#fffbeb', px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid #fde68a' }}>
         <Stack direction="row"  spacing={1} sx={{ alignItems: 'center' }}>
           <WarningAmberIcon sx={{ color: '#d97706', fontSize: 18 }} />
@@ -422,8 +433,21 @@ export default function EmployeeKRAView({
 
   return (
     <>
-      <Dialog open={open} onClose={() => { }}  fullWidth disableEscapeKeyDown
-        PaperProps={{ sx: { borderRadius: 3, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' } }} sx={{ maxWidth: 'lg' }}>
+      <Dialog open={open} onClose={() => { }} fullWidth disableEscapeKeyDown
+        maxWidth="lg"
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 3,
+              width: '90vw',
+              height: 'auto',
+              minHeight: '40vh',
+              maxHeight: '88vh',
+              display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              m: 2,
+            },
+          },
+        }}>
 
         {/* ── HEADER ── */}
         <Box sx={{ background: gradient, px: 2.5, pt: 2, pb: 1.75, color: '#fff', flexShrink: 0 }}>
