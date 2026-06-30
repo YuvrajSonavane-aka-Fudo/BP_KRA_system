@@ -142,7 +142,7 @@ class BaseTestCase(TestCase):
 
 class EmployeeListViewTests(BaseTestCase):
 
-    URL = '/api/v1/employees'
+    URL = '/api/v1/employees/'
 
     # ── Auth ─────────────────────────────────────────────────────────────────
 

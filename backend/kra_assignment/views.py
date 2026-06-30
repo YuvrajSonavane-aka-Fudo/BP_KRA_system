@@ -291,7 +291,24 @@ class KRABulkAssignmentEnrolView(APIView):
         caller_role = caller.role.name if caller.role else "Unknown"
 
         serializer = BulkAssignmentEnrolSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            errors = serializer.errors
+            if "assignments" in errors:
+                for item in errors["assignments"]:
+                    if isinstance(item, dict) and "employee_id" in item:
+                        return Response(
+                            {"error": "missing employee_id in assignment list"},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                if any("assignments list is required and cannot be empty" in str(e) for e in errors["assignments"]):
+                    return Response(
+                        {"error": "assignments list is required and cannot be empty"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            return Response(
+                {"error": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         validated = serializer.validated_data
 
         assignments: list[dict[str, Any]] = validated["assignments"]
@@ -349,6 +366,11 @@ class KRABulkAssignmentEnrolView(APIView):
 
             try:
                 shared_weight = sum(int(c.get("weightage", 0)) for c in shared_categories)
+                if shared_categories and shared_weight != 100:
+                    return Response(
+                        {"error": "shared categories weightage must sum to 100"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
             except (ValueError, TypeError):
                 return Response(
                     {"error": "shared.categories contains an invalid weightage value"},
@@ -405,6 +427,12 @@ class KRABulkAssignmentEnrolView(APIView):
                     is_date_based = temporary_assignment.get("is_date_based", False)
                     try:
                         total_weight = sum(int(c.get("weightage", 0)) for c in categories)
+                        if total_weight != 100:
+                            failed.append({
+                                "employee_id": employee_id,
+                                "reason": "Category weightage must sum to 100",
+                            })
+                            continue
                     except (ValueError, TypeError):
                         failed.append({"employee_id": employee_id, "reason": "Invalid weightage value in categories"})
                         continue
@@ -671,6 +699,12 @@ class KRAAssignmentUpdateDeleteView(APIView):
         caller_role = caller.role.name if caller.role else "Unknown"
         employee_kra_cycle = get_object_or_404(EmployeeKRACycle, id=employee_kra_cycle_id)
 
+        if employee_kra_cycle.stage_id != 1:
+            return Response(
+                "KRA assignment can only be updated in Stage 1",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = AssignmentUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
@@ -690,6 +724,8 @@ class KRAAssignmentUpdateDeleteView(APIView):
 
         try:
             total_weight = sum(int(c.get("weightage", 0)) for c in categories)
+            if total_weight != 100:
+                return Response("Invalid weightage value: must sum to 100", status=status.HTTP_400_BAD_REQUEST)
         except (ValueError, TypeError):
             return Response("Invalid weightage value", status=status.HTTP_400_BAD_REQUEST)
 
@@ -762,6 +798,12 @@ class KRAAssignmentUpdateDeleteView(APIView):
     def delete(self, request: Request, employee_kra_cycle_id: int) -> Response:
         caller = _get_caller(request)
         employee_kra_cycle = get_object_or_404(EmployeeKRACycle, id=employee_kra_cycle_id)
+
+        if employee_kra_cycle.stage_id != 1:
+            return Response(
+                "KRA assignment can only be deleted in Stage 1",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not _caller_can_act_on(caller, employee_kra_cycle.employee_id):
             return Response("Forbidden", status=status.HTTP_403_FORBIDDEN)
@@ -850,7 +892,21 @@ class KRAAssignmentCloneView(APIView):
 
     def post(self, request: Request) -> Response:
         serializer = CloneAssignmentSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            errors = serializer.errors
+            error_msg = ""
+            if "mode" in errors:
+                error_msg = "mode must be one of: 'skip', 'overwrite', 'append'"
+            elif "source_employee_kra_cycle_id" in errors:
+                error_msg = f"source_employee_kra_cycle_id: {errors['source_employee_kra_cycle_id'][0]}"
+            elif "target_employee_kra_cycle_ids" in errors:
+                error_msg = str(errors["target_employee_kra_cycle_ids"][0])
+            else:
+                error_msg = str(errors)
+            return Response(
+                {"error": error_msg},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         validated = serializer.validated_data
 
         source_id: int = validated["source_employee_kra_cycle_id"]

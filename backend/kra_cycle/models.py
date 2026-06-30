@@ -7,7 +7,7 @@ class Stage(models.Model):
     stage
     Master list of KRA cycle stages (1–5).
     """
-    name: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
+    name: Optional[str] = models.CharField(max_length=100, null=True, blank=True)
     description: Optional[str] = models.TextField(null=True, blank=True)
 
     class Meta:
@@ -21,8 +21,8 @@ class Level(models.Model):
     level
     Employee seniority levels (e.g. Dev-01, Dev-02).
     """
-    name: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
-    description: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
+    name: Optional[str] = models.CharField(max_length=45, null=True, blank=True)
+    description: Optional[str] = models.CharField(max_length=45, null=True, blank=True)
     min_experience: Optional[int] = models.IntegerField(null=True, blank=True)
     max_experience: Optional[int] = models.IntegerField(null=True, blank=True)
 
@@ -38,7 +38,7 @@ class Rating(models.Model):
     Numeric rating scale used for self & lead assessment.
     """
     rating: Optional[int] = models.IntegerField(null=True, blank=True)
-    description: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
+    description: Optional[str] = models.CharField(max_length=500, null=True, blank=True)
 
     class Meta:
         db_table = 'rating'
@@ -51,13 +51,13 @@ class KRACategory(models.Model):
     kra_category
     Grouping for KRAs (e.g. Core Development, Behavioural).
     """
-    name: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
-    description: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
+    name: Optional[str] = models.CharField(max_length=45, null=True, blank=True)
+    description: Optional[str] = models.CharField(max_length=45, null=True, blank=True)
     is_standard: Optional[bool] = models.BooleanField(null=True, blank=True)
     
 
     class Meta:
-        db_table = 'kra_category'
+        db_table = 'category'
 
     def __str__(self) -> str:
         return self.name or str(self.id)
@@ -70,8 +70,8 @@ class Role(models.Model):
     IntegerField to avoid circular-import issues — swap to ForeignKey
     once you are comfortable with the model graph.
     """
-    # id is now varchar (was auto-increment int). Stores the role code.
-    id: str = models.CharField(max_length=50, primary_key=True)
+    # id is an auto-increment integer PK.
+    id = models.AutoField(primary_key=True)
     name: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
     description: Optional[str] = models.CharField(max_length=255, null=True, blank=True)
     created: Optional[Any] = models.DateTimeField(auto_now_add=True, null=True, blank=True)
@@ -146,7 +146,7 @@ class Employee(models.Model):
     )
     team: Optional[str] = models.CharField(max_length = 255 , null = True , blank = True)
     team_id: Optional[str] = models.CharField(max_length = 255 , null = True , blank = True)
-    #'role' column in DB is now a varchar FK to role (id).
+    #'role' column in DB is an integer FK to role (id).
     role: Optional[models.ForeignKey] = models.ForeignKey(
         Role , 
         null = True , blank = True,
@@ -271,7 +271,7 @@ class KRACycle (models.Model):
     description: Optional[str] = models.TextField(null = True , blank = True)
     start_date: Optional[Any] = models.DateTimeField(null = True, blank = True)
     end_date: Optional[Any] = models.DateTimeField(null = True, blank = True)
-    status: str = models.CharField(max_length = 50) #not null in db
+    status: str = models.CharField(max_length = 100) #not null in db
     stage: Optional[models.ForeignKey] = models.ForeignKey(
         Stage,
         null = True, blank = True ,
@@ -338,7 +338,7 @@ class EmployeeKRACycle(models.Model):
         db_column = 'kra_cycle_id',
         related_name = 'employee_cycles',
     )
-    status: Optional[str] = models.CharField(max_length = 50 , null = True , blank = True)
+    status: Optional[str] = models.CharField(max_length = 45 , null = True , blank = True)
     stage: Optional[models.ForeignKey] = models.ForeignKey(
         Stage , 
         null = True, blank = True ,
