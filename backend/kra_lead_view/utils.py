@@ -63,7 +63,7 @@ def get_assessment_progress_data(cycle_id: int, caller_id: int, is_hr: bool, emp
     query_cats = f"""
         SELECT ekcc.employee_kra_cycle_id, ekcc.category_id, c.name, ekcc.weightage
         FROM employee_kra_cycle_category ekcc
-        LEFT JOIN kra_category c ON ekcc.category_id = c.id
+        LEFT JOIN category c ON ekcc.category_id = c.id
         WHERE ekcc.employee_kra_cycle_id IN ({placeholders})
     """
     with connection.cursor() as cursor:
@@ -87,7 +87,7 @@ def get_assessment_progress_data(cycle_id: int, caller_id: int, is_hr: bool, emp
         FROM employee_kra_level ekl
         LEFT JOIN kra_level kl ON ekl.kra_level_id = kl.id
         LEFT JOIN kra k ON kl.kra_id = k.id
-        LEFT JOIN kra_category kc ON k.category_id = kc.id
+        LEFT JOIN category kc ON k.category_id = kc.id
         LEFT JOIN rating sr ON ekl.self_rating_id = sr.id
         LEFT JOIN rating lr ON ekl.lead_rating_id = lr.id
         WHERE ekl.employee_kra_cycle_id IN ({placeholders})

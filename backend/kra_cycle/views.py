@@ -1079,7 +1079,7 @@ class KRALibraryView(APIView):
             raw_sql = """
                 SELECT DISTINCT k.*
                 FROM kra k
-                LEFT OUTER JOIN kra_category c ON k.category_id = c.id
+                LEFT OUTER JOIN category c ON k.category_id = c.id
                 INNER JOIN kra_level kl ON k.id = kl.kra_id
                 WHERE kl.level_id = %s
             """
