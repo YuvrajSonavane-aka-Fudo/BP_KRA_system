@@ -741,9 +741,26 @@ function PreviewAssignModal({
   };
 
   return (
-    <Dialog open={open} onClose={onClose}  fullWidth
-      PaperProps={{ sx: { borderRadius: 3, height: '82vh', maxHeight: '82vh', display: 'flex', flexDirection: 'column' } }} sx={{ maxWidth: 'md' }}>
-
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="lg"
+      scroll="paper"
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3,
+            minHeight: '420px',   // ← enough for header + 1 row + footer, won't look cramped
+            maxHeight: '85vh',
+            width: '100%',
+            m: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        },
+      }}
+    >
       <Box sx={{ background: G, px: 3, py: 2, color: '#fff', flexShrink: 0 }}>
         <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}  >
           <Box>
