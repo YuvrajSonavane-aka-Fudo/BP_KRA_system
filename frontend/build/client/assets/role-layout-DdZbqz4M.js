@@ -1,1 +1,0 @@
-import{n as e,o as t}from"./components-COO5XB0-.js";import{t as n}from"./jsx-runtime-fBfwind-.js";import{t as r}from"./ProtectedRoute-hEj19LjY.js";var i=n(),a=[`Admin`,`HR`,`Vertical Lead`,`Manager`],o=t(function(){return(0,i.jsx)(r,{allowedRoles:a,children:(0,i.jsx)(e,{})})});export{o as default};

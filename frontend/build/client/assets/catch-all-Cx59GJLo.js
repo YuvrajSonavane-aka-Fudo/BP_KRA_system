@@ -1,1 +1,0 @@
-import{o as e,t}from"./components-COO5XB0-.js";import{t as n}from"./jsx-runtime-fBfwind-.js";import{t as r}from"./routes-Bfwn16YJ.js";var i=n(),a=e(function(){return(0,i.jsx)(t,{to:r.DASHBOARD,replace:!0})});export{a as default};
