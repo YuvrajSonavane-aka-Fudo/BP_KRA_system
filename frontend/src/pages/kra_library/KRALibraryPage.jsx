@@ -150,7 +150,7 @@ function DeleteConfirmDialog({ open, title, message, onClose, onConfirm, deletin
           sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, borderRadius: 1.5, fontSize: 13 }}>Cancel</Button>
         <Button onClick={onConfirm} disabled={deleting} variant="contained" 
           startIcon={deleting ? <CircularProgress size={12}  /> : null}
-          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 13, color: 'inherit' }}>
+          sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 1.5, px: 2, fontSize: 13, color: '#fff !important' }}>
           {deleting ? 'Deleting…' : 'Delete'}
         </Button>
       </DialogActions>
