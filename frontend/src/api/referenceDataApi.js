@@ -6,7 +6,7 @@ import axiosInstance from './axiosInstance';
  * Response: [{ id, name, description }]
  */
 export const getReferenceData = () =>
-  axiosInstance.get('kra/reference-data');
+  axiosInstance.get('/kra/reference-data/');
 
 /**
  * GET /reference/ratings
@@ -14,11 +14,11 @@ export const getReferenceData = () =>
  * Response: [{ id, label, description }]
  */
 export const getRatings = () =>
-  axiosInstance.get('kra/reference/ratings');
+  axiosInstance.get('/kra/reference-data/');
 
 /**
  * GET /reference/levels
  * Returns employee levels (Dev1, Dev2, QA1, etc.)
  */
 export const getLevels = () =>
-  axiosInstance.get('kra/reference/levels');
+  axiosInstance.get('/kra/reference-data/');

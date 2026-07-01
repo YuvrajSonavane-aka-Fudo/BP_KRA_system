@@ -1,1 +1,0 @@
-import{i as e,t}from"./react-B8IZ02wI.js";import{t as n}from"./AuthProvider-CEflV1pw.js";var r=e(t(),1);function i(){let e=(0,r.useContext)(n);if(!e)throw Error(`useAuth must be used inside AuthProvider`);return e}export{i as t};
