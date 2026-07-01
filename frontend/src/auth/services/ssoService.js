@@ -1,5 +1,6 @@
 import axiosInstance from '../../api/axiosInstance';
 import env from '../../config/env';
+import tokenService from './tokenService';
 
 const ssoService = {
   redirectToProvider(provider) {
@@ -14,7 +15,22 @@ const ssoService = {
     window.location.href = `${env.API_BASE_URL}auth/microsoft/login`;
   },
 
- async getCurrentUser() {
+  async exchangeMicrosoftToken(token) {
+    const response = await axiosInstance.post('auth/microsoft-login', { access_token: token });
+    const data = response.data;
+    if (data.access_token) {
+      tokenService.setTokens(data.access_token, data.refresh_token);
+    }
+    return {
+      session_id: data.access_token, // for compatibility
+      employee_id: data.user.id,
+      full_name: data.user.full_name,
+      roles: data.user.roles || [],
+      department: data.user.department_name,
+    };
+  },
+
+  async getCurrentUser() {
     const response = await axiosInstance.get('auth/me');
     return response.data;
   },

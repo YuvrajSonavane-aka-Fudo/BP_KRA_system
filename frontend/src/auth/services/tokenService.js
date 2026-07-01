@@ -1,24 +1,23 @@
-// Stores tokens in memory (primary) — no localStorage per security best practice
-let _accessToken = null;
-let _refreshToken = null;
+const TOKEN_KEY = "kra_access_token";
+const REFRESH_KEY = "kra_refresh_token";
 
 const tokenService = {
   setTokens(access, refresh) {
-    _accessToken = access;
-    _refreshToken = refresh;
+    if (access) localStorage.setItem(TOKEN_KEY, access);
+    if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
   },
   getAccessToken() {
-    return _accessToken;
+    return localStorage.getItem(TOKEN_KEY);
   },
   getRefreshToken() {
-    return _refreshToken;
+    return localStorage.getItem(REFRESH_KEY);
   },
   clearTokens() {
-    _accessToken = null;
-    _refreshToken = null;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
   },
   hasToken() {
-    return !!_accessToken;
+    return !!localStorage.getItem(TOKEN_KEY);
   },
 };
 

@@ -1,4 +1,5 @@
 import axiosInstance from '../../api/axiosInstance';
+import tokenService from './tokenService';
 
 /**
  * authService — wraps Django session-based auth endpoints.
@@ -9,8 +10,18 @@ import axiosInstance from '../../api/axiosInstance';
 const authService = {
   async login(email, password) {
     const response = await axiosInstance.post('auth/login', { email, password });
-    return response.data;
-    // Returns: { session_id, employee_id, roles, full_name, department }
+    const data = response.data;
+    if (data.access_token) {
+      tokenService.setTokens(data.access_token, data.refresh_token);
+    }
+    // Return unified object mapping backend keys to frontend keys
+    return {
+      session_id: data.access_token,
+      employee_id: data.user.id,
+      full_name: data.user.full_name,
+      roles: data.user.roles || [],
+      department: data.user.department_name,
+    };
   },
 
   async logout() {
@@ -18,6 +29,8 @@ const authService = {
       await axiosInstance.post('auth/logout');
     } catch {
       // Swallow — always clear local state on logout
+    } finally {
+      tokenService.clearTokens();
     }
   },
 };
