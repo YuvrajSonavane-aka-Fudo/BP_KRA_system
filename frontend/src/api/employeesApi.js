@@ -6,7 +6,7 @@ import axiosInstance from './axiosInstance';
  * Optional params: { level_id, department_id, manager_id, search, is_active }
  */
 export const getEmployees = (params = {}) =>
-  axiosInstance.get('/employees', { params });
+  axiosInstance.get('/employees/', { params });
 
 /**
  * GET /employees/:id

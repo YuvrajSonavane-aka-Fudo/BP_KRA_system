@@ -49,7 +49,7 @@ export const cloneKRA = (kra_id, payload) =>
  * List all categories.
  */
 export const getCategories = (params = {}) =>
-  axiosInstance.get('/kra/categories', { params });
+  axiosInstance.get('/kra/categories/', { params });
 
 /**
  * POST /kra/categories
@@ -57,7 +57,7 @@ export const getCategories = (params = {}) =>
  * Body: { name, is_standard: bool }
  */
 export const createCategory = (payload) =>
-  axiosInstance.post('/kra/categories', payload);
+  axiosInstance.post('/kra/categories/', payload);
 
 /**
  * PATCH /kra/categories/:category_id
@@ -65,21 +65,21 @@ export const createCategory = (payload) =>
  * Body: { name?, is_standard?: bool }
  */
 export const updateCategory = (category_id, payload) =>
-  axiosInstance.patch(`/kra/categories/${category_id}`, payload);
+  axiosInstance.patch(`/kra/categories/${category_id}/`, payload);
 
 /**
  * DELETE /kra/categories/:category_id
  * Soft-delete a category.
  */
 export const deleteCategory = (category_id) =>
-  axiosInstance.delete(`/kra/categories/${category_id}`);
+  axiosInstance.delete(`/kra/categories/${category_id}/`);
 
 /**
  * POST /kra/categories/:category_id/clone
  * Clone a category.
  */
 export const cloneCategory = (category_id, payload) =>
-  axiosInstance.post(`/kra/categories/${category_id}/clone`, payload);
+  axiosInstance.post(`/kra/categories/${category_id}/clone/`, payload);
 
 
 // ─── Levels  →  /kra/levels ──────────────────────────────────────────────────

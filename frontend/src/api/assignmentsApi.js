@@ -43,7 +43,7 @@ import { getKRALibrary } from './kraLibraryApi';
  * Call ONCE on page mount — store in state, do NOT re-call.
  */
 export const getCategories = (params = {}) =>
-  axiosInstance.get('kra/categories', { params });
+  axiosInstance.get('kra/categories/', { params });
 
 
 // ── 2. KRA CYCLES ────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export const getCategories = (params = {}) =>
  *   CLOSED    → read-only / view only
  */
 export const getKRACycles = () =>
-  axiosInstance.get('kra/cycles');
+  axiosInstance.get('kra/cycles/');
 
 
 // NOTE: getKRALibrary is intentionally NOT defined here.
@@ -102,7 +102,7 @@ export const getKRACycles = () =>
  * Refresh after: any assign / update / delete / clone action
  */
 export const getEmployees = (cycleId) =>
-  axiosInstance.get('employees', {
+  axiosInstance.get('employees/', {
     params: { cycle_id: cycleId },
   });
 
@@ -186,7 +186,7 @@ export const getEmployees = (cycleId) =>
  *   Store categories + kra_level_ids in assignmentStateManager cache for modal display
  */
 export const bulkAssignKRAs = (cycleId, payload) =>
-  axiosInstance.post(`kra/cycles/${cycleId}/assignments/bulk`, payload);
+  axiosInstance.post(`kra/cycles/${cycleId}/assignments/bulk/`, payload);
 
 
 // ── 5. UPDATE ASSIGNMENT ─────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ export const bulkAssignKRAs = (cycleId, payload) =>
  * Response: { employee_kra_cycle_id, kras_assigned, message }
  */
 export const updateAssignment = (employeeKraCycleId, payload) =>
-  axiosInstance.put(`kra/assignments/${employeeKraCycleId}`, payload);
+  axiosInstance.put(`kra/assignments/${employeeKraCycleId}/`, payload);
 
 
 // ── 6. DELETE / REMOVE ASSIGNMENT ────────────────────────────────────────────
@@ -227,7 +227,7 @@ export const updateAssignment = (employeeKraCycleId, payload) =>
  * Response: { message: 'Employee removed from cycle successfully' }
  */
 export const removeEmployeeFromCycle = (employeeKraCycleId) =>
-  axiosInstance.delete(`kra/assignments/${employeeKraCycleId}`);
+  axiosInstance.delete(`kra/assignments/${employeeKraCycleId}/`);
 
 /**
  * Bulk remove multiple employees from a cycle.
@@ -240,7 +240,7 @@ export const removeEmployeeFromCycle = (employeeKraCycleId) =>
 export const bulkRemoveEmployees = (employeeKraCycleIds) =>
   Promise.all(
     employeeKraCycleIds.map((id) =>
-      axiosInstance.delete(`kra/assignments/${id}`)
+      axiosInstance.delete(`kra/assignments/${id}/`)
     )
   );
 
@@ -263,7 +263,7 @@ export const bulkRemoveEmployees = (employeeKraCycleIds) =>
  * Response: { employee_kra_cycle_id, cloned_from, kras_copied, message }
  */
 export const cloneAssignment = (targetEmployeeKraCycleId, sourceEmployeeKraCycleId) =>
-  axiosInstance.post(`kra/assignments/clone-from`, {
+  axiosInstance.post(`kra/assignments/clone-from/`, {
     source_employee_kra_cycle_id: sourceEmployeeKraCycleId,
     target_employee_kra_cycle_ids: [targetEmployeeKraCycleId],
   });
@@ -279,7 +279,7 @@ export const cloneAssignment = (targetEmployeeKraCycleId, sourceEmployeeKraCycle
  * Wrap in try/catch — Promise.all rejects if ANY request fails.
  */
 export const cloneAssignmentToMany = (targetEmployeeKraCycleIds, sourceEmployeeKraCycleId, mode = 'append') =>
-  axiosInstance.post(`kra/assignments/clone-from`, {
+  axiosInstance.post(`kra/assignments/clone-from/`, {
     source_employee_kra_cycle_id: sourceEmployeeKraCycleId,
     target_employee_kra_cycle_ids: targetEmployeeKraCycleIds,
     mode,

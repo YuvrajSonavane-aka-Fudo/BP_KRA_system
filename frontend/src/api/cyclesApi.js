@@ -8,13 +8,13 @@ import axiosInstance from './axiosInstance';
  * Response: { cycles: [...] }
  */
 export const getCycles = (params = {}) =>
-  axiosInstance.get('/kra/cycles', { params });
+  axiosInstance.get('/kra/cycles/', { params });
 
 /**
  * GET /kra/cycles/:id
  */
 export const getCycleById = (id) =>
-  axiosInstance.get(`/kra/cycles/${id}`);
+  axiosInstance.get(`/kra/cycles/${id}/`);
 
 /**
  * POST /kra/cycles
@@ -22,21 +22,21 @@ export const getCycleById = (id) =>
  * Response: { id, name, status, stage, stages_count }
  */
 export const createCycle = (payload) =>
-  axiosInstance.post('/kra/cycles', payload);
+  axiosInstance.post('/kra/cycles/', payload);
 
 /**
  * PATCH /kra/cycles/:id
  * Body: { status?: 'ACTIVE' | 'CLOSED', is_deleted?: true }
  */
 export const updateCycle = (id, payload) =>
-  axiosInstance.patch(`/kra/cycles/${id}`, payload);
+  axiosInstance.patch(`/kra/cycles/${id}/`, payload);
 
 /**
  * POST /kra/cycles/:id/clone
  * Body: { name, start_date, end_date, description? }
  */
 export const cloneCycle = (id, payload) =>
-  axiosInstance.post(`/kra/cycles/${id}/clone`, payload);
+  axiosInstance.post(`/kra/cycles/${id}/clone/`, payload);
 
 /**
  * POST /kra/cycles/:id/advance-stage
@@ -46,7 +46,7 @@ export const cloneCycle = (id, payload) =>
  *   { target_stage_id: N, employee_ids: [...] } → set specific employees to stage N
  */
 export const advanceCycleStage = (id, payload = {}) =>
-  axiosInstance.post(`/kra/cycles/${id}/advance-stage`, payload);
+  axiosInstance.post(`/kra/cycles/${id}/advance-stage/`, payload);
 
 
 /**
@@ -54,4 +54,4 @@ export const advanceCycleStage = (id, payload = {}) =>
  * Response: { stages, levels, ratings, categories }
  */
 export const getReferenceData = () =>
-  axiosInstance.get('/kra/reference-data');
+  axiosInstance.get('/kra/reference-data/');
